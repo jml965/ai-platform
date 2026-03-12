@@ -6,6 +6,7 @@ import buildRouter from "./build";
 import agentsRouter from "./agents";
 import tokensRouter from "./tokens";
 import billingRouter from "./billing";
+import teamsRouter from "./teams";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(buildRouter);
 router.use(agentsRouter);
 router.use(tokensRouter);
 router.use(billingRouter);
+router.use(teamsRouter);
 
 export default router;

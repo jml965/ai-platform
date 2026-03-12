@@ -56,7 +56,7 @@ artifacts-monorepo/
 
 ## Database Schema
 
-10 tables in `lib/db/src/schema/`:
+13 tables in `lib/db/src/schema/`:
 - `users` — User accounts with locale preference, spending limits, credit balance, and active plan
 - `projects` — Website projects with status tracking
 - `project_files` — Generated files (HTML, CSS, JS) per project
@@ -68,6 +68,9 @@ artifacts-monorepo/
 - `subscriptions` — User subscription records with status and period dates
 - `invoices` — Invoice/payment history (subscriptions + credit top-ups)
 - `credits_ledger` — Double-entry credit ledger (topup/deduction entries)
+- `teams` — Team entities with owner reference
+- `team_members` — Team membership with role (admin/developer/reviewer/viewer)
+- `team_invitations` — Pending email invitations with token and expiry
 
 ## Agent Engine
 
@@ -93,12 +96,13 @@ Routes in `artifacts/api-server/src/routes/`:
 - `agents.ts` — Agent status and task details
 - `tokens.ts` — Usage/limits/summary/notifications for token tracking
 - `billing.ts` — Plans, subscriptions, checkout, invoices, credits, top-up
+- `teams.ts` — CRUD for teams, members, invitations, role changes
 
 ## Website Builder UI
 
 Frontend artifact at `artifacts/website-builder/` (React + Vite + TailwindCSS):
 - Bilingual AR/EN with RTL/LTR support via i18n context (`src/lib/i18n.tsx`)
-- Pages: Login, Dashboard, Builder (project workspace), Billing
+- Pages: Login, Dashboard, Builder (project workspace), Billing, Teams
 - Dashboard: project list with status badges, token usage indicator, new project modal, Billing link
 - Builder: chat prompt, live preview (sandboxed iframe with CSS/JS inlining), execution log panel
 - Billing: current subscription, credit balance + top-up, plan comparison, invoice history
