@@ -8,6 +8,7 @@ import Builder from "@/pages/Builder";
 import Billing from "@/pages/Billing";
 import Teams from "@/pages/Teams";
 import QualityAssurance from "@/pages/QualityAssurance";
+import Monitoring from "@/pages/Monitoring";
 import NotFound from "@/pages/not-found";
 import { useGetMe } from "@workspace/api-client-react";
 import { Loader2 } from "lucide-react";
@@ -58,6 +59,9 @@ function Router() {
       </Route>
       <Route path="/qa">
         <AuthGuard><QualityAssurance /></AuthGuard>
+      </Route>
+      <Route path="/monitoring">
+        <AuthGuard><Monitoring /></AuthGuard>
       </Route>
       <Route component={NotFound} />
     </Switch>

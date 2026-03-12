@@ -125,12 +125,14 @@ Routes in `artifacts/api-server/src/routes/`:
 - `billing.ts` — Plans, subscriptions, checkout, invoices, credits, top-up
 - `teams.ts` — CRUD for teams, members, invitations, role changes
 - `qa.ts` — QA reports listing, latest report, run QA, stats summary
+- `monitoring.ts` — System health, stats, performance, alerts for production monitoring
+- `sandbox.ts` — Sandbox lifecycle management, SSE streaming
 
 ## Website Builder UI
 
 Frontend artifact at `artifacts/website-builder/` (React + Vite + TailwindCSS):
 - Bilingual AR/EN with RTL/LTR support via i18n context (`src/lib/i18n.tsx`)
-- Pages: Login, Dashboard, Builder (project workspace), Billing, Teams, QualityAssurance
+- Pages: Login, Dashboard, Builder (project workspace), Billing, Teams, QualityAssurance, Monitoring
 - Dashboard: project list with status badges, token usage indicator, new project modal, Billing link
 - Builder: chat prompt, live preview (sandboxed iframe with CSS/JS inlining), execution log panel
 - Billing: current subscription, credit balance + top-up, plan comparison, invoice history
