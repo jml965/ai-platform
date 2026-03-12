@@ -16,3 +16,4 @@ export * from "./roles";
 export * from "./permissions";
 export * from "./qa-reports";
 export * from "./sessions";
+export * from "./sandbox-instances";

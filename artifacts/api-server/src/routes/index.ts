@@ -8,6 +8,7 @@ import tokensRouter from "./tokens";
 import billingRouter from "./billing";
 import teamsRouter from "./teams";
 import qaRouter from "./qa";
+import sandboxRouter from "./sandbox";
 import { requireAuth } from "../middlewares/authSession";
 
 const router: IRouter = Router();
@@ -23,5 +24,6 @@ router.use(tokensRouter);
 router.use(billingRouter);
 router.use(teamsRouter);
 router.use(qaRouter);
+router.use(sandboxRouter);
 
 export default router;

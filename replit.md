@@ -20,6 +20,29 @@ Full technical architecture is in `docs/architecture/`:
 
 pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
 
+## Sandbox System
+
+Isolated execution environments for projects. Each sandbox gets its own temp directory, port, and child process.
+
+Key files:
+- `lib/db/src/schema/sandbox-instances.ts` — DB table tracking sandbox state
+- `artifacts/api-server/src/lib/sandbox/sandbox-manager.ts` — Sandbox lifecycle manager (create, execute, start-server, stop, restart, cleanup)
+- `artifacts/api-server/src/routes/sandbox.ts` — REST API + SSE streaming endpoints
+
+API endpoints (all under `/api/sandbox`, auth required):
+- `POST /sandbox` — Create sandbox for a project
+- `GET /sandbox` — List user's sandboxes
+- `GET /sandbox/project/:projectId` — Get sandbox by project
+- `GET /sandbox/:sandboxId` — Get sandbox status
+- `POST /sandbox/:sandboxId/execute` — Run command in sandbox
+- `POST /sandbox/:sandboxId/start-server` — Start long-running server
+- `POST /sandbox/:sandboxId/stop` — Stop sandbox
+- `POST /sandbox/:sandboxId/restart` — Restart sandbox
+- `GET /sandbox/:sandboxId/logs` — Get output logs
+- `GET /sandbox/:sandboxId/stream` — SSE stream of real-time output
+
+Limits: Max 10 concurrent sandboxes, 64-512MB memory, 30-600s timeout, auto-cleanup after 10min inactivity.
+
 ## Stack
 
 - **Monorepo tool**: pnpm workspaces
