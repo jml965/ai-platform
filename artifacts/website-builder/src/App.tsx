@@ -13,7 +13,7 @@ const queryClient = new QueryClient();
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { data: user, isLoading, isError } = useGetMe({ 
-    query: { retry: false, refetchOnWindowFocus: false } 
+    query: { retry: false, refetchOnWindowFocus: false } as never
   });
 
   if (isLoading) {

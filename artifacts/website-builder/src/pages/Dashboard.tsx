@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Plus, LayoutTemplate, Trash2, Loader2, Coins, LogOut } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import type { Project, ProjectStatus as ProjectStatusType } from "@workspace/api-client-react";
 import { 
   useListProjects, 
   useCreateProject, 
@@ -22,7 +23,7 @@ export default function Dashboard() {
   const logout = useAuthLogout();
 
   const handleLogout = async () => {
-    await logout.mutateAsync({});
+    await logout.mutateAsync();
     window.location.href = "/";
   };
 
@@ -101,7 +102,7 @@ export default function Dashboard() {
   );
 }
 
-function ProjectCard({ project, refetch }: { project: any, refetch: () => void }) {
+function ProjectCard({ project, refetch }: { project: Project, refetch: () => void }) {
   const { t } = useI18n();
   const deleteMut = useDeleteProject();
 

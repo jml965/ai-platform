@@ -1,68 +1,146 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Send, Loader2, Code2, Eye, Wrench, FolderOpen, AlertCircle, CheckCircle2, FileCode2 } from "lucide-react";
+import { ArrowLeft, Send, Loader2, Code2, Eye, Wrench, FolderOpen, AlertCircle, CheckCircle2, FileCode2, Coins, User, Bot } from "lucide-react";
 import { format } from "date-fns";
 import { useI18n } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { cn } from "@/lib/utils";
+import type { ExecutionLog, ProjectFile } from "@workspace/api-client-react";
 import {
   useGetProject,
   useStartBuild,
   useGetBuildStatus,
   useGetBuildLogs,
-  useListProjectFiles
+  useListProjectFiles,
+  useGetTokenSummary
 } from "@workspace/api-client-react";
+
+interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  buildId?: string;
+  timestamp: Date;
+}
 
 export default function Builder() {
   const { id } = useParams<{ id: string }>();
   const { t, lang } = useI18n();
-  
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
   const [prompt, setPrompt] = useState("");
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    const saved = localStorage.getItem(`chat_${id}`);
+    if (saved) {
+      try {
+        return JSON.parse(saved).map((m: ChatMessage) => ({ ...m, timestamp: new Date(m.timestamp) }));
+      } catch { return []; }
+    }
+    return [];
+  });
   const [activeBuildId, setActiveBuildId] = useState<string | null>(() => {
     return localStorage.getItem(`latestBuild_${id}`);
   });
 
   const { data: project } = useGetProject(id || "");
+  const { data: tokenSummary } = useGetTokenSummary();
   const startBuildMut = useStartBuild();
 
-  // Polling for build status and logs if we have an active build
   const { data: buildStatus } = useGetBuildStatus(activeBuildId || "", {
     query: {
       enabled: !!activeBuildId,
-      refetchInterval: (query) => {
+      refetchInterval: (query: { state: { data?: { status?: string } } }) => {
         const status = query.state.data?.status;
         return (status === "completed" || status === "failed") ? false : 3000;
       }
-    }
+    } as never
   });
 
   const { data: buildLogs } = useGetBuildLogs(activeBuildId || "", {
     query: {
       enabled: !!activeBuildId,
-      refetchInterval: () => 
+      refetchInterval: () =>
         (buildStatus?.status === "completed" || buildStatus?.status === "failed") ? false : 3000
-    }
+    } as never
   });
 
   const { data: projectFiles } = useListProjectFiles(id || "", {
     query: {
       enabled: !!id,
       refetchInterval: buildStatus?.status === "completed" ? false : 5000
-    }
+    } as never
   });
+
+  useEffect(() => {
+    if (id && messages.length > 0) {
+      localStorage.setItem(`chat_${id}`, JSON.stringify(messages));
+    }
+  }, [messages, id]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  useEffect(() => {
+    if (buildStatus?.status === "completed" && activeBuildId) {
+      const alreadyReplied = messages.some(m => m.buildId === activeBuildId && m.role === "assistant");
+      if (!alreadyReplied) {
+        setMessages(prev => [...prev, {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: t.preview_ready,
+          buildId: activeBuildId,
+          timestamp: new Date(),
+        }]);
+      }
+    } else if (buildStatus?.status === "failed" && activeBuildId) {
+      const alreadyReplied = messages.some(m => m.buildId === activeBuildId && m.role === "assistant");
+      if (!alreadyReplied) {
+        setMessages(prev => [...prev, {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: t.status_failed,
+          buildId: activeBuildId,
+          timestamp: new Date(),
+        }]);
+      }
+    }
+  }, [buildStatus?.status, activeBuildId]);
 
   const handleGenerate = async () => {
     if (!prompt.trim() || !id) return;
+    const userMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: prompt,
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, userMsg]);
+    const currentPrompt = prompt;
+    setPrompt("");
+
     try {
       const res = await startBuildMut.mutateAsync({
-        data: { projectId: id, prompt }
+        data: { projectId: id, prompt: currentPrompt }
       });
       setActiveBuildId(res.buildId);
       localStorage.setItem(`latestBuild_${id}`, res.buildId);
-      setPrompt("");
+
+      setMessages(prev => [...prev, {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: t.agents_working,
+        buildId: res.buildId,
+        timestamp: new Date(),
+      }]);
     } catch (err) {
-      console.error("Failed to start build", err);
+      setMessages(prev => [...prev, {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: t.unknown_error,
+        timestamp: new Date(),
+      }]);
     }
   };
 
@@ -70,7 +148,6 @@ export default function Builder() {
 
   return (
     <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
-      {/* Topbar */}
       <header className="h-14 border-b border-white/10 bg-card/80 backdrop-blur flex items-center justify-between px-4 flex-shrink-0 z-10">
         <div className="flex items-center gap-4">
           <Link href="/dashboard" className="p-2 -ms-2 text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-secondary">
@@ -85,33 +162,75 @@ export default function Builder() {
             </span>
           )}
         </div>
-        <LanguageToggle />
+        <div className="flex items-center gap-3">
+          {tokenSummary && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary/50 border border-white/5">
+              <Coins className="w-4 h-4 text-yellow-500" />
+              <span className="text-xs font-medium">{tokenSummary.monthTokens.toLocaleString()} {t.tokens}</span>
+            </div>
+          )}
+          <LanguageToggle />
+        </div>
       </header>
 
-      {/* Main Layout */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
-        
-        {/* Left Panel: Chat / Prompt */}
+
         <div className="w-full md:w-80 lg:w-96 border-e border-white/10 flex flex-col bg-card/30 flex-shrink-0 z-10 shadow-[4px_0_24px_rgba(0,0,0,0.2)]">
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-             {/* If no build yet, show welcome */}
-             {!activeBuildId && !startBuildMut.isPending && (
-               <div className="text-center mt-20 text-muted-foreground">
-                 <div className="w-16 h-16 mx-auto bg-secondary rounded-full flex items-center justify-center mb-4">
-                   <Code2 className="w-8 h-8 opacity-50" />
-                 </div>
-                 <p>{t.prompt_placeholder}</p>
-               </div>
-             )}
-             
-             {/* Show current prompt if generating */}
-             {startBuildMut.isPending && (
-               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-primary/10 border border-primary/20 rounded-xl p-4 text-sm">
-                 {prompt}
-               </motion.div>
-             )}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {messages.length === 0 && !startBuildMut.isPending && (
+              <div className="text-center mt-20 text-muted-foreground">
+                <div className="w-16 h-16 mx-auto bg-secondary rounded-full flex items-center justify-center mb-4">
+                  <Code2 className="w-8 h-8 opacity-50" />
+                </div>
+                <p>{t.prompt_placeholder}</p>
+              </div>
+            )}
+
+            <AnimatePresence initial={false}>
+              {messages.map((msg) => (
+                <motion.div
+                  key={msg.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={cn(
+                    "flex gap-2.5",
+                    msg.role === "user" ? "flex-row-reverse" : "flex-row"
+                  )}
+                >
+                  <div className={cn(
+                    "w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0",
+                    msg.role === "user" ? "bg-primary/20 text-primary" : "bg-emerald-500/20 text-emerald-400"
+                  )}>
+                    {msg.role === "user" ? <User className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
+                  </div>
+                  <div className={cn(
+                    "rounded-xl p-3 text-sm max-w-[80%]",
+                    msg.role === "user"
+                      ? "bg-primary/10 border border-primary/20"
+                      : "bg-secondary/50 border border-white/5"
+                  )}>
+                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                    <span className="text-[10px] text-muted-foreground/60 mt-1 block">
+                      {format(msg.timestamp, 'HH:mm')}
+                    </span>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+
+            {isBuilding && (
+              <div className="flex gap-2.5">
+                <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 bg-emerald-500/20 text-emerald-400">
+                  <Bot className="w-3.5 h-3.5" />
+                </div>
+                <div className="bg-secondary/50 border border-white/5 rounded-xl p-3">
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                </div>
+              </div>
+            )}
+            <div ref={chatEndRef} />
           </div>
-          
+
           <div className="p-4 border-t border-white/10 bg-card/80 backdrop-blur-md">
             <div className="relative">
               <textarea
@@ -138,7 +257,6 @@ export default function Builder() {
           </div>
         </div>
 
-        {/* Center Panel: Preview / Files */}
         <div className="flex-1 relative bg-black/40 flex flex-col">
           {isBuilding ? (
             <div className="flex-1 flex items-center justify-center">
@@ -160,13 +278,12 @@ export default function Builder() {
           )}
         </div>
 
-        {/* Right Panel: Execution Log */}
         <div className="w-full md:w-80 border-s border-white/10 flex flex-col bg-card/50 flex-shrink-0 z-10 shadow-[-4px_0_24px_rgba(0,0,0,0.2)] hidden lg:flex">
           <div className="p-4 border-b border-white/10 font-semibold flex items-center justify-between bg-card">
             {t.execution_log}
             {isBuilding && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
           </div>
-          
+
           <div className="flex-1 overflow-y-auto p-4">
             <div className="space-y-4 relative before:absolute before:inset-0 before:ms-[19px] before:-translate-x-px before:h-full before:w-0.5 before:bg-white/10">
               <AnimatePresence initial={false}>
@@ -188,29 +305,30 @@ export default function Builder() {
   );
 }
 
-function FilePreview({ files }: { files: any[] }) {
+function FilePreview({ files }: { files: ProjectFile[] }) {
   const [selectedFile, setSelectedFile] = useState(0);
   const { t } = useI18n();
 
-  const htmlFile = files.find((f: any) => f.filePath?.endsWith('.html'));
-  const previewSrc = htmlFile?.content
-    ? `data:text/html;charset=utf-8,${encodeURIComponent(
-        files.reduce((html: string, f: any) => {
-          if (f.filePath?.endsWith('.css') && f.content) {
-            html = html.replace('</head>', `<style>${f.content}</style></head>`);
-          }
-          if (f.filePath?.endsWith('.js') && f.content) {
-            html = html.replace('</body>', `<script>${f.content}</script></body>`);
-          }
-          return html;
-        }, htmlFile.content)
-      )}`
-    : null;
+  const htmlFile = files.find((f) => f.filePath?.endsWith('.html'));
+  const hasPreview = !!htmlFile?.content;
+
+  const buildPreviewHtml = (): string => {
+    if (!htmlFile?.content) return "";
+    return files.reduce((html: string, f) => {
+      if (f.filePath?.endsWith('.css') && f.content) {
+        html = html.replace('</head>', `<style>${f.content}</style></head>`);
+      }
+      if (f.filePath?.endsWith('.js') && f.content) {
+        html = html.replace('</body>', `<script>${f.content}<\/script></body>`);
+      }
+      return html;
+    }, htmlFile.content);
+  };
 
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-1 p-2 border-b border-white/10 bg-card/60 overflow-x-auto">
-        {files.map((f: any, i: number) => (
+        {files.map((f, i) => (
           <button
             key={f.id || i}
             onClick={() => setSelectedFile(i)}
@@ -227,17 +345,9 @@ function FilePreview({ files }: { files: any[] }) {
         ))}
       </div>
 
-      {previewSrc && selectedFile === files.indexOf(htmlFile) ? (
+      {hasPreview && selectedFile === files.indexOf(htmlFile!) ? (
         <iframe
-          srcDoc={files.reduce((html: string, f: any) => {
-            if (f.filePath?.endsWith('.css') && f.content) {
-              html = html.replace('</head>', `<style>${f.content}</style></head>`);
-            }
-            if (f.filePath?.endsWith('.js') && f.content) {
-              html = html.replace('</body>', `<script>${f.content}<\/script></body>`);
-            }
-            return html;
-          }, htmlFile.content)}
+          srcDoc={buildPreviewHtml()}
           sandbox="allow-scripts"
           className="flex-1 w-full border-0 bg-white"
           title={t.live_preview}
@@ -251,7 +361,7 @@ function FilePreview({ files }: { files: any[] }) {
   );
 }
 
-function LogItem({ log }: { log: any }) {
+function LogItem({ log }: { log: ExecutionLog }) {
   const getIcon = () => {
     switch (log.agentType) {
       case 'codegen': return <Code2 className="w-4 h-4" />;
@@ -272,14 +382,14 @@ function LogItem({ log }: { log: any }) {
   };
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       className="relative ps-10"
     >
       <div className={cn("absolute start-0 w-10 h-10 -ms-1 flex items-center justify-center rounded-full bg-card border", getStatusColor())}>
-        {log.status === 'completed' ? <CheckCircle2 className="w-4 h-4" /> : 
-         log.status === 'failed' ? <AlertCircle className="w-4 h-4" /> : 
+        {log.status === 'completed' ? <CheckCircle2 className="w-4 h-4" /> :
+         log.status === 'failed' ? <AlertCircle className="w-4 h-4" /> :
          log.status === 'in_progress' ? <Loader2 className="w-4 h-4 animate-spin" /> : getIcon()}
       </div>
       <div className="bg-background border border-white/5 rounded-xl p-3 shadow-sm">
