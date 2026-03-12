@@ -56,7 +56,7 @@ artifacts-monorepo/
 
 ## Database Schema
 
-13 tables in `lib/db/src/schema/`:
+14 tables in `lib/db/src/schema/`:
 - `users` — User accounts with locale preference, spending limits, credit balance, and active plan
 - `projects` — Website projects with status tracking
 - `project_files` — Generated files (HTML, CSS, JS) per project
@@ -71,6 +71,7 @@ artifacts-monorepo/
 - `teams` — Team entities with owner reference
 - `team_members` — Team membership with role (admin/developer/reviewer/viewer)
 - `team_invitations` — Pending email invitations with token and expiry
+- `sessions` — OIDC session storage for Replit Auth (sid, session data, expiry)
 
 ## Agent Engine
 
@@ -90,7 +91,7 @@ Build pipeline flow: CodeGen → Review → (Fix if issues) → FileManager save
 
 Routes in `artifacts/api-server/src/routes/`:
 - `health.ts` — `GET /api/healthz`
-- `auth.ts` — `GET /api/auth/me`, `POST /api/auth/logout`, `GET /api/auth/login`
+- `auth.ts` — `GET /api/auth/provider`, `GET /api/auth/me`, `PATCH /api/auth/me`, `POST /api/auth/login`, `POST /api/auth/register`, `POST /api/auth/logout`, `GET /api/auth/login` (redirect)
 - `projects.ts` — CRUD for projects + file listing
 - `build.ts` — Start/status/cancel/logs for builds; checks token limits before starting
 - `agents.ts` — Agent status and task details
@@ -130,7 +131,7 @@ Every package extends `tsconfig.base.json` which sets `composite: true`. The roo
 Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` for request and response validation and `@workspace/db` for persistence.
 
 - Entry: `src/index.ts` — reads `PORT`, starts Express
-- App setup: `src/app.ts` — mounts CORS, JSON/urlencoded parsing, routes at `/api`
+- App setup: `src/app.ts` — mounts CORS, cookie-parser, JSON/urlencoded parsing, auth session middleware, routes at `/api`
 - Routes: `src/routes/index.ts` mounts sub-routers
 - Depends on: `@workspace/db`, `@workspace/api-zod`, `@workspace/integrations-openai-ai-server`, `@workspace/integrations-anthropic-ai`
 - `pnpm --filter @workspace/api-server run dev` — run the dev server
@@ -146,6 +147,16 @@ Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client insta
 - `src/schema/<modelname>.ts` — table definitions with `drizzle-zod` insert schemas
 - `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
 - Exports: `.` (pool, db, schema), `./schema` (schema only)
+
+## Self-Hosting / Replit Independence
+
+The project is designed to run both on Replit and on any independent server. Key flexibility features:
+
+- **AUTH_PROVIDER** env var: set to `replit` (default) for Replit Auth, or `local` for email+password authentication
+- **APP_DOMAIN** env var: used for determining the public URL (Stripe callbacks, etc.). Must be set explicitly in all environments including Replit deployments
+- **SESSION_SECRET** env var: required for local auth mode (cookie signing)
+- **Vite plugins**: all Replit-specific plugins (runtime error overlay, cartographer, dev banner) load only when `REPL_ID` is present and `NODE_ENV !== "production"`
+- **Self-hosting guide**: see `SELF_HOSTING.md` at project root for full deployment instructions
 
 Production migrations are handled by Replit when publishing. In development, we just use `pnpm --filter @workspace/db run push`, and we fallback to `pnpm --filter @workspace/db run push-force`.
 

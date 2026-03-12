@@ -3,8 +3,6 @@ import { db } from "@workspace/db";
 import { teamMembersTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 
-const SEED_USER_ID = "00000000-0000-0000-0000-000000000001";
-
 export type TeamRole = "admin" | "developer" | "reviewer" | "viewer";
 
 const ROLE_HIERARCHY: Record<TeamRole, number> = {
@@ -59,8 +57,11 @@ export function hasPermission(role: TeamRole, permission: Permission): boolean {
   return ROLE_PERMISSIONS[role]?.includes(permission) ?? false;
 }
 
-export function getUserId(req: any): string {
-  return req.user?.id ?? SEED_USER_ID;
+export function getUserId(req: Request): string {
+  if (!req.user) {
+    throw new Error("getUserId called without authenticated user");
+  }
+  return req.user.id;
 }
 
 export async function getUserTeamRole(userId: string, teamId: string): Promise<TeamRole | null> {
@@ -96,7 +97,7 @@ export function requireTeamPermission(permission: Permission) {
       });
     }
 
-    (req as any).teamRole = role;
+    req.teamRole = role;
     next();
   };
 }

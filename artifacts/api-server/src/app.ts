@@ -1,7 +1,9 @@
 import express, { type Express } from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import router from "./routes";
 import { processStripeWebhook } from "./lib/stripeWebhookHandler";
+import { authSession } from "./middlewares/authSession";
 
 const app: Express = express();
 
@@ -33,8 +35,10 @@ app.post(
 );
 
 app.use(cors());
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(authSession);
 
 app.use("/api", router);
 

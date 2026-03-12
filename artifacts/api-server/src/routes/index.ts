@@ -7,11 +7,14 @@ import agentsRouter from "./agents";
 import tokensRouter from "./tokens";
 import billingRouter from "./billing";
 import teamsRouter from "./teams";
+import { requireAuth } from "../middlewares/authSession";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(authRouter);
+
+router.use(requireAuth);
 router.use(projectsRouter);
 router.use(buildRouter);
 router.use(agentsRouter);

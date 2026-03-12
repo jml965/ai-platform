@@ -10,13 +10,15 @@ import {
 } from "@workspace/db/schema";
 import { eq, and, desc, sql, count } from "drizzle-orm";
 import { getStripeClient, isStripeConfigured } from "../lib/stripeClient";
+import { getAppBaseUrl } from "../lib/appDomain";
 
 const router: IRouter = Router();
 
-const SEED_USER_ID = "00000000-0000-0000-0000-000000000001";
-
-function getUserId(req: any): string {
-  return req.user?.id ?? SEED_USER_ID;
+function getUserId(req: Express.Request): string {
+  if (!req.user) {
+    throw new Error("getUserId called without authenticated user");
+  }
+  return req.user.id;
 }
 
 async function ensurePlansSeeded() {
@@ -217,8 +219,7 @@ router.post("/billing/checkout", async (req, res) => {
 
     if (isStripeConfigured() && priceUsd > 0) {
       const stripe = getStripeClient()!;
-      const domain = process.env.REPLIT_DOMAINS?.split(",")[0];
-      const baseUrl = domain ? `https://${domain}` : "http://localhost:3000";
+      const baseUrl = getAppBaseUrl();
 
       const [user] = await db
         .select({ stripeCustomerId: usersTable.stripeCustomerId, email: usersTable.email })
@@ -465,8 +466,7 @@ router.post("/billing/topup", async (req, res) => {
 
     if (isStripeConfigured()) {
       const stripe = getStripeClient()!;
-      const domain = process.env.REPLIT_DOMAINS?.split(",")[0];
-      const baseUrl = domain ? `https://${domain}` : "http://localhost:3000";
+      const baseUrl = getAppBaseUrl();
 
       const [user] = await db
         .select({ stripeCustomerId: usersTable.stripeCustomerId, email: usersTable.email })

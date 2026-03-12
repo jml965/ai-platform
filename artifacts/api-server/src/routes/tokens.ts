@@ -5,7 +5,12 @@ import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
 
 const router: IRouter = Router();
 
-const SEED_USER_ID = "00000000-0000-0000-0000-000000000001";
+function getAuthUserId(req: Express.Request): string {
+  if (!req.user) {
+    throw new Error("getAuthUserId called without authenticated user");
+  }
+  return req.user.id;
+}
 
 function todayDateStr(): string {
   return new Date().toISOString().split("T")[0];
@@ -16,8 +21,9 @@ function monthStartDateStr(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
 }
 
-router.get("/tokens/summary", async (_req, res) => {
+router.get("/tokens/summary", async (req, res) => {
   try {
+    const userId = getAuthUserId(req);
     const today = todayDateStr();
     const monthStart = monthStartDateStr();
 
@@ -29,7 +35,7 @@ router.get("/tokens/summary", async (_req, res) => {
       .from(tokenUsageTable)
       .where(
         and(
-          eq(tokenUsageTable.userId, SEED_USER_ID),
+          eq(tokenUsageTable.userId, userId),
           eq(tokenUsageTable.usageDate, today)
         )
       );
@@ -42,7 +48,7 @@ router.get("/tokens/summary", async (_req, res) => {
       .from(tokenUsageTable)
       .where(
         and(
-          eq(tokenUsageTable.userId, SEED_USER_ID),
+          eq(tokenUsageTable.userId, userId),
           gte(tokenUsageTable.usageDate, monthStart)
         )
       );
@@ -53,12 +59,12 @@ router.get("/tokens/summary", async (_req, res) => {
         totalCost: sql<string>`coalesce(sum(${tokenUsageTable.costUsd})::numeric(10,6), '0')`,
       })
       .from(tokenUsageTable)
-      .where(eq(tokenUsageTable.userId, SEED_USER_ID));
+      .where(eq(tokenUsageTable.userId, userId));
 
     const [user] = await db
       .select({ dailyLimitUsd: usersTable.dailyLimitUsd, monthlyLimitUsd: usersTable.monthlyLimitUsd })
       .from(usersTable)
-      .where(eq(usersTable.id, SEED_USER_ID))
+      .where(eq(usersTable.id, userId))
       .limit(1);
 
     const dailyLimit = parseFloat(user?.dailyLimitUsd ?? "5.0");
@@ -84,9 +90,10 @@ router.get("/tokens/summary", async (_req, res) => {
 
 router.get("/tokens/usage", async (req, res) => {
   try {
+    const userId = getAuthUserId(req);
     const { projectId, startDate, endDate, groupBy } = req.query;
 
-    const conditions = [eq(tokenUsageTable.userId, SEED_USER_ID)];
+    const conditions = [eq(tokenUsageTable.userId, userId)];
 
     if (projectId && typeof projectId === "string") {
       conditions.push(eq(tokenUsageTable.projectId, projectId));
@@ -214,8 +221,9 @@ router.get("/tokens/usage", async (req, res) => {
   }
 });
 
-router.get("/tokens/limits", async (_req, res) => {
+router.get("/tokens/limits", async (req, res) => {
   try {
+    const userId = getAuthUserId(req);
     const [user] = await db
       .select({
         dailyLimitUsd: usersTable.dailyLimitUsd,
@@ -223,7 +231,7 @@ router.get("/tokens/limits", async (_req, res) => {
         perProjectLimitUsd: usersTable.perProjectLimitUsd,
       })
       .from(usersTable)
-      .where(eq(usersTable.id, SEED_USER_ID))
+      .where(eq(usersTable.id, userId))
       .limit(1);
 
     if (!user) {
@@ -244,7 +252,7 @@ router.get("/tokens/limits", async (_req, res) => {
       .from(tokenUsageTable)
       .where(
         and(
-          eq(tokenUsageTable.userId, SEED_USER_ID),
+          eq(tokenUsageTable.userId, userId),
           eq(tokenUsageTable.usageDate, today)
         )
       );
@@ -256,7 +264,7 @@ router.get("/tokens/limits", async (_req, res) => {
       .from(tokenUsageTable)
       .where(
         and(
-          eq(tokenUsageTable.userId, SEED_USER_ID),
+          eq(tokenUsageTable.userId, userId),
           gte(tokenUsageTable.usageDate, monthStart)
         )
       );
@@ -276,6 +284,7 @@ router.get("/tokens/limits", async (_req, res) => {
 
 router.patch("/tokens/limits", async (req, res) => {
   try {
+    const userId = getAuthUserId(req);
     const { dailyLimitUsd, monthlyLimitUsd, perProjectLimitUsd } = req.body;
 
     const updates: Record<string, unknown> = { updatedAt: new Date() };
@@ -304,7 +313,7 @@ router.patch("/tokens/limits", async (req, res) => {
     await db
       .update(usersTable)
       .set(updates)
-      .where(eq(usersTable.id, SEED_USER_ID));
+      .where(eq(usersTable.id, userId));
 
     const [user] = await db
       .select({
@@ -313,7 +322,7 @@ router.patch("/tokens/limits", async (req, res) => {
         perProjectLimitUsd: usersTable.perProjectLimitUsd,
       })
       .from(usersTable)
-      .where(eq(usersTable.id, SEED_USER_ID))
+      .where(eq(usersTable.id, userId))
       .limit(1);
 
     const today = todayDateStr();
@@ -326,7 +335,7 @@ router.patch("/tokens/limits", async (req, res) => {
       .from(tokenUsageTable)
       .where(
         and(
-          eq(tokenUsageTable.userId, SEED_USER_ID),
+          eq(tokenUsageTable.userId, userId),
           eq(tokenUsageTable.usageDate, today)
         )
       );
@@ -338,7 +347,7 @@ router.patch("/tokens/limits", async (req, res) => {
       .from(tokenUsageTable)
       .where(
         and(
-          eq(tokenUsageTable.userId, SEED_USER_ID),
+          eq(tokenUsageTable.userId, userId),
           gte(tokenUsageTable.usageDate, monthStart)
         )
       );
@@ -356,12 +365,13 @@ router.patch("/tokens/limits", async (req, res) => {
   }
 });
 
-router.get("/tokens/notifications", async (_req, res) => {
+router.get("/tokens/notifications", async (req, res) => {
   try {
+    const userId = getAuthUserId(req);
     const notifications = await db
       .select()
       .from(notificationsTable)
-      .where(eq(notificationsTable.userId, SEED_USER_ID))
+      .where(eq(notificationsTable.userId, userId))
       .orderBy(desc(notificationsTable.createdAt))
       .limit(50);
 
@@ -385,6 +395,7 @@ router.get("/tokens/notifications", async (_req, res) => {
 
 router.patch("/tokens/notifications/:notificationId/read", async (req, res) => {
   try {
+    const userId = getAuthUserId(req);
     const { notificationId } = req.params;
 
     await db
@@ -393,7 +404,7 @@ router.patch("/tokens/notifications/:notificationId/read", async (req, res) => {
       .where(
         and(
           eq(notificationsTable.id, notificationId),
-          eq(notificationsTable.userId, SEED_USER_ID)
+          eq(notificationsTable.userId, userId)
         )
       );
 
