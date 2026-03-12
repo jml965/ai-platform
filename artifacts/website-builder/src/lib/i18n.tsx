@@ -32,7 +32,14 @@ const en = {
   preview_ready: "Website is ready to view!",
   preview_unavailable: "Preview will appear here once the build completes.",
   back: "Back to Dashboard",
-  unknown_error: "An unknown error occurred"
+  unknown_error: "An unknown error occurred",
+  loading: "Loading...",
+  tokens_label: "tokens",
+  agent_codegen: "Code Generation",
+  agent_reviewer: "Review",
+  agent_fixer: "Fix",
+  agent_filemanager: "File Manager",
+  agent_unknown: "Agent"
 };
 
 const ar = {
@@ -67,7 +74,14 @@ const ar = {
   preview_ready: "الموقع جاهز للمعاينة!",
   preview_unavailable: "ستظهر المعاينة هنا بمجرد اكتمال البناء.",
   back: "العودة للوحة التحكم",
-  unknown_error: "حدث خطأ غير معروف"
+  unknown_error: "حدث خطأ غير معروف",
+  loading: "جاري التحميل...",
+  tokens_label: "توكنز",
+  agent_codegen: "توليد الكود",
+  agent_reviewer: "المراجعة",
+  agent_fixer: "الإصلاح",
+  agent_filemanager: "إدارة الملفات",
+  agent_unknown: "الوكيل"
 };
 
 type Language = "en" | "ar";

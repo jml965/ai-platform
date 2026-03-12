@@ -49,27 +49,30 @@ export default function Builder() {
 
   const { data: buildStatus } = useGetBuildStatus(activeBuildId || "", {
     query: {
+      queryKey: ["getBuildStatus", activeBuildId || ""],
       enabled: !!activeBuildId,
       refetchInterval: (query: { state: { data?: { status?: string } } }) => {
         const status = query.state.data?.status;
         return (status === "completed" || status === "failed") ? false : 3000;
       }
-    } as never
+    }
   });
 
   const { data: buildLogs } = useGetBuildLogs(activeBuildId || "", {
     query: {
+      queryKey: ["getBuildLogs", activeBuildId || ""],
       enabled: !!activeBuildId,
       refetchInterval: () =>
         (buildStatus?.status === "completed" || buildStatus?.status === "failed") ? false : 3000
-    } as never
+    }
   });
 
   const { data: projectFiles } = useListProjectFiles(id || "", {
     query: {
+      queryKey: ["listProjectFiles", id || ""],
       enabled: !!id,
       refetchInterval: buildStatus?.status === "completed" ? false : 5000
-    } as never
+    }
   });
 
   useEffect(() => {
@@ -154,11 +157,11 @@ export default function Builder() {
             <ArrowLeft className={cn("w-5 h-5", lang === "ar" && "rotate-180")} />
           </Link>
           <div className="h-4 w-px bg-white/10" />
-          <h1 className="font-semibold">{project?.name || "Loading..."}</h1>
+          <h1 className="font-semibold">{project?.name || t.loading}</h1>
           {buildStatus?.status && (
             <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground font-medium flex items-center gap-1.5">
               {isBuilding && <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />}
-              {buildStatus.status}
+              {t[`status_${buildStatus.status}` as keyof typeof t] || buildStatus.status}
             </span>
           )}
         </div>
@@ -362,6 +365,13 @@ function FilePreview({ files }: { files: ProjectFile[] }) {
 }
 
 function LogItem({ log }: { log: ExecutionLog }) {
+  const { t } = useI18n();
+
+  const agentLabel = (): string => {
+    const key = `agent_${log.agentType}` as keyof typeof t;
+    return (t[key] as string) || log.agentType;
+  };
+
   const getIcon = () => {
     switch (log.agentType) {
       case 'codegen': return <Code2 className="w-4 h-4" />;
@@ -394,13 +404,13 @@ function LogItem({ log }: { log: ExecutionLog }) {
       </div>
       <div className="bg-background border border-white/5 rounded-xl p-3 shadow-sm">
         <div className="flex justify-between items-start mb-1">
-          <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{log.agentType}</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{agentLabel()}</span>
           {log.createdAt && <span className="text-[10px] text-muted-foreground">{format(new Date(log.createdAt), 'HH:mm:ss')}</span>}
         </div>
         <p className="text-sm">{log.action.replace(/_/g, ' ')}</p>
         {log.tokensUsed ? (
           <div className="mt-2 text-[10px] font-mono text-muted-foreground/80 bg-white/5 inline-block px-1.5 py-0.5 rounded">
-            {log.tokensUsed} tokens
+            {log.tokensUsed} {t.tokens_label}
           </div>
         ) : null}
       </div>
