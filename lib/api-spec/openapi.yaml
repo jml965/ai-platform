@@ -548,6 +548,30 @@ paths:
               schema:
                 $ref: "#/components/schemas/Subscription"
 
+  /billing/subscription/cancel:
+    post:
+      operationId: cancelSubscription
+      tags: [billing]
+      summary: Cancel subscription
+      description: Cancels the user's active subscription and reverts to the free plan
+      responses:
+        "200":
+          description: Subscription cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  cancelledAt:
+                    type: string
+                    format: date-time
+                required:
+                  - success
+        "404":
+          description: No active subscription found
+
   /billing/checkout:
     post:
       operationId: createCheckout
@@ -1464,6 +1488,12 @@ components:
           type: number
         reserveUsd:
           type: number
+        isLow:
+          type: boolean
+          description: True when balance is above zero but below $1
+        isDepleted:
+          type: boolean
+          description: True when balance is zero or negative
       required:
         - balanceUsd
 

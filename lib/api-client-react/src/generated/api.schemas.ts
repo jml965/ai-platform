@@ -341,6 +341,10 @@ export interface InvoiceListResponse {
 export interface CreditBalance {
   balanceUsd: number;
   reserveUsd?: number;
+  /** True when balance is above zero but below $1 */
+  isLow?: boolean;
+  /** True when balance is zero or negative */
+  isDepleted?: boolean;
 }
 
 export interface TopupRequest {
@@ -459,6 +463,11 @@ export const GetTokenUsageGroupBy = {
   project: "project",
   agent: "agent",
 } as const;
+
+export type CancelSubscription200 = {
+  success: boolean;
+  cancelledAt?: string;
+};
 
 export type ListInvoicesParams = {
   page?: number;

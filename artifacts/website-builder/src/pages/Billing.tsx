@@ -41,7 +41,11 @@ export default function Billing() {
 
   const handleSubscribe = async (planId: string) => {
     try {
-      await checkoutMut.mutateAsync({ data: { planId } });
+      const result = await checkoutMut.mutateAsync({ data: { planId } });
+      if (result.checkoutUrl?.startsWith("https://")) {
+        window.location.href = result.checkoutUrl;
+        return;
+      }
       await refetchSub();
       await refetchInvoices();
     } catch (error) {
@@ -58,7 +62,11 @@ export default function Billing() {
       return;
     }
     try {
-      await topupMut.mutateAsync({ data: { amountUsd: amount } });
+      const result = await topupMut.mutateAsync({ data: { amountUsd: amount } });
+      if (result.checkoutUrl?.startsWith("https://")) {
+        window.location.href = result.checkoutUrl;
+        return;
+      }
       await refetchCredits();
       await refetchInvoices();
       setTopupAmount("25");

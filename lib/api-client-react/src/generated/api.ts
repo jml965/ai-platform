@@ -21,6 +21,7 @@ import type {
   AuthCallbackParams,
   BuildStatus,
   BuildTask,
+  CancelSubscription200,
   CheckoutResponse,
   CreateCheckoutRequest,
   CreateProjectRequest,
@@ -2327,6 +2328,88 @@ export function useGetSubscription<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * Cancels the user's active subscription and reverts to the free plan
+ * @summary Cancel subscription
+ */
+export const getCancelSubscriptionUrl = () => {
+  return `/api/billing/subscription/cancel`;
+};
+
+export const cancelSubscription = async (
+  options?: RequestInit,
+): Promise<CancelSubscription200> => {
+  return customFetch<CancelSubscription200>(getCancelSubscriptionUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getCancelSubscriptionMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelSubscription>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof cancelSubscription>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["cancelSubscription"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof cancelSubscription>>,
+    void
+  > = () => {
+    return cancelSubscription(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CancelSubscriptionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof cancelSubscription>>
+>;
+
+export type CancelSubscriptionMutationError = ErrorType<void>;
+
+/**
+ * @summary Cancel subscription
+ */
+export const useCancelSubscription = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelSubscription>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof cancelSubscription>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getCancelSubscriptionMutationOptions(options));
+};
 
 /**
  * Creates a Stripe checkout session for subscribing or upgrading

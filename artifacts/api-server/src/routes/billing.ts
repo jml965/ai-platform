@@ -380,6 +380,7 @@ router.get("/billing/credits", async (req, res) => {
 
     return res.json({
       balanceUsd: balance,
+      reserveUsd: 0,
       isLow: balance > 0 && balance < 1,
       isDepleted: balance <= 0,
     });
@@ -388,6 +389,62 @@ router.get("/billing/credits", async (req, res) => {
     return res
       .status(500)
       .json({ error: { code: "INTERNAL", message: "Failed to get credits" } });
+  }
+});
+
+router.post("/billing/subscription/cancel", async (req, res) => {
+  try {
+    const userId = getUserId(req);
+
+    const [sub] = await db
+      .select()
+      .from(subscriptionsTable)
+      .where(
+        and(
+          eq(subscriptionsTable.userId, userId),
+          eq(subscriptionsTable.status, "active")
+        )
+      )
+      .orderBy(desc(subscriptionsTable.createdAt))
+      .limit(1);
+
+    if (!sub) {
+      return res
+        .status(404)
+        .json({ error: { code: "NOT_FOUND", message: "No active subscription found" } });
+    }
+
+    const now = new Date();
+
+    await db
+      .update(subscriptionsTable)
+      .set({ status: "cancelled", cancelledAt: now, updatedAt: now })
+      .where(eq(subscriptionsTable.id, sub.id));
+
+    await ensurePlansSeeded();
+    const [basicPlan] = await db
+      .select()
+      .from(plansTable)
+      .where(eq(plansTable.slug, "basic"))
+      .limit(1);
+
+    if (basicPlan) {
+      await db
+        .update(usersTable)
+        .set({
+          activePlanId: basicPlan.id,
+          dailyLimitUsd: basicPlan.dailyLimitUsd,
+          monthlyLimitUsd: basicPlan.monthlyLimitUsd,
+        })
+        .where(eq(usersTable.id, userId));
+    }
+
+    return res.json({ success: true, cancelledAt: now.toISOString() });
+  } catch (error) {
+    console.error("Cancel subscription error:", error);
+    return res.status(500).json({
+      error: { code: "INTERNAL", message: "Failed to cancel subscription" },
+    });
   }
 });
 

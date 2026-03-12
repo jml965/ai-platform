@@ -6,7 +6,7 @@ import { processStripeWebhook } from "./lib/stripeWebhookHandler";
 const app: Express = express();
 
 app.post(
-  "/api/stripe/webhook",
+  "/api/billing/webhook",
   express.raw({ type: "application/json" }),
   async (req, res) => {
     const signature = req.headers["stripe-signature"];

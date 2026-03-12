@@ -9,4 +9,8 @@
 export interface CreditBalance {
   balanceUsd: number;
   reserveUsd?: number;
+  /** True when balance is above zero but below $1 */
+  isLow?: boolean;
+  /** True when balance is zero or negative */
+  isDepleted?: boolean;
 }

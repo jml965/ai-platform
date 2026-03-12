@@ -471,6 +471,15 @@ export const GetSubscriptionResponse = zod.object({
 });
 
 /**
+ * Cancels the user's active subscription and reverts to the free plan
+ * @summary Cancel subscription
+ */
+export const CancelSubscriptionResponse = zod.object({
+  success: zod.boolean(),
+  cancelledAt: zod.date().optional(),
+});
+
+/**
  * Creates a Stripe checkout session for subscribing or upgrading
  * @summary Create checkout session
  */
@@ -519,6 +528,14 @@ export const ListInvoicesResponse = zod.object({
 export const GetCreditsResponse = zod.object({
   balanceUsd: zod.number(),
   reserveUsd: zod.number().optional(),
+  isLow: zod
+    .boolean()
+    .optional()
+    .describe("True when balance is above zero but below $1"),
+  isDepleted: zod
+    .boolean()
+    .optional()
+    .describe("True when balance is zero or negative"),
 });
 
 /**
