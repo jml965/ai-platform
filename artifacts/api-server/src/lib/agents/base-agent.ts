@@ -21,9 +21,19 @@ export abstract class BaseAgent {
       throw new Error(`Token budget exhausted. Used: ${context.tokensUsedSoFar}, Limit: ${this.constitution.maxTotalTokensPerBuild}`);
     }
 
+    const estimatedPromptTokens = messages.reduce((sum, m) => sum + Math.ceil(m.content.length / 4), 0);
+    if (estimatedPromptTokens > budget.remaining) {
+      throw new Error(`Estimated prompt tokens (${estimatedPromptTokens}) exceed remaining budget (${budget.remaining})`);
+    }
+
+    const maxCompletion = Math.min(
+      this.constitution.maxTokensPerCall,
+      Math.max(1024, budget.remaining - estimatedPromptTokens)
+    );
+
     const response = await openai.chat.completions.create({
       model: "gpt-5.2",
-      max_completion_tokens: Math.min(this.constitution.maxTokensPerCall, budget.remaining),
+      max_completion_tokens: maxCompletion,
       messages,
     });
 

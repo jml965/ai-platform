@@ -1,6 +1,6 @@
 import { db } from "@workspace/db";
 import { projectFilesTable } from "@workspace/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { validateFilePath, validateFileExtension } from "./constitution";
 import type { AgentConstitution } from "./constitution";
 import type { AgentResult, GeneratedFile, AgentType } from "./types";
@@ -20,6 +20,25 @@ export class FileManagerAgent {
     const startTime = Date.now();
     const savedFiles: string[] = [];
     const errors: string[] = [];
+
+    const existingCount = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(projectFilesTable)
+      .where(eq(projectFilesTable.projectId, projectId));
+    const currentFileCount = existingCount[0]?.count ?? 0;
+    const newFileCount = files.filter(
+      (f) => !files.some((ef) => ef.filePath === f.filePath)
+    ).length;
+
+    if (currentFileCount + newFileCount > this.constitution.maxFilesPerProject) {
+      return {
+        success: false,
+        tokensUsed: 0,
+        durationMs: Date.now() - startTime,
+        error: `Project file limit exceeded (max: ${this.constitution.maxFilesPerProject}, current: ${currentFileCount}, adding: ${newFileCount})`,
+        data: { savedFiles: [], errors: [`File limit exceeded`] },
+      };
+    }
 
     for (const file of files) {
       if (!validateFilePath(file.filePath, projectId)) {

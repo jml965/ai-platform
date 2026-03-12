@@ -277,6 +277,12 @@ async function executeBuildPipeline(
       reviewResult.durationMs
     );
 
+    if (!reviewResult.success) {
+      console.error(`Build ${buildId} review failed:`, reviewResult.error);
+      await finalizeBuild(buildId, projectId, "failed", totalTokens, totalCost);
+      return;
+    }
+
     const review = reviewResult.data?.review as
       | { approved: boolean; issues: CodeIssue[] }
       | undefined;
@@ -287,37 +293,48 @@ async function executeBuildPipeline(
         return;
       }
 
-      const fixTaskId = await createTask(buildId, projectId, "fixer");
-      await logExecution(buildId, projectId, fixTaskId, "fixer", "fix_code", "in_progress", {
-        issueCount: review.issues.length,
-      });
-
-      context.tokensUsedSoFar = totalTokens;
-      const fixResult = await fixerAgent.executeWithIssues(context, review.issues);
-      totalTokens += fixResult.tokensUsed;
-      const fixCost = estimateCost(fixResult.tokensUsed);
-      totalCost += fixCost;
-
-      if (fixResult.tokensUsed > 0) {
-        await recordTokenUsage(userId, projectId, buildId, "fixer", fixResult.tokensUsed, fixCost);
-      }
-
-      if (fixResult.success) {
-        await completeTask(fixTaskId, fixResult.tokensUsed, fixCost, fixResult.durationMs);
+      const errorIssues = review.issues.filter((i) => i.severity === "error");
+      if (errorIssues.length === 0) {
+        console.log(`Build ${buildId}: review had warnings/info only, proceeding without fix`);
       } else {
-        await failTask(fixTaskId, fixResult.error ?? "Unknown error", fixResult.durationMs);
-      }
+        const fixTaskId = await createTask(buildId, projectId, "fixer");
+        await logExecution(buildId, projectId, fixTaskId, "fixer", "fix_code", "in_progress", {
+          issueCount: errorIssues.length,
+        });
 
-      await logExecution(
-        buildId, projectId, fixTaskId, "fixer", "fix_code",
-        fixResult.success ? "completed" : "failed",
-        { tokensUsed: fixResult.tokensUsed },
-        fixResult.tokensUsed,
-        fixResult.durationMs
-      );
+        context.tokensUsedSoFar = totalTokens;
+        const fixResult = await fixerAgent.executeWithIssues(context, errorIssues);
+        totalTokens += fixResult.tokensUsed;
+        const fixCost = estimateCost(fixResult.tokensUsed);
+        totalCost += fixCost;
 
-      if (fixResult.success && fixResult.data?.files) {
-        generatedFiles = fixResult.data.files as GeneratedFile[];
+        if (fixResult.tokensUsed > 0) {
+          await recordTokenUsage(userId, projectId, buildId, "fixer", fixResult.tokensUsed, fixCost);
+        }
+
+        if (fixResult.success) {
+          await completeTask(fixTaskId, fixResult.tokensUsed, fixCost, fixResult.durationMs);
+        } else {
+          await failTask(fixTaskId, fixResult.error ?? "Unknown error", fixResult.durationMs);
+        }
+
+        await logExecution(
+          buildId, projectId, fixTaskId, "fixer", "fix_code",
+          fixResult.success ? "completed" : "failed",
+          { tokensUsed: fixResult.tokensUsed },
+          fixResult.tokensUsed,
+          fixResult.durationMs
+        );
+
+        if (!fixResult.success) {
+          console.error(`Build ${buildId} fixer failed:`, fixResult.error);
+          await finalizeBuild(buildId, projectId, "failed", totalTokens, totalCost);
+          return;
+        }
+
+        if (fixResult.data?.files) {
+          generatedFiles = fixResult.data.files as GeneratedFile[];
+        }
       }
     }
 
