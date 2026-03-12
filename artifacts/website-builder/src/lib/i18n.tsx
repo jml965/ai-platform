@@ -45,7 +45,16 @@ const en = {
   agent_reviewer: "Review",
   agent_fixer: "Fix",
   agent_filemanager: "File Manager",
-  agent_unknown: "Agent"
+  agent_unknown: "Agent",
+  agent_label: "Agent",
+  canvas_tab: "Canvas",
+  code_tab: "Code",
+  library: "Library",
+  search_files: "Search files...",
+  checkpoint: "Checkpoint",
+  time_elapsed: "elapsed",
+  seconds_short: "s",
+  no_files: "No files yet"
 };
 
 const ar = {
@@ -93,7 +102,16 @@ const ar = {
   agent_reviewer: "المراجعة",
   agent_fixer: "الإصلاح",
   agent_filemanager: "إدارة الملفات",
-  agent_unknown: "الوكيل"
+  agent_unknown: "الوكيل",
+  agent_label: "الوكيل",
+  canvas_tab: "المعاينة",
+  code_tab: "الكود",
+  library: "المكتبة",
+  search_files: "بحث في الملفات...",
+  checkpoint: "نقطة تحقق",
+  time_elapsed: "مضت",
+  seconds_short: "ث",
+  no_files: "لا توجد ملفات بعد"
 };
 
 type Language = "en" | "ar";
