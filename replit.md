@@ -64,7 +64,7 @@ artifacts-monorepo/
 - `execution_logs` — Detailed execution log entries per agent action
 - `token_usage` — Token consumption records for cost tracking
 - `notifications` — In-app notifications (spending alerts, system messages)
-- `plans` — Subscription plan catalog (Basic/Pro/Team) with limits and features
+- `plans` — Subscription plan catalog (Limited/Professional) with monthly & yearly pricing, AI agent feature flags (sandboxExecution, autoFix, packageInstall, aiAgentFull)
 - `subscriptions` — User subscription records with status and period dates
 - `invoices` — Invoice/payment history (subscriptions + credit top-ups)
 - `credits_ledger` — Double-entry credit ledger (topup/deduction entries)

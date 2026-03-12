@@ -19,6 +19,8 @@ import type {
 import type {
   AgentsStatusResponse,
   AuthCallbackParams,
+  AuthLoginBody,
+  AuthRegisterBody,
   BuildStatus,
   BuildTask,
   CancelSubscription200,
@@ -29,6 +31,7 @@ import type {
   CreditBalance,
   ErrorResponse,
   ExecutionLogListResponse,
+  GetAuthProvider200,
   GetTokenUsageParams,
   HealthStatus,
   InviteMemberRequest,
@@ -147,63 +150,73 @@ export function useHealthCheck<
 }
 
 /**
- * Redirects to Replit OIDC login
- * @summary Start login flow
+ * Returns the current authentication provider (replit or local)
+ * @summary Get auth provider
  */
-export const getAuthLoginUrl = () => {
-  return `/api/auth/login`;
+export const getGetAuthProviderUrl = () => {
+  return `/api/auth/provider`;
 };
 
-export const authLogin = async (options?: RequestInit): Promise<unknown> => {
-  return customFetch<unknown>(getAuthLoginUrl(), {
+export const getAuthProvider = async (
+  options?: RequestInit,
+): Promise<GetAuthProvider200> => {
+  return customFetch<GetAuthProvider200>(getGetAuthProviderUrl(), {
     ...options,
     method: "GET",
   });
 };
 
-export const getAuthLoginQueryKey = () => {
-  return [`/api/auth/login`] as const;
+export const getGetAuthProviderQueryKey = () => {
+  return [`/api/auth/provider`] as const;
 };
 
-export const getAuthLoginQueryOptions = <
-  TData = Awaited<ReturnType<typeof authLogin>>,
-  TError = ErrorType<void>,
+export const getGetAuthProviderQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAuthProvider>>,
+  TError = ErrorType<unknown>,
 >(options?: {
-  query?: UseQueryOptions<Awaited<ReturnType<typeof authLogin>>, TError, TData>;
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAuthProvider>>,
+    TError,
+    TData
+  >;
   request?: SecondParameter<typeof customFetch>;
 }) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getAuthLoginQueryKey();
+  const queryKey = queryOptions?.queryKey ?? getGetAuthProviderQueryKey();
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof authLogin>>> = ({
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAuthProvider>>> = ({
     signal,
-  }) => authLogin({ signal, ...requestOptions });
+  }) => getAuthProvider({ signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof authLogin>>,
+    Awaited<ReturnType<typeof getAuthProvider>>,
     TError,
     TData
   > & { queryKey: QueryKey };
 };
 
-export type AuthLoginQueryResult = NonNullable<
-  Awaited<ReturnType<typeof authLogin>>
+export type GetAuthProviderQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAuthProvider>>
 >;
-export type AuthLoginQueryError = ErrorType<void>;
+export type GetAuthProviderQueryError = ErrorType<unknown>;
 
 /**
- * @summary Start login flow
+ * @summary Get auth provider
  */
 
-export function useAuthLogin<
-  TData = Awaited<ReturnType<typeof authLogin>>,
-  TError = ErrorType<void>,
+export function useGetAuthProvider<
+  TData = Awaited<ReturnType<typeof getAuthProvider>>,
+  TError = ErrorType<unknown>,
 >(options?: {
-  query?: UseQueryOptions<Awaited<ReturnType<typeof authLogin>>, TError, TData>;
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getAuthProvider>>,
+    TError,
+    TData
+  >;
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getAuthLoginQueryOptions(options);
+  const queryOptions = getGetAuthProviderQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -213,10 +226,173 @@ export function useAuthLogin<
 }
 
 /**
- * Receives callback from Replit Auth after login
- * @summary Auth callback
+ * Redirects to Replit OIDC login (replit provider only)
+ * @summary Start login flow (Replit)
  */
-export const getAuthCallbackUrl = (params: AuthCallbackParams) => {
+export const getAuthLoginRedirectUrl = () => {
+  return `/api/auth/login`;
+};
+
+export const authLoginRedirect = async (
+  options?: RequestInit,
+): Promise<unknown> => {
+  return customFetch<unknown>(getAuthLoginRedirectUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getAuthLoginRedirectQueryKey = () => {
+  return [`/api/auth/login`] as const;
+};
+
+export const getAuthLoginRedirectQueryOptions = <
+  TData = Awaited<ReturnType<typeof authLoginRedirect>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof authLoginRedirect>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getAuthLoginRedirectQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof authLoginRedirect>>
+  > = ({ signal }) => authLoginRedirect({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof authLoginRedirect>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type AuthLoginRedirectQueryResult = NonNullable<
+  Awaited<ReturnType<typeof authLoginRedirect>>
+>;
+export type AuthLoginRedirectQueryError = ErrorType<void>;
+
+/**
+ * @summary Start login flow (Replit)
+ */
+
+export function useAuthLoginRedirect<
+  TData = Awaited<ReturnType<typeof authLoginRedirect>>,
+  TError = ErrorType<void>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof authLoginRedirect>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getAuthLoginRedirectQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Authenticates a user with email and password (local provider only)
+ * @summary Login with email and password
+ */
+export const getAuthLoginUrl = () => {
+  return `/api/auth/login`;
+};
+
+export const authLogin = async (
+  authLoginBody: AuthLoginBody,
+  options?: RequestInit,
+): Promise<User> => {
+  return customFetch<User>(getAuthLoginUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(authLoginBody),
+  });
+};
+
+export const getAuthLoginMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof authLogin>>,
+    TError,
+    { data: BodyType<AuthLoginBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof authLogin>>,
+  TError,
+  { data: BodyType<AuthLoginBody> },
+  TContext
+> => {
+  const mutationKey = ["authLogin"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof authLogin>>,
+    { data: BodyType<AuthLoginBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return authLogin(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AuthLoginMutationResult = NonNullable<
+  Awaited<ReturnType<typeof authLogin>>
+>;
+export type AuthLoginMutationBody = BodyType<AuthLoginBody>;
+export type AuthLoginMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Login with email and password
+ */
+export const useAuthLogin = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof authLogin>>,
+    TError,
+    { data: BodyType<AuthLoginBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof authLogin>>,
+  TError,
+  { data: BodyType<AuthLoginBody> },
+  TContext
+> => {
+  return useMutation(getAuthLoginMutationOptions(options));
+};
+
+/**
+ * Handles Replit OIDC callback, creates session, redirects to app
+ * @summary OIDC callback
+ */
+export const getAuthCallbackUrl = (params?: AuthCallbackParams) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -233,7 +409,7 @@ export const getAuthCallbackUrl = (params: AuthCallbackParams) => {
 };
 
 export const authCallback = async (
-  params: AuthCallbackParams,
+  params?: AuthCallbackParams,
   options?: RequestInit,
 ): Promise<unknown> => {
   return customFetch<unknown>(getAuthCallbackUrl(params), {
@@ -250,7 +426,7 @@ export const getAuthCallbackQueryOptions = <
   TData = Awaited<ReturnType<typeof authCallback>>,
   TError = ErrorType<void>,
 >(
-  params: AuthCallbackParams,
+  params?: AuthCallbackParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof authCallback>>,
@@ -281,14 +457,14 @@ export type AuthCallbackQueryResult = NonNullable<
 export type AuthCallbackQueryError = ErrorType<void>;
 
 /**
- * @summary Auth callback
+ * @summary OIDC callback
  */
 
 export function useAuthCallback<
   TData = Awaited<ReturnType<typeof authCallback>>,
   TError = ErrorType<void>,
 >(
-  params: AuthCallbackParams,
+  params?: AuthCallbackParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof authCallback>>,
@@ -306,6 +482,93 @@ export function useAuthCallback<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * Creates a new user account (local provider only)
+ * @summary Register with email and password
+ */
+export const getAuthRegisterUrl = () => {
+  return `/api/auth/register`;
+};
+
+export const authRegister = async (
+  authRegisterBody: AuthRegisterBody,
+  options?: RequestInit,
+): Promise<User> => {
+  return customFetch<User>(getAuthRegisterUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(authRegisterBody),
+  });
+};
+
+export const getAuthRegisterMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof authRegister>>,
+    TError,
+    { data: BodyType<AuthRegisterBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof authRegister>>,
+  TError,
+  { data: BodyType<AuthRegisterBody> },
+  TContext
+> => {
+  const mutationKey = ["authRegister"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof authRegister>>,
+    { data: BodyType<AuthRegisterBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return authRegister(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AuthRegisterMutationResult = NonNullable<
+  Awaited<ReturnType<typeof authRegister>>
+>;
+export type AuthRegisterMutationBody = BodyType<AuthRegisterBody>;
+export type AuthRegisterMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Register with email and password
+ */
+export const useAuthRegister = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof authRegister>>,
+    TError,
+    { data: BodyType<AuthRegisterBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof authRegister>>,
+  TError,
+  { data: BodyType<AuthRegisterBody> },
+  TContext
+> => {
+  return useMutation(getAuthRegisterMutationOptions(options));
+};
 
 /**
  * Ends the user session

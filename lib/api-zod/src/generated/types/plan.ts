@@ -11,7 +11,9 @@ export interface Plan {
   id: string;
   name: string;
   nameAr: string;
+  slug: string;
   priceMonthlyUsd: number;
+  priceYearlyUsd?: number | null;
   maxProjects: number;
   monthlyTokenLimit: number;
   features?: PlanFeatures;

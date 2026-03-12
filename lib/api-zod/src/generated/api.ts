@@ -16,12 +16,54 @@ export const HealthCheckResponse = zod.object({
 });
 
 /**
- * Receives callback from Replit Auth after login
- * @summary Auth callback
+ * Returns the current authentication provider (replit or local)
+ * @summary Get auth provider
+ */
+export const GetAuthProviderResponse = zod.object({
+  provider: zod.enum(["replit", "local"]),
+});
+
+/**
+ * Authenticates a user with email and password (local provider only)
+ * @summary Login with email and password
+ */
+export const authLoginBodyPasswordMin = 8;
+
+export const AuthLoginBody = zod.object({
+  email: zod.string().email(),
+  password: zod.string().min(authLoginBodyPasswordMin),
+});
+
+export const AuthLoginResponse = zod.object({
+  id: zod.string().uuid(),
+  email: zod.string(),
+  displayName: zod.string(),
+  avatarUrl: zod.string().optional(),
+  locale: zod.enum(["ar", "en"]),
+  dailyLimitUsd: zod.number().optional(),
+  monthlyLimitUsd: zod.number().optional(),
+  createdAt: zod.date().optional(),
+});
+
+/**
+ * Handles Replit OIDC callback, creates session, redirects to app
+ * @summary OIDC callback
  */
 export const AuthCallbackQueryParams = zod.object({
-  code: zod.coerce.string(),
-  state: zod.coerce.string(),
+  code: zod.coerce.string().optional(),
+  state: zod.coerce.string().optional(),
+});
+
+/**
+ * Creates a new user account (local provider only)
+ * @summary Register with email and password
+ */
+export const authRegisterBodyPasswordMin = 8;
+
+export const AuthRegisterBody = zod.object({
+  email: zod.string().email(),
+  password: zod.string().min(authRegisterBodyPasswordMin),
+  displayName: zod.string().optional(),
 });
 
 /**
@@ -439,7 +481,9 @@ export const ListPlansResponse = zod.object({
       id: zod.string().uuid(),
       name: zod.string(),
       nameAr: zod.string(),
+      slug: zod.string(),
       priceMonthlyUsd: zod.number(),
+      priceYearlyUsd: zod.number().nullish(),
       maxProjects: zod.number(),
       monthlyTokenLimit: zod.number(),
       features: zod.object({}).passthrough().optional(),
@@ -463,7 +507,9 @@ export const GetSubscriptionResponse = zod.object({
     id: zod.string().uuid(),
     name: zod.string(),
     nameAr: zod.string(),
+    slug: zod.string(),
     priceMonthlyUsd: zod.number(),
+    priceYearlyUsd: zod.number().nullish(),
     maxProjects: zod.number(),
     monthlyTokenLimit: zod.number(),
     features: zod.object({}).passthrough().optional(),

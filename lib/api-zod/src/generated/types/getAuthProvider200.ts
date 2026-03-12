@@ -5,8 +5,8 @@
  * AI Website Builder Platform API — bilingual (AR/EN)
  * OpenAPI spec version: 0.1.0
  */
+import type { GetAuthProvider200Provider } from "./getAuthProvider200Provider";
 
-export type AuthCallbackParams = {
-  code?: string;
-  state?: string;
+export type GetAuthProvider200 = {
+  provider: GetAuthProvider200Provider;
 };

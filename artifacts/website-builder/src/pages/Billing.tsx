@@ -4,7 +4,8 @@ import { motion } from "framer-motion";
 import {
   CreditCard, Zap, CheckCircle2, ChevronRight,
   Loader2, LayoutTemplate, LogOut, ArrowLeft,
-  Receipt, Plus, Wallet, Crown, Users, Sparkles
+  Receipt, Plus, Wallet, Sparkles, XCircle,
+  Bot, Play, Bug, Package
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/LanguageToggle";
@@ -33,6 +34,7 @@ export default function Billing() {
 
   const [topupAmount, setTopupAmount] = useState("25");
   const [topupError, setTopupError] = useState("");
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
 
   const handleLogout = async () => {
     await logout.mutateAsync();
@@ -77,18 +79,6 @@ export default function Billing() {
 
   const currentPlanId = subscription?.plan?.id;
 
-  const planIcons = [Zap, Sparkles, Crown, Users];
-  const planColors = [
-    "border-white/10 bg-card",
-    "border-primary/50 bg-primary/5",
-    "border-amber-500/50 bg-amber-500/5",
-  ];
-  const planBadgeColors = [
-    "bg-secondary text-secondary-foreground",
-    "bg-primary/20 text-primary",
-    "bg-amber-500/20 text-amber-400",
-  ];
-
   const invoiceStatusColors: Record<string, string> = {
     paid: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
     pending: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
@@ -108,9 +98,29 @@ export default function Billing() {
     trialing: "billing_status_trialing",
   };
 
+  const activePlans = (plansData?.data ?? []).filter((p) => p.isActive !== false);
+
+  type FeatureItem = {
+    key: string;
+    label: keyof typeof t;
+    included: boolean;
+    icon: React.ReactNode;
+    highlight?: boolean;
+  };
+
+  const getFeatures = (features: Record<string, boolean>): FeatureItem[] => [
+    { key: "livePreview", label: "billing_feature_preview", included: !!features.livePreview, icon: <Play className="w-4 h-4" /> },
+    { key: "codeExport", label: "billing_feature_export", included: !!features.codeExport, icon: <Package className="w-4 h-4" /> },
+    { key: "customDomain", label: "billing_feature_domain", included: !!features.customDomain, icon: <Zap className="w-4 h-4" /> },
+    { key: "codegen", label: "billing_feature_codegen", included: true, icon: <Bot className="w-4 h-4" /> },
+    { key: "sandboxExecution", label: "billing_feature_sandbox", included: !!features.sandboxExecution, icon: <Play className="w-4 h-4" />, highlight: !!features.sandboxExecution },
+    { key: "autoFix", label: "billing_feature_autofix", included: !!features.autoFix, icon: <Bug className="w-4 h-4" />, highlight: !!features.autoFix },
+    { key: "packageInstall", label: "billing_feature_package_install", included: !!features.packageInstall, icon: <Package className="w-4 h-4" />, highlight: !!features.packageInstall },
+    { key: "aiAgentFull", label: "billing_feature_ai_agent_full", included: !!features.aiAgentFull, icon: <Sparkles className="w-4 h-4" />, highlight: !!features.aiAgentFull },
+  ];
+
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
-      {/* Header */}
       <header className="h-16 border-b border-white/10 bg-card/50 backdrop-blur-md sticky top-0 z-40 px-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
@@ -210,7 +220,6 @@ export default function Billing() {
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Balance Card */}
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -227,7 +236,6 @@ export default function Billing() {
               </div>
             </motion.div>
 
-            {/* Topup Form */}
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -291,83 +299,144 @@ export default function Billing() {
 
         {/* Plans */}
         <section>
-          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-            <Zap className="w-5 h-5 text-primary" />
-            {t.billing_upgrade}
-          </h2>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <Zap className="w-5 h-5 text-primary" />
+              {t.billing_upgrade}
+            </h2>
+
+            <div className="flex items-center gap-2 bg-card border border-white/10 rounded-xl p-1">
+              <button
+                onClick={() => setBillingCycle("monthly")}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  billingCycle === "monthly"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t.billing_monthly}
+              </button>
+              <button
+                onClick={() => setBillingCycle("yearly")}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                  billingCycle === "yearly"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t.billing_yearly}
+                <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full">
+                  {t.billing_save_yearly}
+                </span>
+              </button>
+            </div>
+          </div>
 
           {loadingPlans ? (
             <div className="flex items-center justify-center py-10">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {plansData?.data?.map((plan, index) => {
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+              {activePlans.map((plan, index) => {
                 const isCurrent = plan.id === currentPlanId;
-                const PlanIcon = planIcons[index] ?? Zap;
-                const colorClass = planColors[index] ?? planColors[0];
-                const badgeClass = planBadgeColors[index] ?? planBadgeColors[0];
+                const isProfessional = plan.slug === "professional";
                 const features = (plan.features ?? {}) as Record<string, boolean>;
+                const featureList = getFeatures(features);
+                const displayPrice = billingCycle === "yearly" && plan.priceYearlyUsd
+                  ? (plan.priceYearlyUsd / 12).toFixed(0)
+                  : plan.priceMonthlyUsd;
+                const totalYearlyPrice = plan.priceYearlyUsd ?? null;
 
                 return (
                   <motion.div
                     key={plan.id}
                     initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className={`relative border rounded-2xl p-6 flex flex-col ${colorClass} ${isCurrent ? "ring-2 ring-primary/40" : ""}`}
+                    transition={{ delay: index * 0.08 }}
+                    className={`relative border rounded-2xl p-6 flex flex-col ${
+                      isProfessional
+                        ? "border-primary/50 bg-primary/5 shadow-lg shadow-primary/10"
+                        : "border-white/10 bg-card"
+                    } ${isCurrent ? "ring-2 ring-primary/40" : ""}`}
                   >
-                    {isCurrent && (
-                      <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-bold ${badgeClass}`}>
+                    {isProfessional && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-xs font-bold bg-primary text-primary-foreground shadow-lg">
+                        {t.billing_recommended}
+                      </div>
+                    )}
+
+                    {isCurrent && !isProfessional && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-bold bg-secondary text-secondary-foreground">
                         {t.billing_current}
                       </div>
                     )}
 
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${badgeClass}`}>
-                        <PlanIcon className="w-5 h-5" />
+                    {isCurrent && isProfessional && (
+                      <div className="absolute -top-3 right-4 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        {t.billing_current}
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${
+                        isProfessional ? "bg-primary/20" : "bg-secondary"
+                      }`}>
+                        {isProfessional ? (
+                          <Sparkles className="w-5 h-5 text-primary" />
+                        ) : (
+                          <Zap className="w-5 h-5 text-muted-foreground" />
+                        )}
                       </div>
                       <div>
-                        <h3 className="font-bold">{lang === "ar" ? plan.nameAr : plan.name}</h3>
-                        <p className="text-2xl font-bold mt-0.5">
-                          {plan.priceMonthlyUsd === 0
-                            ? t.billing_free
-                            : `$${plan.priceMonthlyUsd}${t.billing_per_month}`}
-                        </p>
+                        <h3 className="font-bold text-lg">{lang === "ar" ? plan.nameAr : plan.name}</h3>
                       </div>
                     </div>
 
-                    <ul className="space-y-2 flex-1 mb-6">
-                      <li className="flex items-center gap-2 text-sm">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                        <span>{plan.maxProjects} {t.billing_projects}</span>
-                      </li>
-                      <li className="flex items-center gap-2 text-sm">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                        <span>{(plan.monthlyTokenLimit / 1000).toFixed(0)}K {t.billing_tokens}</span>
-                      </li>
-                      {features.livePreview && (
-                        <li className="flex items-center gap-2 text-sm">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                          <span>{t.billing_feature_preview}</span>
-                        </li>
+                    <div className="mb-5">
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-3xl font-bold">
+                          ${displayPrice}
+                        </span>
+                        <span className="text-muted-foreground text-sm">
+                          {t.billing_per_month}
+                        </span>
+                      </div>
+                      {billingCycle === "yearly" && totalYearlyPrice && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          ${totalYearlyPrice.toFixed(0)} {t.billing_per_year}
+                        </p>
                       )}
-                      {features.codeExport && (
-                        <li className="flex items-center gap-2 text-sm">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                          <span>{t.billing_feature_export}</span>
+                    </div>
+
+                    <div className="mb-4">
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
+                        <span className="flex items-center gap-1.5">
+                          <span className="font-semibold text-foreground">{plan.maxProjects}</span> {t.billing_projects}
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="font-semibold text-foreground">{(plan.monthlyTokenLimit / 1000).toFixed(0)}K</span> {t.billing_tokens}
+                        </span>
+                      </div>
+                    </div>
+
+                    <ul className="space-y-2.5 flex-1 mb-6">
+                      {featureList.map((feat) => (
+                        <li key={feat.key} className="flex items-center gap-2.5 text-sm">
+                          {feat.included ? (
+                            <CheckCircle2 className={`w-4 h-4 shrink-0 ${feat.highlight ? "text-primary" : "text-emerald-400"}`} />
+                          ) : (
+                            <XCircle className="w-4 h-4 shrink-0 text-muted-foreground/40" />
+                          )}
+                          <span className={feat.included ? (feat.highlight ? "text-foreground font-medium" : "") : "text-muted-foreground/60 line-through"}>
+                            {t[feat.label]}
+                          </span>
                         </li>
-                      )}
-                      {features.customDomain && (
-                        <li className="flex items-center gap-2 text-sm">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                          <span>{t.billing_feature_domain}</span>
-                        </li>
-                      )}
-                      {features.teamCollaboration && (
-                        <li className="flex items-center gap-2 text-sm">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                          <span>{t.billing_feature_team}</span>
+                      ))}
+                      {isProfessional && (
+                        <li className="flex items-start gap-2.5 text-xs mt-2 bg-primary/10 rounded-lg p-2.5 border border-primary/20">
+                          <Bot className="w-4 h-4 shrink-0 text-primary mt-0.5" />
+                          <span className="text-primary/80">{t.billing_feature_ai_agent_full_desc}</span>
                         </li>
                       )}
                     </ul>
@@ -375,10 +444,12 @@ export default function Billing() {
                     <button
                       onClick={() => handleSubscribe(plan.id)}
                       disabled={isCurrent || checkoutMut.isPending}
-                      className={`w-full py-2.5 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${
+                      className={`w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${
                         isCurrent
                           ? "bg-secondary text-secondary-foreground cursor-default"
-                          : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 hover:-translate-y-0.5 active:translate-y-0"
+                          : isProfessional
+                            ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 hover:-translate-y-0.5 active:translate-y-0"
+                            : "bg-secondary text-foreground hover:bg-secondary/80 border border-white/10 hover:-translate-y-0.5 active:translate-y-0"
                       } disabled:opacity-60`}
                     >
                       {checkoutMut.isPending && !isCurrent ? (

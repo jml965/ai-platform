@@ -278,7 +278,9 @@ export interface Plan {
   id: string;
   name: string;
   nameAr: string;
+  slug: string;
   priceMonthlyUsd: number;
+  priceYearlyUsd?: number | null;
   maxProjects: number;
   monthlyTokenLimit: number;
   features?: PlanFeatures;
@@ -440,9 +442,34 @@ export interface PreviewResponse {
   status: PreviewResponseStatus;
 }
 
+export type GetAuthProvider200Provider =
+  (typeof GetAuthProvider200Provider)[keyof typeof GetAuthProvider200Provider];
+
+export const GetAuthProvider200Provider = {
+  replit: "replit",
+  local: "local",
+} as const;
+
+export type GetAuthProvider200 = {
+  provider: GetAuthProvider200Provider;
+};
+
+export type AuthLoginBody = {
+  email: string;
+  /** @minLength 8 */
+  password: string;
+};
+
 export type AuthCallbackParams = {
-  code: string;
-  state: string;
+  code?: string;
+  state?: string;
+};
+
+export type AuthRegisterBody = {
+  email: string;
+  /** @minLength 8 */
+  password: string;
+  displayName?: string;
 };
 
 export type ListProjectsParams = {

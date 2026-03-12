@@ -6,7 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type AuthCallbackParams = {
-  code?: string;
-  state?: string;
+export type AuthRegisterBody = {
+  email: string;
+  /** @minLength 8 */
+  password: string;
+  displayName?: string;
 };

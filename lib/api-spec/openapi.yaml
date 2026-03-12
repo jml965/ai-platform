@@ -1462,8 +1462,13 @@ components:
           type: string
         nameAr:
           type: string
+        slug:
+          type: string
         priceMonthlyUsd:
           type: number
+        priceYearlyUsd:
+          type: number
+          nullable: true
         maxProjects:
           type: integer
         monthlyTokenLimit:
@@ -1479,6 +1484,7 @@ components:
         - id
         - name
         - nameAr
+        - slug
         - priceMonthlyUsd
         - maxProjects
         - monthlyTokenLimit

@@ -17,55 +17,140 @@ const router: IRouter = Router();
 
 async function ensurePlansSeeded() {
   const existing = await db.select({ cnt: count() }).from(plansTable);
-  if ((existing[0]?.cnt ?? 0) > 0) return;
+  if ((existing[0]?.cnt ?? 0) > 0) {
+    await migrateLegacyPlans();
+    return;
+  }
 
   await db.insert(plansTable).values([
     {
-      name: "Basic",
-      nameAr: "أساسي",
-      slug: "basic",
-      priceMonthlyUsd: "0.00",
-      maxProjects: 3,
-      monthlyTokenLimit: 100000,
+      name: "Limited",
+      nameAr: "محدودة",
+      slug: "limited",
+      priceMonthlyUsd: "9.00",
+      priceYearlyUsd: "86.00",
+      maxProjects: 5,
+      monthlyTokenLimit: 200000,
       dailyLimitUsd: "5.0000",
-      monthlyLimitUsd: "10.0000",
+      monthlyLimitUsd: "15.0000",
       supportType: "community",
-      features: { livePreview: true, codeExport: false, customDomain: false },
+      features: {
+        livePreview: true,
+        codeExport: false,
+        customDomain: false,
+        sandboxExecution: false,
+        autoFix: false,
+        packageInstall: false,
+        aiAgentFull: false,
+      },
       sortOrder: 0,
     },
     {
-      name: "Pro",
-      nameAr: "متقدم",
-      slug: "pro",
-      priceMonthlyUsd: "19.00",
-      maxProjects: 20,
-      monthlyTokenLimit: 1000000,
-      dailyLimitUsd: "20.0000",
-      monthlyLimitUsd: "50.0000",
+      name: "Professional",
+      nameAr: "احترافية",
+      slug: "professional",
+      priceMonthlyUsd: "39.00",
+      priceYearlyUsd: "348.00",
+      maxProjects: 50,
+      monthlyTokenLimit: 2000000,
+      dailyLimitUsd: "50.0000",
+      monthlyLimitUsd: "120.0000",
       supportType: "priority",
-      features: { livePreview: true, codeExport: true, customDomain: true },
-      sortOrder: 1,
-    },
-    {
-      name: "Team",
-      nameAr: "فرق",
-      slug: "team",
-      priceMonthlyUsd: "49.00",
-      maxProjects: 100,
-      monthlyTokenLimit: 5000000,
-      dailyLimitUsd: "100.0000",
-      monthlyLimitUsd: "200.0000",
-      supportType: "dedicated",
       features: {
         livePreview: true,
         codeExport: true,
         customDomain: true,
-        teamCollaboration: true,
-        priorityQueue: true,
+        sandboxExecution: true,
+        autoFix: true,
+        packageInstall: true,
+        aiAgentFull: true,
       },
-      sortOrder: 2,
+      sortOrder: 1,
     },
   ]);
+}
+
+async function migrateLegacyPlans() {
+  const legacyPlans = await db
+    .select({ id: plansTable.id, slug: plansTable.slug })
+    .from(plansTable)
+    .where(sql`${plansTable.slug} IN ('basic', 'pro', 'team')`);
+
+  if (legacyPlans.length === 0) return;
+
+  const basicPlan = legacyPlans.find((p) => p.slug === "basic");
+  const proPlan = legacyPlans.find((p) => p.slug === "pro");
+  const teamPlan = legacyPlans.find((p) => p.slug === "team");
+
+  if (basicPlan) {
+    await db
+      .update(plansTable)
+      .set({
+        name: "Limited",
+        nameAr: "محدودة",
+        slug: "limited",
+        priceMonthlyUsd: "9.00",
+        priceYearlyUsd: "86.00",
+        maxProjects: 5,
+        monthlyTokenLimit: 200000,
+        dailyLimitUsd: "5.0000",
+        monthlyLimitUsd: "15.0000",
+        supportType: "community",
+        features: {
+          livePreview: true,
+          codeExport: false,
+          customDomain: false,
+          sandboxExecution: false,
+          autoFix: false,
+          packageInstall: false,
+          aiAgentFull: false,
+        },
+        sortOrder: 0,
+      })
+      .where(eq(plansTable.id, basicPlan.id));
+  }
+
+  if (proPlan) {
+    await db
+      .update(plansTable)
+      .set({
+        name: "Professional",
+        nameAr: "احترافية",
+        slug: "professional",
+        priceMonthlyUsd: "39.00",
+        priceYearlyUsd: "348.00",
+        maxProjects: 50,
+        monthlyTokenLimit: 2000000,
+        dailyLimitUsd: "50.0000",
+        monthlyLimitUsd: "120.0000",
+        supportType: "priority",
+        features: {
+          livePreview: true,
+          codeExport: true,
+          customDomain: true,
+          sandboxExecution: true,
+          autoFix: true,
+          packageInstall: true,
+          aiAgentFull: true,
+        },
+        sortOrder: 1,
+      })
+      .where(eq(plansTable.id, proPlan.id));
+  }
+
+  if (teamPlan) {
+    const professionalPlanId = proPlan?.id;
+    if (professionalPlanId) {
+      await db
+        .update(subscriptionsTable)
+        .set({ planId: professionalPlanId })
+        .where(eq(subscriptionsTable.planId, teamPlan.id));
+    }
+    await db
+      .update(plansTable)
+      .set({ isActive: false })
+      .where(eq(plansTable.id, teamPlan.id));
+  }
 }
 
 router.get("/billing/plans", async (_req, res) => {
@@ -83,7 +168,9 @@ router.get("/billing/plans", async (_req, res) => {
         id: p.id,
         name: p.name,
         nameAr: p.nameAr,
+        slug: p.slug,
         priceMonthlyUsd: parseFloat(p.priceMonthlyUsd),
+        priceYearlyUsd: p.priceYearlyUsd ? parseFloat(p.priceYearlyUsd) : null,
         maxProjects: p.maxProjects,
         monthlyTokenLimit: p.monthlyTokenLimit,
         features: p.features,
@@ -119,7 +206,7 @@ router.get("/billing/subscription", requireBillingAccess("billing.view"), async 
       const [freePlan] = await db
         .select()
         .from(plansTable)
-        .where(eq(plansTable.slug, "basic"))
+        .where(eq(plansTable.slug, "limited"))
         .limit(1);
 
       return res.json({
@@ -138,11 +225,11 @@ router.get("/billing/subscription", requireBillingAccess("billing.view"), async 
             }
           : {
               id: "00000000-0000-0000-0000-000000000000",
-              name: "Basic",
-              nameAr: "أساسي",
-              priceMonthlyUsd: 0,
-              maxProjects: 3,
-              monthlyTokenLimit: 100000,
+              name: "Limited",
+              nameAr: "محدودة",
+              priceMonthlyUsd: 9,
+              maxProjects: 5,
+              monthlyTokenLimit: 200000,
               supportType: "community",
             },
         status: "active",
@@ -424,7 +511,7 @@ router.post("/billing/subscription/cancel", requireBillingAccess("billing.manage
     const [basicPlan] = await db
       .select()
       .from(plansTable)
-      .where(eq(plansTable.slug, "basic"))
+      .where(eq(plansTable.slug, "limited"))
       .limit(1);
 
     if (basicPlan) {

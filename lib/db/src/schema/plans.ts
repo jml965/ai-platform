@@ -8,6 +8,7 @@ export const plansTable = pgTable("plans", {
   nameAr: text("name_ar").notNull(),
   slug: text("slug").notNull().unique(),
   priceMonthlyUsd: numeric("price_monthly_usd", { precision: 10, scale: 2 }).notNull(),
+  priceYearlyUsd: numeric("price_yearly_usd", { precision: 10, scale: 2 }),
   maxProjects: integer("max_projects").notNull(),
   monthlyTokenLimit: integer("monthly_token_limit").notNull(),
   dailyLimitUsd: numeric("daily_limit_usd", { precision: 10, scale: 4 }).notNull(),
