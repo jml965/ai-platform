@@ -28,11 +28,14 @@
                     └── يسجل في سجل التنفيذ
 ```
 
-### 2. قائمة الانتظار (Task Queue)
+### 2. قائمة الانتظار (Task Queue — Redis + BullMQ)
 
+- مبنية على Redis كطبقة تخزين مؤقتة (in-memory) مع BullMQ لإدارة الـ jobs والـ workers
+- 5 queues منفصلة: `build:codegen`، `build:review`، `build:fix`، `build:files`، `notifications`
 - كل مهمة لها حالة: `pending` → `in_progress` → `completed` / `failed`
 - المهام تُنفَّذ بالتسلسل داخل المشروع الواحد
 - المهام من مشاريع مختلفة يمكن أن تعمل بالتوازي
+- BullMQ يوفر: إعادة المحاولة التلقائية، الأولويات، rate limiting لكل وكيل
 
 ### 3. الوكلاء (Agents)
 
