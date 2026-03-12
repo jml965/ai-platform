@@ -473,6 +473,11 @@ export function getSandboxStatus(sandboxId: string): {
   };
 }
 
+export function getSandboxWorkDir(sandboxId: string): string | null {
+  const sandbox = activeSandboxes.get(sandboxId);
+  return sandbox?.workDir ?? null;
+}
+
 export function getProjectSandbox(projectId: string): string | null {
   for (const [id, sandbox] of activeSandboxes) {
     if (sandbox.projectId === projectId && (sandbox.status === "created" || sandbox.status === "running")) {

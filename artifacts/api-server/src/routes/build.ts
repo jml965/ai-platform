@@ -3,7 +3,8 @@ import { db } from "@workspace/db";
 import { buildTasksTable, executionLogsTable, projectsTable, usersTable, teamMembersTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 import { StartBuildBody } from "@workspace/api-zod";
-import { startBuild, cancelBuild, getActiveBuild, checkBuildLimits } from "../lib/agents";
+import { startBuild, cancelBuild, getActiveBuild, checkBuildLimits, getRunner } from "../lib/agents";
+import type { RunnerOutput } from "../lib/agents";
 import { getUserId, getUserTeamRole, hasPermission } from "../middlewares/permissions";
 
 const router: IRouter = Router();
@@ -220,6 +221,149 @@ router.get("/build/:buildId/logs", async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: { code: "INTERNAL", message: "Failed to get build logs" } });
+  }
+});
+
+router.get("/build/:buildId/runner/stream", async (req, res) => {
+  try {
+    const { buildId } = req.params;
+    const userId = getUserId(req);
+    const activeBuild = getActiveBuild(buildId);
+
+    let projectId = activeBuild?.projectId;
+    if (!projectId) {
+      const [firstTask] = await db
+        .select({ projectId: buildTasksTable.projectId })
+        .from(buildTasksTable)
+        .where(eq(buildTasksTable.buildId, buildId))
+        .limit(1);
+      projectId = firstTask?.projectId;
+    }
+
+    if (projectId) {
+      const access = await verifyProjectBuildAccess(userId, projectId, "build.view");
+      if (!access.allowed) {
+        res.status(403).json({ error: { code: "FORBIDDEN", message: "Access denied" } });
+        return;
+      }
+    }
+
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    });
+
+    res.write("data: " + JSON.stringify({ type: "info", message: "Connected to runner stream", timestamp: new Date().toISOString() }) + "\n\n");
+
+    const runner = getRunner(buildId);
+    if (!runner) {
+      res.write("data: " + JSON.stringify({ type: "info", message: "No active runner for this build. Waiting...", timestamp: new Date().toISOString() }) + "\n\n");
+    }
+
+    const onOutput = (output: RunnerOutput) => {
+      if (!res.writableEnded) {
+        res.write("data: " + JSON.stringify(output) + "\n\n");
+      }
+    };
+
+    let currentRunner = runner;
+    let unsubscribe: (() => void) | null = null;
+    if (currentRunner) {
+      unsubscribe = currentRunner.onOutput(onOutput);
+
+      const status = currentRunner.getStatus();
+      res.write("data: " + JSON.stringify({ type: "info", message: `Runner status: ${status.phase}, project: ${status.projectType}`, timestamp: new Date().toISOString() }) + "\n\n");
+    }
+
+    const pollInterval = setInterval(() => {
+      if (!currentRunner) {
+        const newRunner = getRunner(buildId);
+        if (newRunner) {
+          currentRunner = newRunner;
+          unsubscribe = currentRunner.onOutput(onOutput);
+          res.write("data: " + JSON.stringify({ type: "info", message: "Runner attached", timestamp: new Date().toISOString() }) + "\n\n");
+        }
+      }
+
+      if (currentRunner) {
+        const status = currentRunner.getStatus();
+        const terminalPhases = ["failed", "stopped", "idle"];
+        if (terminalPhases.includes(status.phase)) {
+          if (!res.writableEnded) {
+            res.write("data: " + JSON.stringify({ type: "info", message: `Runner finished: ${status.phase}`, timestamp: new Date().toISOString() }) + "\n\n");
+            res.end();
+          }
+          clearInterval(pollInterval);
+          clearInterval(keepAlive);
+        }
+      }
+
+      const build = getActiveBuild(buildId);
+      if (build && (build.status === "completed" || build.status === "failed" || build.status === "cancelled")) {
+        if (!res.writableEnded) {
+          res.write("data: " + JSON.stringify({ type: "info", message: `Build finished: ${build.status}`, timestamp: new Date().toISOString() }) + "\n\n");
+          res.end();
+        }
+        clearInterval(pollInterval);
+        clearInterval(keepAlive);
+      }
+    }, 2000);
+
+    const keepAlive = setInterval(() => {
+      if (!res.writableEnded) {
+        res.write(": keepalive\n\n");
+      }
+    }, 15000);
+
+    req.on("close", () => {
+      clearInterval(pollInterval);
+      clearInterval(keepAlive);
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    });
+  } catch (error) {
+    if (!res.headersSent) {
+      res.status(500).json({ error: { code: "INTERNAL", message: "Failed to stream runner output" } });
+    }
+  }
+});
+
+router.get("/build/:buildId/runner/status", async (req, res) => {
+  try {
+    const { buildId } = req.params;
+    const userId = getUserId(req);
+    const activeBuild = getActiveBuild(buildId);
+
+    let projectId = activeBuild?.projectId;
+    if (!projectId) {
+      const [firstTask] = await db
+        .select({ projectId: buildTasksTable.projectId })
+        .from(buildTasksTable)
+        .where(eq(buildTasksTable.buildId, buildId))
+        .limit(1);
+      projectId = firstTask?.projectId;
+    }
+
+    if (projectId) {
+      const access = await verifyProjectBuildAccess(userId, projectId, "build.view");
+      if (!access.allowed) {
+        res.status(403).json({ error: { code: "FORBIDDEN", message: "Access denied" } });
+        return;
+      }
+    }
+
+    const runner = getRunner(buildId);
+    if (!runner) {
+      res.status(404).json({ error: { code: "NOT_FOUND", message: "No active runner for this build" } });
+      return;
+    }
+
+    res.json({ data: runner.getStatus() });
+  } catch (error) {
+    res.status(500).json({ error: { code: "INTERNAL", message: "Failed to get runner status" } });
   }
 });
 

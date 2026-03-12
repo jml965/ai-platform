@@ -15,6 +15,7 @@ import { CodeGenAgent } from "./codegen-agent";
 import { ReviewerAgent } from "./reviewer-agent";
 import { FixerAgent } from "./fixer-agent";
 import { FileManagerAgent } from "./filemanager-agent";
+import { PackageRunnerAgent, setRunner, removeRunner } from "./package-runner-agent";
 import { checkSpendingLimits, checkAndNotifyLimits } from "../token-limits";
 import { runQaWithRetry } from "./qa-pipeline";
 import type {
@@ -422,6 +423,60 @@ async function executeBuildPipeline(
     );
 
     if (saveResult.success) {
+      if (build.cancelRequested) {
+        await finalizeBuild(buildId, projectId, "cancelled", totalTokens, totalCost);
+        return;
+      }
+
+      const runnerTaskId = await createTask(buildId, projectId, "package_runner");
+      await logExecution(buildId, projectId, runnerTaskId, "package_runner", "install_and_run", "in_progress", {
+        fileCount: generatedFiles.length,
+      });
+
+      const runnerStartTime = Date.now();
+      const packageRunner = new PackageRunnerAgent(constitution);
+      setRunner(buildId, packageRunner);
+
+      const outputLogs: { type: string; message: string; timestamp: string }[] = [];
+      packageRunner.onOutput((output) => {
+        outputLogs.push(output);
+      });
+
+      try {
+        const runnerResult = await packageRunner.executeWithFiles(projectId, generatedFiles);
+        const runnerDuration = Date.now() - runnerStartTime;
+
+        if (runnerResult.success) {
+          await completeTask(runnerTaskId, 0, 0, runnerDuration);
+        } else {
+          await failTask(runnerTaskId, runnerResult.error ?? "Package runner failed", runnerDuration);
+        }
+
+        await logExecution(
+          buildId, projectId, runnerTaskId, "package_runner", "install_and_run",
+          runnerResult.success ? "completed" : "failed",
+          {
+            ...runnerResult.data,
+            outputLogCount: outputLogs.length,
+            lastOutput: outputLogs.slice(-5).map((l) => l.message).join("\n"),
+          },
+          0,
+          runnerDuration
+        );
+
+        if (!runnerResult.success) {
+          console.error(`Build ${buildId} package runner failed:`, runnerResult.error);
+        }
+      } catch (runnerError) {
+        const runnerDuration = Date.now() - runnerStartTime;
+        const errMsg = runnerError instanceof Error ? runnerError.message : String(runnerError);
+        await failTask(runnerTaskId, errMsg, runnerDuration);
+        await logExecution(buildId, projectId, runnerTaskId, "package_runner", "install_and_run", "failed", {
+          error: errMsg,
+        }, 0, runnerDuration);
+        console.error(`Build ${buildId} package runner error:`, runnerError);
+      }
+
       try {
         await logExecution(buildId, projectId, null, "qa_pipeline", "qa_validation", "in_progress");
         const qaReportId = await runQaWithRetry(buildId, projectId, userId);
@@ -434,7 +489,14 @@ async function executeBuildPipeline(
       }
     }
 
-    const finalStatus = saveResult.success ? "completed" : "failed";
+    const runnerFailed = saveResult.success &&
+      (await db.select({ status: buildTasksTable.status })
+        .from(buildTasksTable)
+        .where(and(eq(buildTasksTable.buildId, buildId), eq(buildTasksTable.agentType, "package_runner")))
+        .limit(1)
+        .then(rows => rows.length > 0 && rows[0].status === "failed"));
+
+    const finalStatus = !saveResult.success ? "failed" : runnerFailed ? "failed" : "completed";
     await finalizeBuild(buildId, projectId, finalStatus, totalTokens, totalCost);
   } catch (error) {
     console.error(`Build ${buildId} error:`, error);
@@ -546,5 +608,6 @@ async function finalizeBuild(
 
   setTimeout(() => {
     activeBuilds.delete(buildId);
+    removeRunner(buildId);
   }, 5 * 60 * 1000);
 }
