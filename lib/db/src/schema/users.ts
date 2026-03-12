@@ -11,6 +11,7 @@ export const usersTable = pgTable("users", {
   locale: text("locale").notNull().default("en"),
   dailyLimitUsd: numeric("daily_limit_usd", { precision: 10, scale: 4 }).default("5.0000"),
   monthlyLimitUsd: numeric("monthly_limit_usd", { precision: 10, scale: 4 }).default("50.0000"),
+  perProjectLimitUsd: numeric("per_project_limit_usd", { precision: 10, scale: 4 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

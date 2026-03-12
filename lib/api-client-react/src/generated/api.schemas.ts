@@ -257,6 +257,21 @@ export interface TokenSummary {
   remainingMonthlyUsd?: number;
 }
 
+export interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  titleAr: string;
+  message: string;
+  messageAr: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface NotificationListResponse {
+  data: Notification[];
+}
+
 export type PlanFeatures = { [key: string]: unknown };
 
 export interface Plan {

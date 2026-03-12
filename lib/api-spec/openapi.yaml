@@ -485,6 +485,41 @@ paths:
               schema:
                 $ref: "#/components/schemas/TokenSummary"
 
+  /tokens/notifications:
+    get:
+      operationId: getTokenNotifications
+      tags: [tokens]
+      summary: Get notifications
+      description: Returns token-related notifications for the user
+      responses:
+        "200":
+          description: Notifications list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationListResponse"
+
+  /tokens/notifications/{notificationId}/read:
+    patch:
+      operationId: markNotificationRead
+      tags: [tokens]
+      summary: Mark notification read
+      description: Marks a notification as read
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Marked as read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
   /billing/plans:
     get:
       operationId: listPlans
@@ -1260,6 +1295,47 @@ components:
         - todayCostUsd
         - monthTokens
         - monthCostUsd
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+        title:
+          type: string
+        titleAr:
+          type: string
+        message:
+          type: string
+        messageAr:
+          type: string
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - type
+        - title
+        - titleAr
+        - message
+        - messageAr
+        - isRead
+        - createdAt
+
+    NotificationListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
+      required:
+        - data
 
     Plan:
       type: object

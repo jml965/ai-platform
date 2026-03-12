@@ -398,6 +398,38 @@ export const GetTokenSummaryResponse = zod.object({
 });
 
 /**
+ * Returns token-related notifications for the user
+ * @summary Get notifications
+ */
+export const GetTokenNotificationsResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      type: zod.string(),
+      title: zod.string(),
+      titleAr: zod.string(),
+      message: zod.string(),
+      messageAr: zod.string(),
+      isRead: zod.boolean(),
+      createdAt: zod.date(),
+    }),
+  ),
+});
+
+/**
+ * Marks a notification as read
+ * @summary Mark notification read
+ */
+export const MarkNotificationReadParams = zod.object({
+  notificationId: zod.coerce.string().uuid(),
+});
+
+export const MarkNotificationReadResponse = zod.object({
+  success: zod.boolean(),
+  message: zod.string().optional(),
+});
+
+/**
  * Returns all available subscription plans
  * @summary List subscription plans
  */

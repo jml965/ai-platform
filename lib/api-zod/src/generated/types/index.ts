@@ -35,6 +35,8 @@ export * from "./invoiceListResponse";
 export * from "./invoiceStatus";
 export * from "./listInvoicesParams";
 export * from "./listProjectsParams";
+export * from "./notification";
+export * from "./notificationListResponse";
 export * from "./paginationMeta";
 export * from "./plan";
 export * from "./planFeatures";

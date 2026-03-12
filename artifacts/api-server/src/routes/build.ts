@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { buildTasksTable, executionLogsTable, projectsTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 import { StartBuildBody } from "@workspace/api-zod";
-import { startBuild, cancelBuild, getActiveBuild } from "../lib/agents";
+import { startBuild, cancelBuild, getActiveBuild, checkBuildLimits } from "../lib/agents";
 
 const router: IRouter = Router();
 
@@ -24,6 +24,18 @@ router.post("/build/start", async (req, res) => {
 
     if (project.status === "building") {
       res.status(409).json({ error: { code: "BUILD_IN_PROGRESS", message: "A build is already in progress for this project" } });
+      return;
+    }
+
+    const limitResult = await checkBuildLimits(project.userId, body.projectId);
+    if (!limitResult.allowed) {
+      res.status(429).json({
+        error: {
+          code: "TOKEN_LIMIT_REACHED",
+          message: limitResult.reason || "Spending limit reached",
+          message_ar: limitResult.reasonAr,
+        },
+      });
       return;
     }
 

@@ -12,6 +12,7 @@ import { CodeGenAgent } from "./codegen-agent";
 import { ReviewerAgent } from "./reviewer-agent";
 import { FixerAgent } from "./fixer-agent";
 import { FileManagerAgent } from "./filemanager-agent";
+import { checkSpendingLimits, checkAndNotifyLimits } from "../token-limits";
 import type {
   BuildContext,
   BuildStatus,
@@ -91,6 +92,10 @@ async function recordTokenUsage(
     costUsd: costUsd.toFixed(6),
     usageDate: new Date().toISOString().split("T")[0],
   });
+
+  await checkAndNotifyLimits(userId, projectId, costUsd).catch((err) =>
+    console.error("Failed to check/notify limits:", err)
+  );
 }
 
 function estimateCost(tokensUsed: number): number {
@@ -138,6 +143,14 @@ async function failTask(taskId: string, errorMessage: string, durationMs: number
       completedAt: new Date(),
     })
     .where(eq(buildTasksTable.id, taskId));
+}
+
+export async function checkBuildLimits(
+  userId: string,
+  projectId: string
+): Promise<{ allowed: boolean; reason?: string; reasonAr?: string }> {
+  const limits = await checkSpendingLimits(userId, projectId);
+  return { allowed: limits.allowed, reason: limits.reason, reasonAr: limits.reasonAr };
 }
 
 export async function startBuild(
@@ -191,6 +204,15 @@ async function executeBuildPipeline(
 
   try {
     await logExecution(buildId, projectId, null, "system", "build_started", "in_progress", { prompt });
+
+    const limitCheck = await checkSpendingLimits(userId, projectId);
+    if (!limitCheck.allowed) {
+      await logExecution(buildId, projectId, null, "system", "limit_exceeded", "failed", {
+        reason: limitCheck.reason,
+      });
+      await finalizeBuild(buildId, projectId, "failed", totalTokens, totalCost);
+      return;
+    }
 
     if (build.cancelRequested) {
       await finalizeBuild(buildId, projectId, "cancelled", totalTokens, totalCost);
