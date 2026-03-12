@@ -77,6 +77,7 @@ async function recordTokenUsage(
   projectId: string,
   buildId: string,
   agentType: string,
+  model: string,
   tokensUsed: number,
   costUsd: number
 ) {
@@ -89,7 +90,7 @@ async function recordTokenUsage(
     projectId,
     buildId,
     agentType,
-    model: "gpt-5.2",
+    model,
     tokensInput,
     tokensOutput,
     costUsd: costUsd.toFixed(6),
@@ -101,7 +102,13 @@ async function recordTokenUsage(
   );
 }
 
-function estimateCost(tokensUsed: number): number {
+function estimateCost(tokensUsed: number, model: string): number {
+  if (model.startsWith("claude-sonnet")) {
+    return tokensUsed * 0.000015;
+  }
+  if (model === "o1") {
+    return tokensUsed * 0.00006;
+  }
   return tokensUsed * 0.00003;
 }
 
@@ -237,10 +244,10 @@ async function executeBuildPipeline(
 
     const codegenResult = await codegenAgent.execute(context);
     totalTokens += codegenResult.tokensUsed;
-    const codegenCost = estimateCost(codegenResult.tokensUsed);
+    const codegenCost = estimateCost(codegenResult.tokensUsed, codegenAgent.modelConfig.model);
     totalCost += codegenCost;
 
-    await recordTokenUsage(userId, projectId, buildId, "codegen", codegenResult.tokensUsed, codegenCost);
+    await recordTokenUsage(userId, projectId, buildId, "codegen", codegenAgent.modelConfig.model, codegenResult.tokensUsed, codegenCost);
 
     if (codegenResult.success) {
       await completeTask(codegenTaskId, codegenResult.tokensUsed, codegenCost, codegenResult.durationMs);
@@ -289,10 +296,10 @@ async function executeBuildPipeline(
 
     const reviewResult = await reviewerAgent.execute(context);
     totalTokens += reviewResult.tokensUsed;
-    const reviewCost = estimateCost(reviewResult.tokensUsed);
+    const reviewCost = estimateCost(reviewResult.tokensUsed, reviewerAgent.modelConfig.model);
     totalCost += reviewCost;
 
-    await recordTokenUsage(userId, projectId, buildId, "reviewer", reviewResult.tokensUsed, reviewCost);
+    await recordTokenUsage(userId, projectId, buildId, "reviewer", reviewerAgent.modelConfig.model, reviewResult.tokensUsed, reviewCost);
 
     if (reviewResult.success) {
       await completeTask(reviewTaskId, reviewResult.tokensUsed, reviewCost, reviewResult.durationMs);
@@ -346,10 +353,10 @@ async function executeBuildPipeline(
         context.tokensUsedSoFar = totalTokens;
         const fixResult = await fixerAgent.executeWithIssues(context, errorIssues);
         totalTokens += fixResult.tokensUsed;
-        const fixCost = estimateCost(fixResult.tokensUsed);
+        const fixCost = estimateCost(fixResult.tokensUsed, fixerAgent.modelConfig.model);
         totalCost += fixCost;
 
-        await recordTokenUsage(userId, projectId, buildId, "fixer", fixResult.tokensUsed, fixCost);
+        await recordTokenUsage(userId, projectId, buildId, "fixer", fixerAgent.modelConfig.model, fixResult.tokensUsed, fixCost);
 
         if (fixResult.success) {
           await completeTask(fixTaskId, fixResult.tokensUsed, fixCost, fixResult.durationMs);

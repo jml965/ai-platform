@@ -1,8 +1,9 @@
-import { BaseAgent } from "./base-agent";
+import { BaseAgent, type ModelConfig } from "./base-agent";
 import type { AgentResult, BuildContext, CodeIssue, GeneratedFile } from "./types";
 
 export class FixerAgent extends BaseAgent {
   readonly agentType = "fixer" as const;
+  readonly modelConfig: ModelConfig = { provider: "anthropic", model: "claude-sonnet-4-5" };
 
   readonly systemPrompt = `You are a code fixer AI agent. Your job is to fix issues found during code review. You receive the original code and a list of issues, and you return the corrected files.
 

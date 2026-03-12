@@ -1,10 +1,19 @@
 import { openai } from "@workspace/integrations-openai-ai-server";
+import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { AgentConstitution, checkTokenBudget } from "./constitution";
 import type { AgentResult, AgentType, BuildContext } from "./types";
+
+export type AIProvider = "openai" | "anthropic";
+
+export interface ModelConfig {
+  provider: AIProvider;
+  model: string;
+}
 
 export abstract class BaseAgent {
   abstract readonly agentType: AgentType;
   abstract readonly systemPrompt: string;
+  abstract readonly modelConfig: ModelConfig;
 
   protected constitution: AgentConstitution;
 
@@ -31,8 +40,19 @@ export abstract class BaseAgent {
       Math.max(1024, budget.remaining - estimatedPromptTokens)
     );
 
+    if (this.modelConfig.provider === "anthropic") {
+      return this.callAnthropic(messages, maxCompletion);
+    }
+
+    return this.callOpenAI(messages, maxCompletion);
+  }
+
+  private async callOpenAI(
+    messages: { role: "system" | "user" | "assistant"; content: string }[],
+    maxCompletion: number
+  ): Promise<{ content: string; tokensUsed: number }> {
     const response = await openai.chat.completions.create({
-      model: "gpt-5.2",
+      model: this.modelConfig.model,
       max_completion_tokens: maxCompletion,
       messages,
     });
@@ -40,6 +60,32 @@ export abstract class BaseAgent {
     const content = response.choices[0]?.message?.content ?? "";
     const usage = response.usage;
     const tokensUsed = (usage?.prompt_tokens ?? 0) + (usage?.completion_tokens ?? 0);
+
+    return { content, tokensUsed };
+  }
+
+  private async callAnthropic(
+    messages: { role: "system" | "user" | "assistant"; content: string }[],
+    maxCompletion: number
+  ): Promise<{ content: string; tokensUsed: number }> {
+    const systemMessage = messages.find(m => m.role === "system");
+    const chatMessages = messages
+      .filter(m => m.role !== "system")
+      .map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
+
+    const response = await anthropic.messages.create({
+      model: this.modelConfig.model,
+      max_tokens: maxCompletion,
+      system: systemMessage?.content,
+      messages: chatMessages,
+    });
+
+    const content = response.content
+      .filter((block: { type: string }) => block.type === "text")
+      .map((block: { type: string; text: string }) => block.text)
+      .join("");
+
+    const tokensUsed = (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0);
 
     return { content, tokensUsed };
   }

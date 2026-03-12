@@ -1,8 +1,9 @@
-import { BaseAgent } from "./base-agent";
+import { BaseAgent, type ModelConfig } from "./base-agent";
 import type { AgentResult, BuildContext, GeneratedFile } from "./types";
 
 export class CodeGenAgent extends BaseAgent {
   readonly agentType = "codegen" as const;
+  readonly modelConfig: ModelConfig = { provider: "anthropic", model: "claude-sonnet-4-5" };
 
   readonly systemPrompt = `You are a senior web developer AI agent. Your job is to generate clean, production-ready website code based on user descriptions.
 

@@ -1,8 +1,9 @@
-import { BaseAgent } from "./base-agent";
+import { BaseAgent, type ModelConfig } from "./base-agent";
 import type { AgentResult, BuildContext, CodeReviewResult } from "./types";
 
 export class ReviewerAgent extends BaseAgent {
   readonly agentType = "reviewer" as const;
+  readonly modelConfig: ModelConfig = { provider: "openai", model: "o1" };
 
   readonly systemPrompt = `You are a senior code reviewer AI agent. Your job is to review generated website code for quality, security, accessibility, and best practices.
 
