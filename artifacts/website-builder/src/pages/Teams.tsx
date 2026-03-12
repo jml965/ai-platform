@@ -307,12 +307,14 @@ function TeamCard({
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="p-2 text-white/30 hover:text-red-400 transition-colors"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          {(team.myRole === "admin") && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              className="p-2 text-white/30 hover:text-red-400 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
           <ChevronDown
             className={`w-5 h-5 text-white/30 transition-transform ${isSelected ? "rotate-180" : ""}`}
           />
@@ -327,7 +329,7 @@ function TeamCard({
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
           >
-            <TeamDetails teamId={team.id} ownerId={team.ownerId} t={t} lang={lang} />
+            <TeamDetails teamId={team.id} ownerId={team.ownerId} myRole={team.myRole} t={t} lang={lang} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -338,14 +340,19 @@ function TeamCard({
 function TeamDetails({
   teamId,
   ownerId,
+  myRole,
   t,
   lang,
 }: {
   teamId: string;
   ownerId: string;
+  myRole: string;
   t: any;
   lang: string;
 }) {
+  const canViewMembers = myRole === "admin" || myRole === "developer";
+  const canInvite = myRole === "admin";
+  const canManageMembers = myRole === "admin";
   const { data: membersData, isLoading, refetch } = useListTeamMembers(teamId);
   const inviteMut = useInviteTeamMember();
   const updateRoleMut = useUpdateTeamMemberRole();
@@ -390,21 +397,35 @@ function TeamDetails({
 
   const members = membersData?.data ?? [];
 
+  if (!canViewMembers) {
+    return (
+      <div className="border-t border-white/10 p-5 text-center text-white/40">
+        <p className="text-sm">
+          {lang === "ar"
+            ? "ليس لديك صلاحية لعرض أعضاء الفريق"
+            : "You do not have permission to view team members"}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="border-t border-white/10 p-5">
       <div className="flex items-center justify-between mb-4">
         <h4 className="font-medium text-white/80">{t.team_members}</h4>
-        <button
-          onClick={() => setShowInvite(!showInvite)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600/20 hover:bg-violet-600/30 text-violet-400 rounded-lg text-sm transition-colors"
-        >
-          <UserPlus className="w-3.5 h-3.5" />
-          {t.team_invite}
-        </button>
+        {canInvite && (
+          <button
+            onClick={() => setShowInvite(!showInvite)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600/20 hover:bg-violet-600/30 text-violet-400 rounded-lg text-sm transition-colors"
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            {t.team_invite}
+          </button>
+        )}
       </div>
 
       <AnimatePresence>
-        {showInvite && (
+        {canInvite && showInvite && (
           <motion.div
             initial={{ opacity: 0, y: -5 }}
             animate={{ opacity: 1, y: 0 }}
@@ -490,7 +511,7 @@ function TeamDetails({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {isOwner ? (
+                  {isOwner || !canManageMembers ? (
                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border ${ROLE_COLORS[role]}`}>
                       {ROLE_ICONS[role]}
                       {t[`team_role_${role}` as keyof typeof t]}

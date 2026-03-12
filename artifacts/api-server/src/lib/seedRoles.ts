@@ -24,13 +24,11 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "logs.view",
   ],
   reviewer: [
-    "team.view",
     "project.view",
     "build.view",
     "logs.view",
   ],
   viewer: [
-    "team.view",
     "project.view",
   ],
 };

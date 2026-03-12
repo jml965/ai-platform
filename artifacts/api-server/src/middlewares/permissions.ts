@@ -42,13 +42,11 @@ const ROLE_PERMISSIONS: Record<TeamRole, Permission[]> = {
     "logs.view",
   ],
   reviewer: [
-    "team.view",
     "project.view",
     "build.view",
     "logs.view",
   ],
   viewer: [
-    "team.view",
     "project.view",
   ],
 };
