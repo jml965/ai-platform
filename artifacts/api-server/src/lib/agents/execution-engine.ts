@@ -4,6 +4,8 @@ import {
   executionLogsTable,
   projectsTable,
   tokenUsageTable,
+  creditsLedgerTable,
+  usersTable,
 } from "@workspace/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
@@ -462,6 +464,39 @@ async function finalizeBuild(
     totalTokens,
     totalCost,
   });
+
+  if (totalCost > 0 && build?.userId) {
+    try {
+      const [user] = await db
+        .select({ creditBalanceUsd: usersTable.creditBalanceUsd })
+        .from(usersTable)
+        .where(eq(usersTable.id, build.userId))
+        .limit(1);
+
+      const currentBalance = parseFloat(user?.creditBalanceUsd ?? "0");
+      const actualDeducted = Math.min(currentBalance, totalCost);
+      const newBalance = currentBalance - actualDeducted;
+
+      if (actualDeducted > 0) {
+        await db
+          .update(usersTable)
+          .set({ creditBalanceUsd: newBalance.toFixed(6) })
+          .where(eq(usersTable.id, build.userId));
+
+        await db.insert(creditsLedgerTable).values({
+          userId: build.userId,
+          type: "deduction",
+          amountUsd: (-actualDeducted).toFixed(6),
+          balanceAfter: newBalance.toFixed(6),
+          description: `Build cost: ${buildId.slice(0, 8)}`,
+          referenceId: buildId,
+          referenceType: "build",
+        });
+      }
+    } catch (err) {
+      console.error(`Failed to deduct credits for build ${buildId}:`, err);
+    }
+  }
 
   setTimeout(() => {
     activeBuilds.delete(buildId);

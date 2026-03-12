@@ -5,6 +5,7 @@ import projectsRouter from "./projects";
 import buildRouter from "./build";
 import agentsRouter from "./agents";
 import tokensRouter from "./tokens";
+import billingRouter from "./billing";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(projectsRouter);
 router.use(buildRouter);
 router.use(agentsRouter);
 router.use(tokensRouter);
+router.use(billingRouter);
 
 export default router;

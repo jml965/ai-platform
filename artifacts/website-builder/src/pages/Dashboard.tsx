@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, LayoutTemplate, Trash2, Loader2, Coins, LogOut } from "lucide-react";
+import { Plus, LayoutTemplate, Trash2, Loader2, Coins, LogOut, CreditCard } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import type { Project, ProjectStatus as ProjectStatusType } from "@workspace/api-client-react";
@@ -45,6 +45,10 @@ export default function Dashboard() {
               <span className="text-sm font-medium">{tokenSummary.monthTokens.toLocaleString()} {t.tokens}</span>
             </div>
           )}
+          <Link href="/billing" className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 text-sm text-muted-foreground hover:text-foreground hover:border-white/20 transition-all">
+            <CreditCard className="w-4 h-4" />
+            {t.billing}
+          </Link>
           <LanguageToggle />
           <button onClick={handleLogout} className="p-2 text-muted-foreground hover:text-destructive transition-colors rounded-lg hover:bg-destructive/10" title={t.logout}>
             <LogOut className="w-5 h-5" />

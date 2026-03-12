@@ -56,13 +56,18 @@ artifacts-monorepo/
 
 ## Database Schema
 
-6 tables in `lib/db/src/schema/`:
-- `users` — User accounts with locale preference and spending limits
+10 tables in `lib/db/src/schema/`:
+- `users` — User accounts with locale preference, spending limits, credit balance, and active plan
 - `projects` — Website projects with status tracking
 - `project_files` — Generated files (HTML, CSS, JS) per project
 - `build_tasks` — Individual agent tasks within a build
 - `execution_logs` — Detailed execution log entries per agent action
 - `token_usage` — Token consumption records for cost tracking
+- `notifications` — In-app notifications (spending alerts, system messages)
+- `plans` — Subscription plan catalog (Basic/Pro/Team) with limits and features
+- `subscriptions` — User subscription records with status and period dates
+- `invoices` — Invoice/payment history (subscriptions + credit top-ups)
+- `credits_ledger` — Double-entry credit ledger (topup/deduction entries)
 
 ## Agent Engine
 
@@ -84,17 +89,19 @@ Routes in `artifacts/api-server/src/routes/`:
 - `health.ts` — `GET /api/healthz`
 - `auth.ts` — `GET /api/auth/me`, `POST /api/auth/logout`, `GET /api/auth/login`
 - `projects.ts` — CRUD for projects + file listing
-- `build.ts` — Start/status/cancel/logs for builds
+- `build.ts` — Start/status/cancel/logs for builds; checks token limits before starting
 - `agents.ts` — Agent status and task details
-- `tokens.ts` — `GET /api/tokens/summary`
+- `tokens.ts` — Usage/limits/summary/notifications for token tracking
+- `billing.ts` — Plans, subscriptions, checkout, invoices, credits, top-up
 
 ## Website Builder UI
 
 Frontend artifact at `artifacts/website-builder/` (React + Vite + TailwindCSS):
 - Bilingual AR/EN with RTL/LTR support via i18n context (`src/lib/i18n.tsx`)
-- Pages: Login, Dashboard, Builder (project workspace)
-- Dashboard: project list with status badges, token usage indicator, new project modal
+- Pages: Login, Dashboard, Builder (project workspace), Billing
+- Dashboard: project list with status badges, token usage indicator, new project modal, Billing link
 - Builder: chat prompt, live preview (sandboxed iframe with CSS/JS inlining), execution log panel
+- Billing: current subscription, credit balance + top-up, plan comparison, invoice history
 - Language toggle in header on every page
 - Uses `@workspace/api-client-react` generated hooks for API integration
 - Polling for build status during active builds
