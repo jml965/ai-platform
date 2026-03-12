@@ -164,6 +164,37 @@ router.get("/qa/stats/summary", async (req, res) => {
 
     const avg = avgScoreResult[0];
 
+    const recentReports = await db
+      .select({
+        lintDetails: qaReportsTable.lintDetails,
+        runtimeDetails: qaReportsTable.runtimeDetails,
+        functionalDetails: qaReportsTable.functionalDetails,
+      })
+      .from(qaReportsTable)
+      .where(sql`${qaReportsTable.projectId} = ANY(${projectIds}) AND ${qaReportsTable.status} IN ('failed', 'warning')`)
+      .orderBy(desc(qaReportsTable.createdAt))
+      .limit(20);
+
+    const errorCounts: Record<string, number> = {};
+    for (const r of recentReports) {
+      const phases = [r.lintDetails, r.runtimeDetails, r.functionalDetails];
+      for (const phase of phases) {
+        const details = phase as { checks?: Array<{ passed: boolean; severity: string; name: string }> } | null;
+        if (details?.checks) {
+          for (const check of details.checks) {
+            if (!check.passed && (check.severity === "error" || check.severity === "warning")) {
+              errorCounts[check.name] = (errorCounts[check.name] || 0) + 1;
+            }
+          }
+        }
+      }
+    }
+
+    const commonErrors = Object.entries(errorCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name, count]) => ({ name, count }));
+
     res.json({
       totalReports,
       passRate: totalReports > 0 ? Math.round(((passedReports + warningReports) / totalReports) * 100) : 0,
@@ -179,6 +210,7 @@ router.get("/qa/stats/summary", async (req, res) => {
         functional: avg?.avgFunctional ?? 0,
       },
       averageDurationMs: avg?.avgDuration ?? 0,
+      commonErrors,
     });
   } catch (error) {
     res.status(500).json({ error: { code: "INTERNAL", message: "Failed to get QA stats" } });
