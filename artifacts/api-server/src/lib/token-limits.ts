@@ -126,38 +126,43 @@ export async function checkAndNotifyLimits(
   projectId: string,
   costJustAdded: number
 ): Promise<void> {
-  const dailyLimit = await getUserDailyLimit(userId);
-  const monthlyLimit = await getUserMonthlyLimit(userId);
+  const [user] = await db
+    .select({
+      dailyLimitUsd: usersTable.dailyLimitUsd,
+      monthlyLimitUsd: usersTable.monthlyLimitUsd,
+      perProjectLimitUsd: usersTable.perProjectLimitUsd,
+    })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId))
+    .limit(1);
+
+  if (!user) return;
+
+  const dailyLimit = parseFloat(user.dailyLimitUsd ?? "5.0");
+  const monthlyLimit = parseFloat(user.monthlyLimitUsd ?? "50.0");
+  const perProjectLimit = user.perProjectLimitUsd ? parseFloat(user.perProjectLimitUsd) : null;
 
   const today = todayDateStr();
   const monthStart = monthStartDateStr();
 
-  const [dailyRow] = await db
-    .select({
-      totalCost: sql<string>`coalesce(sum(${tokenUsageTable.costUsd})::numeric(10,6), '0')`,
-    })
-    .from(tokenUsageTable)
-    .where(
-      and(
-        eq(tokenUsageTable.userId, userId),
-        eq(tokenUsageTable.usageDate, today)
-      )
-    );
-
-  const [monthlyRow] = await db
-    .select({
-      totalCost: sql<string>`coalesce(sum(${tokenUsageTable.costUsd})::numeric(10,6), '0')`,
-    })
-    .from(tokenUsageTable)
-    .where(
-      and(
-        eq(tokenUsageTable.userId, userId),
-        gte(tokenUsageTable.usageDate, monthStart)
-      )
-    );
+  const [[dailyRow], [monthlyRow], [projectRow]] = await Promise.all([
+    db
+      .select({ totalCost: sql<string>`coalesce(sum(${tokenUsageTable.costUsd})::numeric(10,6), '0')` })
+      .from(tokenUsageTable)
+      .where(and(eq(tokenUsageTable.userId, userId), eq(tokenUsageTable.usageDate, today))),
+    db
+      .select({ totalCost: sql<string>`coalesce(sum(${tokenUsageTable.costUsd})::numeric(10,6), '0')` })
+      .from(tokenUsageTable)
+      .where(and(eq(tokenUsageTable.userId, userId), gte(tokenUsageTable.usageDate, monthStart))),
+    db
+      .select({ totalCost: sql<string>`coalesce(sum(${tokenUsageTable.costUsd})::numeric(10,6), '0')` })
+      .from(tokenUsageTable)
+      .where(and(eq(tokenUsageTable.userId, userId), eq(tokenUsageTable.projectId, projectId))),
+  ]);
 
   const dailyUsed = parseFloat(dailyRow?.totalCost ?? "0");
   const monthlyUsed = parseFloat(monthlyRow?.totalCost ?? "0");
+  const projectUsed = parseFloat(projectRow?.totalCost ?? "0");
 
   const dailyPct = (dailyUsed / dailyLimit) * 100;
   const monthlyPct = (monthlyUsed / monthlyLimit) * 100;
@@ -194,6 +199,27 @@ export async function checkAndNotifyLimits(
       message: `You have used ${monthlyPct.toFixed(0)}% of your monthly spending limit ($${monthlyUsed.toFixed(2)} of $${monthlyLimit.toFixed(2)}).`,
       messageAr: `لقد استخدمت ${monthlyPct.toFixed(0)}% من حد الإنفاق الشهري ($${monthlyUsed.toFixed(2)} من $${monthlyLimit.toFixed(2)}).`,
     });
+  }
+
+  if (perProjectLimit !== null) {
+    const projectPct = (projectUsed / perProjectLimit) * 100;
+    const projectPctBefore = ((projectUsed - costJustAdded) / perProjectLimit) * 100;
+
+    if (projectPct >= 100 && projectPctBefore < 100) {
+      await createNotification(userId, "limit_reached", {
+        title: "Project spending limit reached",
+        titleAr: "تم الوصول إلى حد إنفاق المشروع",
+        message: `You have reached the per-project spending limit of $${perProjectLimit.toFixed(2)} for this project. No more builds can be started.`,
+        messageAr: `لقد وصلت إلى حد إنفاق المشروع البالغ $${perProjectLimit.toFixed(2)}. لا يمكن بدء المزيد من عمليات البناء لهذا المشروع.`,
+      });
+    } else if (projectPct >= 80 && projectPctBefore < 80) {
+      await createNotification(userId, "limit_warning", {
+        title: "Approaching project spending limit",
+        titleAr: "اقتراب من حد إنفاق المشروع",
+        message: `You have used ${projectPct.toFixed(0)}% of the per-project spending limit ($${projectUsed.toFixed(2)} of $${perProjectLimit.toFixed(2)}).`,
+        messageAr: `لقد استخدمت ${projectPct.toFixed(0)}% من حد إنفاق المشروع ($${projectUsed.toFixed(2)} من $${perProjectLimit.toFixed(2)}).`,
+      });
+    }
   }
 }
 

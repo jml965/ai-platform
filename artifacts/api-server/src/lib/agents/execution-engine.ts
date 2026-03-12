@@ -261,6 +261,16 @@ async function executeBuildPipeline(
       return;
     }
 
+    const postCodegenLimit = await checkSpendingLimits(userId, projectId);
+    if (!postCodegenLimit.allowed) {
+      await logExecution(buildId, projectId, null, "system", "limit_exceeded_mid_build", "failed", {
+        reason: postCodegenLimit.reason,
+        after_agent: "codegen",
+      });
+      await finalizeBuild(buildId, projectId, "failed", totalTokens, totalCost);
+      return;
+    }
+
     let generatedFiles = codegenResult.data?.files as GeneratedFile[];
     context.tokensUsedSoFar = totalTokens;
     context.existingFiles = generatedFiles.map((f) => ({
@@ -301,6 +311,16 @@ async function executeBuildPipeline(
 
     if (!reviewResult.success) {
       console.error(`Build ${buildId} review failed:`, reviewResult.error);
+      await finalizeBuild(buildId, projectId, "failed", totalTokens, totalCost);
+      return;
+    }
+
+    const postReviewLimit = await checkSpendingLimits(userId, projectId);
+    if (!postReviewLimit.allowed) {
+      await logExecution(buildId, projectId, null, "system", "limit_exceeded_mid_build", "failed", {
+        reason: postReviewLimit.reason,
+        after_agent: "reviewer",
+      });
       await finalizeBuild(buildId, projectId, "failed", totalTokens, totalCost);
       return;
     }
@@ -350,6 +370,16 @@ async function executeBuildPipeline(
 
         if (!fixResult.success) {
           console.error(`Build ${buildId} fixer failed:`, fixResult.error);
+          await finalizeBuild(buildId, projectId, "failed", totalTokens, totalCost);
+          return;
+        }
+
+        const postFixerLimit = await checkSpendingLimits(userId, projectId);
+        if (!postFixerLimit.allowed) {
+          await logExecution(buildId, projectId, null, "system", "limit_exceeded_mid_build", "failed", {
+            reason: postFixerLimit.reason,
+            after_agent: "fixer",
+          });
           await finalizeBuild(buildId, projectId, "failed", totalTokens, totalCost);
           return;
         }
