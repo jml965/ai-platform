@@ -6,12 +6,18 @@ import {
   invoicesTable,
   creditsLedgerTable,
   usersTable,
+  notificationsTable,
 } from "@workspace/db/schema";
 import { eq, and, desc, sql, count } from "drizzle-orm";
+import { getStripeClient, isStripeConfigured } from "../lib/stripeClient";
 
 const router: IRouter = Router();
 
 const SEED_USER_ID = "00000000-0000-0000-0000-000000000001";
+
+function getUserId(req: any): string {
+  return req.user?.id ?? SEED_USER_ID;
+}
 
 async function ensurePlansSeeded() {
   const existing = await db.select({ cnt: count() }).from(plansTable);
@@ -54,7 +60,13 @@ async function ensurePlansSeeded() {
       dailyLimitUsd: "100.0000",
       monthlyLimitUsd: "200.0000",
       supportType: "dedicated",
-      features: { livePreview: true, codeExport: true, customDomain: true, teamCollaboration: true, priorityQueue: true },
+      features: {
+        livePreview: true,
+        codeExport: true,
+        customDomain: true,
+        teamCollaboration: true,
+        priorityQueue: true,
+      },
       sortOrder: 2,
     },
   ]);
@@ -84,18 +96,21 @@ router.get("/billing/plans", async (_req, res) => {
     });
   } catch (error) {
     console.error("List plans error:", error);
-    return res.status(500).json({ error: { code: "INTERNAL", message: "Failed to list plans" } });
+    return res
+      .status(500)
+      .json({ error: { code: "INTERNAL", message: "Failed to list plans" } });
   }
 });
 
-router.get("/billing/subscription", async (_req, res) => {
+router.get("/billing/subscription", async (req, res) => {
   try {
+    const userId = getUserId(req);
     const [sub] = await db
       .select()
       .from(subscriptionsTable)
       .where(
         and(
-          eq(subscriptionsTable.userId, SEED_USER_ID),
+          eq(subscriptionsTable.userId, userId),
           eq(subscriptionsTable.status, "active")
         )
       )
@@ -112,7 +127,7 @@ router.get("/billing/subscription", async (_req, res) => {
 
       return res.json({
         id: "00000000-0000-0000-0000-000000000000",
-        userId: SEED_USER_ID,
+        userId,
         plan: freePlan
           ? {
               id: freePlan.id,
@@ -133,7 +148,9 @@ router.get("/billing/subscription", async (_req, res) => {
             },
         status: "active",
         currentPeriodStart: new Date().toISOString(),
-        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        currentPeriodEnd: new Date(
+          Date.now() + 30 * 24 * 60 * 60 * 1000
+        ).toISOString(),
       });
     }
 
@@ -163,7 +180,9 @@ router.get("/billing/subscription", async (_req, res) => {
     });
   } catch (error) {
     console.error("Get subscription error:", error);
-    return res.status(500).json({ error: { code: "INTERNAL", message: "Failed to get subscription" } });
+    return res.status(500).json({
+      error: { code: "INTERNAL", message: "Failed to get subscription" },
+    });
   }
 });
 
@@ -171,8 +190,12 @@ router.post("/billing/checkout", async (req, res) => {
   try {
     const { planId } = req.body;
     if (!planId) {
-      return res.status(400).json({ error: { code: "VALIDATION", message: "planId is required" } });
+      return res.status(400).json({
+        error: { code: "VALIDATION", message: "planId is required" },
+      });
     }
+
+    const userId = getUserId(req);
 
     const [plan] = await db
       .select()
@@ -181,7 +204,62 @@ router.post("/billing/checkout", async (req, res) => {
       .limit(1);
 
     if (!plan) {
-      return res.status(404).json({ error: { code: "NOT_FOUND", message: "Plan not found" } });
+      return res
+        .status(404)
+        .json({ error: { code: "NOT_FOUND", message: "Plan not found" } });
+    }
+
+    const priceUsd = parseFloat(plan.priceMonthlyUsd);
+
+    if (isStripeConfigured() && priceUsd > 0) {
+      const stripe = getStripeClient()!;
+      const domain = process.env.REPLIT_DOMAINS?.split(",")[0];
+      const baseUrl = domain ? `https://${domain}` : "http://localhost:3000";
+
+      const [user] = await db
+        .select({ stripeCustomerId: usersTable.stripeCustomerId, email: usersTable.email })
+        .from(usersTable)
+        .where(eq(usersTable.id, userId))
+        .limit(1);
+
+      let customerId = user?.stripeCustomerId ?? undefined;
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email: user?.email ?? undefined,
+          metadata: { userId },
+        });
+        customerId = customer.id;
+        await db
+          .update(usersTable)
+          .set({ stripeCustomerId: customerId })
+          .where(eq(usersTable.id, userId));
+      }
+
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        payment_method_types: ["card"],
+        line_items: [
+          {
+            price_data: {
+              currency: "usd",
+              unit_amount: Math.round(priceUsd * 100),
+              recurring: { interval: "month" },
+              product_data: { name: `${plan.name} Plan` },
+            },
+            quantity: 1,
+          },
+        ],
+        mode: "subscription",
+        success_url: `${baseUrl}/billing?status=success`,
+        cancel_url: `${baseUrl}/billing?status=cancelled`,
+        metadata: {
+          userId,
+          planId: plan.id,
+          type: "subscription",
+        },
+      });
+
+      return res.json({ checkoutUrl: session.url });
     }
 
     const now = new Date();
@@ -193,7 +271,7 @@ router.post("/billing/checkout", async (req, res) => {
       .set({ status: "cancelled", cancelledAt: now })
       .where(
         and(
-          eq(subscriptionsTable.userId, SEED_USER_ID),
+          eq(subscriptionsTable.userId, userId),
           eq(subscriptionsTable.status, "active")
         )
       );
@@ -201,7 +279,7 @@ router.post("/billing/checkout", async (req, res) => {
     const [newSub] = await db
       .insert(subscriptionsTable)
       .values({
-        userId: SEED_USER_ID,
+        userId,
         planId: plan.id,
         status: "active",
         currentPeriodStart: now,
@@ -216,12 +294,11 @@ router.post("/billing/checkout", async (req, res) => {
         dailyLimitUsd: plan.dailyLimitUsd,
         monthlyLimitUsd: plan.monthlyLimitUsd,
       })
-      .where(eq(usersTable.id, SEED_USER_ID));
+      .where(eq(usersTable.id, userId));
 
-    const priceUsd = parseFloat(plan.priceMonthlyUsd);
     if (priceUsd > 0) {
       await db.insert(invoicesTable).values({
-        userId: SEED_USER_ID,
+        userId,
         amountUsd: plan.priceMonthlyUsd,
         status: "paid",
         type: "subscription",
@@ -236,29 +313,31 @@ router.post("/billing/checkout", async (req, res) => {
     });
   } catch (error) {
     console.error("Checkout error:", error);
-    return res.status(500).json({ error: { code: "INTERNAL", message: "Failed to create checkout" } });
+    return res.status(500).json({
+      error: { code: "INTERNAL", message: "Failed to create checkout" },
+    });
   }
-});
-
-router.post("/billing/webhook", async (_req, res) => {
-  return res.json({ received: true });
 });
 
 router.get("/billing/invoices", async (req, res) => {
   try {
+    const userId = getUserId(req);
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+    const limit = Math.min(
+      100,
+      Math.max(1, parseInt(req.query.limit as string) || 20)
+    );
     const offset = (page - 1) * limit;
 
     const [totalRow] = await db
       .select({ cnt: count() })
       .from(invoicesTable)
-      .where(eq(invoicesTable.userId, SEED_USER_ID));
+      .where(eq(invoicesTable.userId, userId));
 
     const invoices = await db
       .select()
       .from(invoicesTable)
-      .where(eq(invoicesTable.userId, SEED_USER_ID))
+      .where(eq(invoicesTable.userId, userId))
       .orderBy(desc(invoicesTable.createdAt))
       .limit(limit)
       .offset(offset);
@@ -280,24 +359,35 @@ router.get("/billing/invoices", async (req, res) => {
     });
   } catch (error) {
     console.error("List invoices error:", error);
-    return res.status(500).json({ error: { code: "INTERNAL", message: "Failed to list invoices" } });
+    return res.status(500).json({
+      error: { code: "INTERNAL", message: "Failed to list invoices" },
+    });
   }
 });
 
-router.get("/billing/credits", async (_req, res) => {
+router.get("/billing/credits", async (req, res) => {
   try {
+    const userId = getUserId(req);
     const [user] = await db
-      .select({ creditBalanceUsd: usersTable.creditBalanceUsd })
+      .select({
+        creditBalanceUsd: usersTable.creditBalanceUsd,
+      })
       .from(usersTable)
-      .where(eq(usersTable.id, SEED_USER_ID))
+      .where(eq(usersTable.id, userId))
       .limit(1);
 
+    const balance = parseFloat(user?.creditBalanceUsd ?? "0");
+
     return res.json({
-      balanceUsd: parseFloat(user?.creditBalanceUsd ?? "0"),
+      balanceUsd: balance,
+      isLow: balance > 0 && balance < 1,
+      isDepleted: balance <= 0,
     });
   } catch (error) {
     console.error("Get credits error:", error);
-    return res.status(500).json({ error: { code: "INTERNAL", message: "Failed to get credits" } });
+    return res
+      .status(500)
+      .json({ error: { code: "INTERNAL", message: "Failed to get credits" } });
   }
 });
 
@@ -305,13 +395,68 @@ router.post("/billing/topup", async (req, res) => {
   try {
     const { amountUsd } = req.body;
     if (!amountUsd || typeof amountUsd !== "number" || amountUsd <= 0) {
-      return res.status(400).json({ error: { code: "VALIDATION", message: "Invalid amount" } });
+      return res
+        .status(400)
+        .json({ error: { code: "VALIDATION", message: "Invalid amount" } });
+    }
+
+    const userId = getUserId(req);
+
+    if (isStripeConfigured()) {
+      const stripe = getStripeClient()!;
+      const domain = process.env.REPLIT_DOMAINS?.split(",")[0];
+      const baseUrl = domain ? `https://${domain}` : "http://localhost:3000";
+
+      const [user] = await db
+        .select({ stripeCustomerId: usersTable.stripeCustomerId, email: usersTable.email })
+        .from(usersTable)
+        .where(eq(usersTable.id, userId))
+        .limit(1);
+
+      let customerId = user?.stripeCustomerId ?? undefined;
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email: user?.email ?? undefined,
+          metadata: { userId },
+        });
+        customerId = customer.id;
+        await db
+          .update(usersTable)
+          .set({ stripeCustomerId: customerId })
+          .where(eq(usersTable.id, userId));
+      }
+
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        payment_method_types: ["card"],
+        line_items: [
+          {
+            price_data: {
+              currency: "usd",
+              unit_amount: Math.round(amountUsd * 100),
+              product_data: {
+                name: `Credit Top-up: $${amountUsd.toFixed(2)}`,
+              },
+            },
+            quantity: 1,
+          },
+        ],
+        mode: "payment",
+        success_url: `${baseUrl}/billing?status=topup_success`,
+        cancel_url: `${baseUrl}/billing?status=cancelled`,
+        metadata: {
+          userId,
+          type: "topup",
+        },
+      });
+
+      return res.json({ checkoutUrl: session.url });
     }
 
     const [user] = await db
       .select({ creditBalanceUsd: usersTable.creditBalanceUsd })
       .from(usersTable)
-      .where(eq(usersTable.id, SEED_USER_ID))
+      .where(eq(usersTable.id, userId))
       .limit(1);
 
     const currentBalance = parseFloat(user?.creditBalanceUsd ?? "0");
@@ -320,10 +465,10 @@ router.post("/billing/topup", async (req, res) => {
     await db
       .update(usersTable)
       .set({ creditBalanceUsd: newBalance.toFixed(6) })
-      .where(eq(usersTable.id, SEED_USER_ID));
+      .where(eq(usersTable.id, userId));
 
     await db.insert(creditsLedgerTable).values({
-      userId: SEED_USER_ID,
+      userId,
       type: "topup",
       amountUsd: amountUsd.toFixed(6),
       balanceAfter: newBalance.toFixed(6),
@@ -332,7 +477,7 @@ router.post("/billing/topup", async (req, res) => {
     });
 
     await db.insert(invoicesTable).values({
-      userId: SEED_USER_ID,
+      userId,
       amountUsd: amountUsd.toFixed(2),
       status: "paid",
       type: "topup",
@@ -346,7 +491,9 @@ router.post("/billing/topup", async (req, res) => {
     });
   } catch (error) {
     console.error("Topup error:", error);
-    return res.status(500).json({ error: { code: "INTERNAL", message: "Failed to process topup" } });
+    return res.status(500).json({
+      error: { code: "INTERNAL", message: "Failed to process topup" },
+    });
   }
 });
 

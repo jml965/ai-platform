@@ -14,6 +14,7 @@ export const usersTable = pgTable("users", {
   perProjectLimitUsd: numeric("per_project_limit_usd", { precision: 10, scale: 4 }),
   creditBalanceUsd: numeric("credit_balance_usd", { precision: 10, scale: 6 }).notNull().default("0.000000"),
   activePlanId: uuid("active_plan_id"),
+  stripeCustomerId: text("stripe_customer_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

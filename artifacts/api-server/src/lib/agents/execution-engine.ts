@@ -6,6 +6,7 @@ import {
   tokenUsageTable,
   creditsLedgerTable,
   usersTable,
+  notificationsTable,
 } from "@workspace/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
@@ -492,6 +493,30 @@ async function finalizeBuild(
           referenceId: buildId,
           referenceType: "build",
         });
+
+        if (newBalance <= 0) {
+          await db.insert(notificationsTable).values({
+            userId: build.userId,
+            type: "credits_depleted",
+            title: "Credits Depleted",
+            titleAr: "نفاد الرصيد",
+            message:
+              "Your credit balance has reached zero. Top up your credits to continue building projects.",
+            messageAr:
+              "وصل رصيدك إلى الصفر. أعد تعبئة رصيدك لمتابعة بناء المشاريع.",
+            metadata: JSON.stringify({ topupUrl: "/billing" }),
+          });
+        } else if (newBalance < 1) {
+          await db.insert(notificationsTable).values({
+            userId: build.userId,
+            type: "credits_low",
+            title: "Credits Running Low",
+            titleAr: "رصيدك منخفض",
+            message: `Your credit balance is low ($${newBalance.toFixed(2)} remaining). Top up to avoid interruptions.`,
+            messageAr: `رصيدك منخفض ($${newBalance.toFixed(2)} متبقي). أعد التعبئة لتجنب الانقطاع.`,
+            metadata: JSON.stringify({ topupUrl: "/billing", balanceUsd: newBalance }),
+          });
+        }
       }
     } catch (err) {
       console.error(`Failed to deduct credits for build ${buildId}:`, err);

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { buildTasksTable, executionLogsTable, projectsTable } from "@workspace/db/schema";
+import { buildTasksTable, executionLogsTable, projectsTable, usersTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 import { StartBuildBody } from "@workspace/api-zod";
 import { startBuild, cancelBuild, getActiveBuild, checkBuildLimits } from "../lib/agents";
@@ -34,6 +34,25 @@ router.post("/build/start", async (req, res) => {
           code: "TOKEN_LIMIT_REACHED",
           message: limitResult.reason || "Spending limit reached",
           message_ar: limitResult.reasonAr,
+        },
+      });
+      return;
+    }
+
+    const [userRecord] = await db
+      .select({ creditBalanceUsd: usersTable.creditBalanceUsd })
+      .from(usersTable)
+      .where(eq(usersTable.id, project.userId))
+      .limit(1);
+
+    const creditBalance = parseFloat(userRecord?.creditBalanceUsd ?? "0");
+    if (creditBalance <= 0) {
+      res.status(402).json({
+        error: {
+          code: "INSUFFICIENT_CREDITS",
+          message: "Insufficient credits. Please top up your balance to start a build.",
+          message_ar: "رصيد غير كافٍ. يرجى تعبئة رصيدك لبدء البناء.",
+          topupUrl: "/billing",
         },
       });
       return;
