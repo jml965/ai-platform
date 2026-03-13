@@ -282,7 +282,7 @@ export class PackageRunnerAgent extends BaseAgent {
         } catch {}
       }
 
-      const sandbox = await createSandbox(projectId, runtime as "node" | "python", 512, 300);
+      const sandbox = await createSandbox(projectId, runtime as "node" | "python", 512, 600);
       this.sandboxId = sandbox.id;
       this.status.sandboxId = sandbox.id;
       this.emitOutput("info", `Sandbox created (id: ${sandbox.id}, port: ${sandbox.port})`);

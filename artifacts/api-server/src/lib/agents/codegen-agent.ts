@@ -58,7 +58,15 @@ IMPORTANT:
 - "dependencies" and "devDependencies" should contain ONLY the additional packages your generated code needs beyond the template defaults
 - "directories" should list any additional directories beyond the template defaults
 - Always include the "framework" field
-- For fastapi projects, use PEP 440 version specifiers in dependencies (e.g. ">=1.2.0", "~=2.0", "==1.5.0") — do NOT use npm-style caret (^) or tilde (~) syntax`;
+- For fastapi projects, use PEP 440 version specifiers in dependencies (e.g. ">=1.2.0", "~=2.0", "==1.5.0") — do NOT use npm-style caret (^) or tilde (~) syntax
+
+MULTI-PAGE PROJECTS:
+- You MUST generate ALL pages the user requests — there is NO limit on the number of pages
+- For complex apps (e-commerce, social media, dashboards), generate 8-15+ pages with proper routing
+- Include: layouts, navigation, shared components, context providers, API utilities, and all page components
+- Generate complete functional code for EVERY page — no placeholders or "TODO" comments
+- Use React Router for multi-page SPAs with nested routes where appropriate
+- Include proper data models, state management, and mock/seed data for realistic previews`;
 
   async execute(context: BuildContext): Promise<AgentResult> {
     const startTime = Date.now();
