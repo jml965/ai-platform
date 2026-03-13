@@ -12,6 +12,7 @@ import sandboxRouter from "./sandbox";
 import monitoringRouter from "./monitoring";
 import plannerRouter from "./planner";
 import deploymentsRouter from "./deployments";
+import domainsRouter from "./domains";
 import notificationsRouter from "./notifications";
 import { requireAuth } from "../middlewares/authSession";
 
@@ -32,6 +33,7 @@ router.use(sandboxRouter);
 router.use(monitoringRouter);
 router.use(plannerRouter);
 router.use(deploymentsRouter);
+router.use(domainsRouter);
 router.use(notificationsRouter);
 
 export default router;

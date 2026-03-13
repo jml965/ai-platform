@@ -29,6 +29,7 @@ import BuildTerminal from "@/components/builder/Terminal";
 import BuildProgress, { inferPhase } from "@/components/builder/BuildProgress";
 import CodeEditor from "@/components/builder/CodeEditor";
 import ProjectPlan from "@/components/builder/ProjectPlan";
+import DomainSettings from "@/components/builder/DomainSettings";
 import { useUpdateFile } from "@/hooks/useUpdateFile";
 import "@/components/builder/prism-theme.css";
 
@@ -59,7 +60,7 @@ export default function Builder() {
   const [activeBuildId, setActiveBuildId] = useState<string | null>(() => {
     return localStorage.getItem(`latestBuild_${id}`);
   });
-  const [centerTab, setCenterTab] = useState<"canvas" | "code">("canvas");
+  const [centerTab, setCenterTab] = useState<"canvas" | "code" | "domains">("canvas");
   const [selectedFileIndex, setSelectedFileIndex] = useState(0);
   const [selectedDevice, setSelectedDevice] = useState("responsive");
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -638,6 +639,18 @@ export default function Builder() {
             <Code2 className="w-3.5 h-3.5" />
             {t.code_tab}
           </button>
+          <button
+            onClick={() => setCenterTab("domains")}
+            className={cn(
+              "px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5",
+              centerTab === "domains"
+                ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
+                : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
+            )}
+          >
+            <Globe className="w-3.5 h-3.5" />
+            {t.domain_settings}
+          </button>
 
           <div className="flex-1" />
 
@@ -753,7 +766,11 @@ export default function Builder() {
 
         <div className="flex-1 relative bg-[#0d1117] overflow-hidden flex flex-col" onClick={() => showDeviceMenu && setShowDeviceMenu(false)}>
           <div className="flex-1 overflow-hidden">
-            {centerTab === "canvas" ? (
+            {centerTab === "domains" ? (
+              <div className="h-full overflow-y-auto">
+                <DomainSettings projectId={id || ""} />
+              </div>
+            ) : centerTab === "canvas" ? (
               isBuilding ? (
                 <div className="h-full flex items-center justify-center">
                   <div className="flex flex-col items-center">

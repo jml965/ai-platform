@@ -118,9 +118,27 @@ artifacts-monorepo/
 └── package.json            # Root package with hoisted devDeps
 ```
 
+## Custom Domains System
+
+Users can link custom domains (e.g., mysite.com) to their projects with automatic DNS verification and SSL certificate management.
+
+Key files:
+- `lib/db/src/schema/domains.ts` — DB table for custom domains
+- `artifacts/api-server/src/routes/domains.ts` — REST API for domain CRUD + DNS verification
+- `lib/api-client-react/src/domains-hooks.ts` — React Query hooks for domain operations
+- `artifacts/website-builder/src/components/builder/DomainSettings.tsx` — Domain settings UI component
+
+API endpoints (all under `/api/projects/:projectId/domains`, auth + project access required):
+- `GET /projects/:projectId/domains` — List project domains
+- `POST /projects/:projectId/domains` — Add custom domain
+- `POST /projects/:projectId/domains/:domainId/verify` — Verify DNS and issue SSL
+- `DELETE /projects/:projectId/domains/:domainId` — Remove domain
+
+DNS verification supports both A records (platform IP) and CNAME records (platform.dev). SSL certificates auto-issue on successful DNS verification (simulated 90-day validity).
+
 ## Database Schema
 
-15 tables in `lib/db/src/schema/`:
+16 tables in `lib/db/src/schema/`:
 - `users` — User accounts with locale preference, spending limits, credit balance, and active plan
 - `projects` — Website projects with status tracking
 - `project_files` — Generated files (HTML, CSS, JS) per project
@@ -137,6 +155,7 @@ artifacts-monorepo/
 - `team_invitations` — Pending email invitations with token and expiry
 - `sessions` — OIDC session storage for Replit Auth (sid, session data, expiry)
 - `qa_reports` — QA validation reports with 3-phase checks (lint/runtime/functional), scores, retry tracking, cost tracking, fix attempts JSONB
+- `domains` — Custom domains linked to projects with DNS verification status, SSL certificate tracking
 
 ## Agent Engine
 

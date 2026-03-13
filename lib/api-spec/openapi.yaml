@@ -30,6 +30,8 @@ tags:
     description: Email notification preferences
   - name: preview
     description: Live preview of generated websites
+  - name: domains
+    description: Custom domain management
 
 paths:
   /healthz:
@@ -1074,6 +1076,91 @@ paths:
               schema:
                 $ref: "#/components/schemas/PreviewResponse"
 
+  /projects/{projectId}/domains:
+    get:
+      operationId: listDomains
+      tags: [domains]
+      summary: List project domains
+      description: Returns all custom domains linked to a project
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Domain list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DomainListResponse"
+    post:
+      operationId: addDomain
+      tags: [domains]
+      summary: Add custom domain
+      description: Links a custom domain to the project
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddDomainRequest"
+      responses:
+        "201":
+          description: Domain added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DomainResponse"
+
+  /projects/{projectId}/domains/{domainId}/verify:
+    post:
+      operationId: verifyDomain
+      tags: [domains]
+      summary: Verify domain DNS
+      description: Checks DNS records and issues SSL certificate if verified
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - name: domainId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DomainVerifyResponse"
+
+  /projects/{projectId}/domains/{domainId}:
+    delete:
+      operationId: removeDomain
+      tags: [domains]
+      summary: Remove custom domain
+      description: Removes a custom domain from the project
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - name: domainId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Domain removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
 components:
   parameters:
     ProjectId:
@@ -1923,3 +2010,105 @@ components:
             $ref: "#/components/schemas/DeploymentResponse"
       required:
         - data
+
+    DomainResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        domain:
+          type: string
+        status:
+          type: string
+          enum: [pending, dns_pending, active, ssl_error]
+        dnsVerified:
+          type: boolean
+        sslIssued:
+          type: boolean
+        sslExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        verificationToken:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - projectId
+        - domain
+        - status
+        - dnsVerified
+        - sslIssued
+
+    DomainListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/DomainResponse"
+      required:
+        - data
+
+    AddDomainRequest:
+      type: object
+      properties:
+        domain:
+          type: string
+      required:
+        - domain
+
+    DomainVerifyResponse:
+      allOf:
+        - $ref: "#/components/schemas/DomainResponse"
+        - type: object
+          properties:
+            dnsRecords:
+              type: array
+              items:
+                type: object
+                properties:
+                  type:
+                    type: string
+                  value:
+                    type: string
+            dnsInstructions:
+              type: object
+              properties:
+                aRecord:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    host:
+                      type: string
+                    value:
+                      type: string
+                cnameRecord:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    host:
+                      type: string
+                    value:
+                      type: string
+                txtRecord:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    host:
+                      type: string
+                    value:
+                      type: string
