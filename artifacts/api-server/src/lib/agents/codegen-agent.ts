@@ -11,7 +11,7 @@ function isValidFramework(value: unknown): value is ProjectFramework {
 
 export class CodeGenAgent extends BaseAgent {
   readonly agentType = "codegen" as const;
-  readonly modelConfig: ModelConfig = { provider: "anthropic", model: "claude-opus-4-0-20250514" };
+  readonly modelConfig: ModelConfig = { provider: "anthropic", model: "claude-sonnet-4-5-20241022" };
 
   readonly systemPrompt = `You are a senior full-stack developer AI agent. Your job is to generate complete, production-ready project code based on user descriptions.
 
