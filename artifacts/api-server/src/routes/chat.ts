@@ -82,6 +82,8 @@ router.post("/chat/message", async (req, res) => {
     }
 
     let contextInfo = "";
+    let isCurrentlyBuilding = false;
+    let isAlreadyBuilt = false;
     if (project) {
       const statusMap: Record<string, string> = {
         draft: "New project, not built yet",
@@ -90,6 +92,7 @@ router.post("/chat/message", async (req, res) => {
         failed: "Last build failed",
         deployed: "Live and deployed",
       };
+      isCurrentlyBuilding = project.status === "building";
       contextInfo = `\n\nProject context:
 - Project name: "${project.name}"
 - Current status: ${statusMap[project.status || ""] || project.status}
@@ -100,10 +103,26 @@ router.post("/chat/message", async (req, res) => {
         .from(projectFilesTable)
         .where(eq(projectFilesTable.projectId, projectId));
       if (files.length > 0) {
-        contextInfo += `\n- Has ${files.length} files: ${files.map(f => f.filePath).join(", ")}`;
-        contextInfo += `\n- The project is already built. User can ask to modify/rebuild it, or ask questions about it.`;
+        isAlreadyBuilt = true;
+        contextInfo += `\n- Has ${files.length} files already generated`;
+        contextInfo += `\n- The project is already built with ${files.length} files. DO NOT rebuild unless user explicitly asks to change/modify something specific.`;
+        contextInfo += `\n- If user says "كمل" or "continue" or similar, and project is already built (status=ready), tell them the project is complete and ask what they want to modify.`;
       } else {
         contextInfo += `\n- No files yet. User needs to describe what website they want to build.`;
+      }
+      if (isCurrentlyBuilding) {
+        contextInfo += `\n- IMPORTANT: Project is currently being built. DO NOT trigger another build. Use action="chat" and tell the user to wait.`;
+      }
+
+      const recentBuilds = await db
+        .select({ status: buildTasksTable.status })
+        .from(buildTasksTable)
+        .where(eq(buildTasksTable.projectId, projectId))
+        .orderBy(desc(buildTasksTable.createdAt))
+        .limit(1);
+      if (recentBuilds.length > 0 && recentBuilds[0].status === "in_progress") {
+        isCurrentlyBuilding = true;
+        contextInfo += `\n- A build is currently in progress. DO NOT start another build.`;
       }
     } else {
       contextInfo = `\n\nNo project selected. Help the user understand they can create a project and describe what they want to build.`;
@@ -186,6 +205,11 @@ router.post("/chat/message", async (req, res) => {
       .where(eq(usersTable.id, userId));
 
     let buildId: string | undefined;
+
+    if (shouldBuild && isCurrentlyBuilding) {
+      shouldBuild = false;
+      console.log("[CHAT] Blocked build: project is currently building");
+    }
 
     if (shouldBuild && projectId && project) {
       try {
