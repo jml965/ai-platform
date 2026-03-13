@@ -108,6 +108,26 @@ router.post("/chat/message", async (req, res) => {
         deployed: "Live and deployed",
       };
       isCurrentlyBuilding = project.status === "building";
+
+      if (isCurrentlyBuilding) {
+        const { getAllActiveBuilds } = await import("../lib/agents/execution-engine");
+        const activeBuild = getAllActiveBuilds().find(b => b.projectId === projectId);
+        const recentInProgress = await db
+          .select({ status: buildTasksTable.status })
+          .from(buildTasksTable)
+          .where(eq(buildTasksTable.projectId, projectId))
+          .orderBy(desc(buildTasksTable.createdAt))
+          .limit(1);
+        const hasActiveTask = recentInProgress.length > 0 && recentInProgress[0].status === "in_progress";
+
+        if (!activeBuild && !hasActiveTask) {
+          console.log("[CHAT] Detected stuck project in 'building' state, auto-fixing to 'ready'");
+          await db.update(projectsTable).set({ status: "ready" }).where(eq(projectsTable.id, projectId));
+          isCurrentlyBuilding = false;
+          project.status = "ready";
+        }
+      }
+
       contextInfo = `\n\nProject context:
 - Project name: "${project.name}"
 - Current status: ${statusMap[project.status || ""] || project.status}
@@ -127,17 +147,6 @@ router.post("/chat/message", async (req, res) => {
       }
       if (isCurrentlyBuilding) {
         contextInfo += `\n- IMPORTANT: Project is currently being built. DO NOT trigger another build. Use action="chat" and tell the user to wait.`;
-      }
-
-      const recentBuilds = await db
-        .select({ status: buildTasksTable.status })
-        .from(buildTasksTable)
-        .where(eq(buildTasksTable.projectId, projectId))
-        .orderBy(desc(buildTasksTable.createdAt))
-        .limit(1);
-      if (recentBuilds.length > 0 && recentBuilds[0].status === "in_progress") {
-        isCurrentlyBuilding = true;
-        contextInfo += `\n- A build is currently in progress. DO NOT start another build.`;
       }
     } else {
       contextInfo = `\n\nNo project selected. Help the user understand they can create a project and describe what they want to build.`;
