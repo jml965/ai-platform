@@ -36,7 +36,7 @@ The platform utilizes a pnpm workspace monorepo structure, separating deployable
     - `FileManager`: Manages file persistence in the database.
 - **Agent Orchestration:** An `execution-engine` orchestrates the build pipeline (codegen → review → fix → save) and integrates with a 3-phase QA pipeline (lint → runtime → functional validation).
 - **Sandbox System:** Provides isolated execution environments for project lifecycle management (create, execute, start-server, stop, restart, cleanup).
-- **Deployment System:** Manages project deployments to public URLs with subdomain support, including deploy, undeploy, and redeploy functionalities.
+- **Deployment System:** Real deployment via GitHub Pages — creates a GitHub repository for each project, pushes files, and enables GitHub Pages. Each deployed site gets a live URL at `username.github.io/repo-name`. Uses Replit's GitHub connector (OAuth) for authenticated API access.
 - **Email Notification System:** An event-driven system sends emails for critical events based on user preferences.
 - **Validation:** Zod is used for schema validation, integrated with `drizzle-zod`.
 - **API Codegen:** Orval generates API client hooks and Zod schemas from an OpenAPI specification.
