@@ -38,7 +38,7 @@ type OutputListener = (output: RunnerOutput) => void;
 
 export class PackageRunnerAgent extends BaseAgent {
   readonly agentType: AgentType = "package_runner";
-  readonly modelConfig: ModelConfig = { provider: "openai", model: "o1" };
+  readonly modelConfig: ModelConfig = { provider: "openai", model: "o3" };
   readonly systemPrompt = `You are a build and deployment assistant. You analyze error logs from package installation and server startup, then suggest fixes. Respond with a JSON object: { "diagnosis": "...", "suggestedCommand": "..." }`;
 
   private sandboxId: string | null = null;
