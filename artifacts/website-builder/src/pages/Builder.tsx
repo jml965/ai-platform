@@ -318,12 +318,14 @@ export default function Builder() {
         setMessages(prev => [...prev, {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: `❌ ${t.status_failed}`,
+          content: `⚠️ ${t.status_failed}`,
           buildId: activeBuildId,
           timestamp: new Date(),
         }]);
         queryClient.invalidateQueries({ queryKey: ["listProjectFiles", id] });
+        queryClient.invalidateQueries({ queryKey: ["getProject", id] });
         setTimeout(() => {
+          setPreviewKey(k => k + 1);
           setActiveBuildId(null);
           if (id) localStorage.removeItem(`latestBuild_${id}`);
         }, 2000);

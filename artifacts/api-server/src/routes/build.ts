@@ -123,7 +123,10 @@ router.get("/build/:buildId/status", async (req, res) => {
     } else if (tasks.every((t) => t.status === "completed")) {
       status = "completed";
     } else if (tasks.some((t) => t.status === "failed")) {
-      status = "failed";
+      const coreAgents = ["codegen", "reviewer", "fixer", "filemanager"];
+      const coreTasks = tasks.filter((t) => coreAgents.includes(t.agentType));
+      const coreAllCompleted = coreTasks.length > 0 && coreTasks.every((t) => t.status === "completed");
+      status = coreAllCompleted ? "completed" : "failed";
     } else {
       status = "pending";
     }
