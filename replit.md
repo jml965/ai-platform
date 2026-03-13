@@ -35,7 +35,7 @@ The platform utilizes a pnpm workspace monorepo structure, separating deployable
     - `FixAgent`: Automatically fixes identified issues (Anthropic Claude Opus 4).
     - `FileManager`: Manages file persistence in the database.
     - `PackageRunner`: Detects project type (nodejs/python/static) and runs install/start in sandbox.
-- **Agent Orchestration:** An `execution-engine` orchestrates the build pipeline (codegen → review → fix → save → package_runner → QA). Package runner failures are non-fatal — the build succeeds as long as files are saved. Uses streaming API for Anthropic calls to handle long-running operations.
+- **Agent Orchestration:** An `execution-engine` orchestrates the build pipeline (codegen → review → fix → save → package_runner → QA). Package runner failures are non-fatal — the build succeeds as long as files are saved. Uses streaming API for Anthropic calls to handle long-running operations. Fixer agent returns only changed files, which are merged (not replaced) with the original codegen output to prevent file loss.
 - **Sandbox System:** Provides isolated execution environments for project lifecycle management (create, execute, start-server, stop, restart, cleanup).
 - **Deployment System:** Real deployment via GitHub Pages — creates a GitHub repository for each project, pushes files, and enables GitHub Pages. Each deployed site gets a live URL at `username.github.io/repo-name`. Uses Replit's GitHub connector (OAuth) for authenticated API access.
 - **Email Notification System:** An event-driven system sends emails for critical events based on user preferences.

@@ -518,7 +518,14 @@ async function executeBuildPipeline(
         }
 
         if (fixResult.data?.files) {
-          generatedFiles = fixResult.data.files as GeneratedFile[];
+          const fixedFiles = fixResult.data.files as GeneratedFile[];
+          const fixedMap = new Map(fixedFiles.map(f => [f.filePath, f]));
+          generatedFiles = generatedFiles.map(f => fixedMap.get(f.filePath) || f);
+          for (const ff of fixedFiles) {
+            if (!generatedFiles.some(g => g.filePath === ff.filePath)) {
+              generatedFiles.push(ff);
+            }
+          }
         }
       }
     }
@@ -958,7 +965,14 @@ ${prompt}`;
         }
 
         if (fixResult.data?.files) {
-          generatedFiles = fixResult.data.files as GeneratedFile[];
+          const fixedFiles = fixResult.data.files as GeneratedFile[];
+          const fixedMap = new Map(fixedFiles.map(f => [f.filePath, f]));
+          generatedFiles = generatedFiles.map(f => fixedMap.get(f.filePath) || f);
+          for (const ff of fixedFiles) {
+            if (!generatedFiles.some(g => g.filePath === ff.filePath)) {
+              generatedFiles.push(ff);
+            }
+          }
         }
       }
     }
