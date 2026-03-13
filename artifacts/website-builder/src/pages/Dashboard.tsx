@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, LayoutTemplate, Trash2, Loader2, Coins, LogOut, CreditCard, Users, ShieldCheck, Activity, Globe, ExternalLink, Square, RefreshCw, Rocket, Bell, Palette, Home, Smartphone, Play, BarChart2, Gamepad2, FileText, Settings, BookOpen, Gift, Search, ChevronDown, Upload, UploadCloud, Download, Cpu, Wand2, Camera, ArrowRight, Check, X } from "lucide-react";
@@ -54,9 +54,26 @@ export default function Dashboard() {
   const logout = useAuthLogout();
   const userName = (me as any)?.name || (me as any)?.email?.split("@")[0] || "User";
 
+  const [, navigate] = useLocation();
+  const createProjectMut = useCreateProject();
+
   const handleLogout = async () => {
     await logout.mutateAsync();
     window.location.href = "/";
+  };
+
+  const handleStartProject = async (idea: string) => {
+    if (!idea.trim()) return;
+    try {
+      const projName = idea.length > 40 ? idea.substring(0, 40) + "..." : idea;
+      const result = await createProjectMut.mutateAsync({ data: { name: projName, description: idea } });
+      const newProjectId = (result as any)?.id;
+      if (newProjectId) {
+        navigate(`/project/${newProjectId}?prompt=${encodeURIComponent(idea)}`);
+      }
+    } catch (err) {
+      console.error("Failed to create project for idea:", err);
+    }
   };
 
   return (
@@ -109,7 +126,7 @@ export default function Dashboard() {
         <HomeSidebar t={t} lang={lang} userName={userName} />
 
         <div className="flex-1 overflow-y-auto">
-          <HomeHeroSection t={t} lang={lang} userName={userName} />
+          <HomeHeroSection t={t} lang={lang} userName={userName} onStart={handleStartProject} isStarting={createProjectMut.isPending} />
 
           <main className="max-w-7xl w-full mx-auto p-6 lg:p-8">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
@@ -264,7 +281,7 @@ function HomeSidebar({ t, lang, userName }: { t: any; lang: string; userName: st
   );
 }
 
-function HomeHeroSection({ t, lang, userName }: { t: any; lang: string; userName: string }) {
+function HomeHeroSection({ t, lang, userName, onStart, isStarting }: { t: any; lang: string; userName: string; onStart: (idea: string) => void; isStarting: boolean }) {
   const [activeTab, setActiveTab] = useState("app");
   const [textValue, setTextValue] = useState("");
   const [showWebAppDropdown, setShowWebAppDropdown] = useState(false);
@@ -450,8 +467,20 @@ function HomeHeroSection({ t, lang, userName }: { t: any; lang: string; userName
                 <Camera className="w-3.5 h-3.5" />
                 <ChevronDown className="w-3 h-3" />
               </button>
-              <button className="flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] text-[#8b949e] font-medium hover:text-white transition-colors">
-                {t.home_start} <ArrowRight className="w-3.5 h-3.5" />
+              <button
+                onClick={e => { e.stopPropagation(); if (textValue.trim()) onStart(textValue.trim()); }}
+                disabled={!textValue.trim() || isStarting}
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-[12.5px] font-medium transition-all ${
+                  textValue.trim() && !isStarting
+                    ? "bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20"
+                    : "text-[#8b949e] hover:text-white"
+                }`}
+              >
+                {isStarting ? (
+                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> {t.creating}</>
+                ) : (
+                  <>{t.home_start} <ArrowRight className="w-3.5 h-3.5" /></>
+                )}
               </button>
             </div>
           </div>
