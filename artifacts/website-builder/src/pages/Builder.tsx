@@ -354,6 +354,7 @@ export default function Builder() {
 
     try {
       const chatRes = await sendChatMessage(currentPrompt, [...messages, userMsg]);
+      console.log("[CHAT] Response:", JSON.stringify(chatRes));
 
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
@@ -362,11 +363,14 @@ export default function Builder() {
         timestamp: new Date(),
       }]);
 
+      console.log("[CHAT] shouldBuild:", chatRes.shouldBuild, "buildPrompt:", chatRes.buildPrompt);
       if (chatRes.shouldBuild) {
         try {
+          console.log("[BUILD] Starting build with prompt:", chatRes.buildPrompt || currentPrompt);
           const buildRes = await startBuildMut.mutateAsync({
             data: { projectId: id, prompt: chatRes.buildPrompt || currentPrompt }
           });
+          console.log("[BUILD] Build started:", buildRes);
           setActiveBuildId(buildRes.buildId);
           localStorage.setItem(`latestBuild_${id}`, buildRes.buildId);
           setPlanApproved(false);
@@ -378,11 +382,13 @@ export default function Builder() {
             buildId: buildRes.buildId,
             timestamp: new Date(),
           }]);
-        } catch (err) {
+        } catch (err: any) {
+          console.error("[BUILD] Build failed:", err);
+          const errorMsg = err?.response?.data?.error?.message || err?.message || t.unknown_error;
           setMessages(prev => [...prev, {
             id: crypto.randomUUID(),
             role: "assistant",
-            content: t.unknown_error,
+            content: `⚠️ ${errorMsg}`,
             timestamp: new Date(),
           }]);
         }

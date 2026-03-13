@@ -32,6 +32,7 @@ async function verifyProjectBuildAccess(userId: string, projectId: string, permi
 
 router.post("/build/start", async (req, res) => {
   try {
+    console.log("[BUILD] /build/start called with body:", JSON.stringify(req.body));
     const userId = getUserId(req);
     const body = StartBuildBody.parse(req.body);
 

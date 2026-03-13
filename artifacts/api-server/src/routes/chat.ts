@@ -13,28 +13,22 @@ interface ChatRequest {
   history?: { role: "user" | "assistant"; content: string }[];
 }
 
-const AGENT_SYSTEM_PROMPT = `أنت وكيل برمجة ذكي ومحترف لمنصة بناء مواقع. أنت المدير التنفيذي — تفهم وتنفذ وتناقش وتنصح.
+const AGENT_SYSTEM_PROMPT = `You are an expert AI website builder assistant. You communicate naturally in the user's language.
 
-يجب أن ترد دائماً بـ JSON فقط بالشكل التالي:
-{"reply": "ردك هنا", "action": "build" أو "chat"}
+Your ONLY job is to decide: does the user want to BUILD/MODIFY something, or just CHAT?
 
-- action = "build": عندما المستخدم يريد إنشاء/تعديل/بناء/تنفيذ أي شيء
-- action = "chat": عندما المستخدم يسأل سؤال أو يناقش أو يستشير
+CRITICAL: You must respond with ONLY a valid JSON object. No markdown, no code blocks, no extra text.
 
-أمثلة:
-- "اعمل لي موقع بيع سيارات" → {"reply": "حاضر، سأبدأ بناء موقع بيع سيارات الآن", "action": "build"}
-- "نفذ" → {"reply": "تمام، أبدأ التنفيذ الآن", "action": "build"}
-- "ابدأ" → {"reply": "حاضر، أبدأ العمل", "action": "build"}
-- "غير اللون للأزرق" → {"reply": "سأغير اللون للأزرق", "action": "build"}
-- "ما رأيك بالتصميم؟" → {"reply": "التصميم جيد، أقترح تحسين...", "action": "chat"}
-- "كيف حالك" → {"reply": "أهلاً! أنا جاهز للعمل", "action": "chat"}
+Format: {"reply":"your short reply","action":"build"} or {"reply":"your short reply","action":"chat"}
 
-قواعد:
-- كن مختصراً — جملة أو جملتين كحد أقصى
-- تحدث بلغة المستخدم
-- لا تولّد كود في الرد
-- كن واثقاً ومباشراً
-- أجب بـ JSON فقط، بدون أي نص خارج الـ JSON`;
+Rules:
+- action="build" for ANY request to create, modify, build, edit, change, fix, add, remove, update a website or any part of it
+- action="build" for commands like "نفذ", "ابدأ", "اعمل", "غير", "عدل", "build", "create", "make", "start", "do it"
+- action="chat" ONLY for pure questions, greetings, or discussions with NO build intent
+- Keep reply to 1-2 sentences max
+- Reply in the same language as the user
+- Do NOT generate any code or HTML in your reply
+- Do NOT wrap your response in code blocks or markdown`;
 
 router.post("/chat/message", async (req, res) => {
   try {
@@ -70,17 +64,17 @@ router.post("/chat/message", async (req, res) => {
 
     let contextInfo = "";
     if (project) {
-      contextInfo = `\n\nسياق المشروع:
-- اسم المشروع: ${project.name}
-- الحالة: ${project.status}
-- الوصف: ${project.description || "بدون وصف"}`;
+      contextInfo = `\n\nProject context:
+- Name: ${project.name}
+- Status: ${project.status}
+- Description: ${project.description || "none"}`;
 
       const files = await db
         .select({ filePath: projectFilesTable.filePath })
         .from(projectFilesTable)
         .where(eq(projectFilesTable.projectId, projectId));
       if (files.length > 0) {
-        contextInfo += `\n- ملفات موجودة: ${files.map(f => f.filePath).join(", ")}`;
+        contextInfo += `\n- Existing files: ${files.map(f => f.filePath).join(", ")}`;
       }
     }
 
@@ -99,7 +93,7 @@ router.post("/chat/message", async (req, res) => {
 
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-5",
-      max_tokens: 256,
+      max_tokens: 150,
       system: AGENT_SYSTEM_PROMPT + contextInfo,
       messages,
     });
@@ -109,21 +103,47 @@ router.post("/chat/message", async (req, res) => {
       .map((block: { type: string; text: string }) => block.text)
       .join("");
 
+    console.log("[CHAT] Raw AI response:", rawReply);
+
     let reply = "";
     let shouldBuild = false;
 
     try {
-      const jsonMatch = rawReply.match(/\{[\s\S]*\}/);
+      const cleaned = rawReply
+        .replace(/```json\s*/gi, "")
+        .replace(/```\s*/g, "")
+        .trim();
+
+      const jsonMatch = cleaned.match(/\{"reply"\s*:\s*"[^"]*"\s*,\s*"action"\s*:\s*"(?:build|chat)"\s*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
-        reply = parsed.reply || rawReply;
+        reply = parsed.reply || "";
         shouldBuild = parsed.action === "build";
       } else {
-        reply = rawReply;
+        const fallbackMatch = cleaned.match(/\{[\s\S]*?"action"\s*:\s*"(build|chat)"[\s\S]*?\}/);
+        if (fallbackMatch) {
+          try {
+            const parsed = JSON.parse(fallbackMatch[0]);
+            reply = parsed.reply || cleaned;
+            shouldBuild = parsed.action === "build";
+          } catch {
+            reply = cleaned.replace(/[{}"\n]/g, " ").trim();
+            const buildKeywords = /build|اعمل|ابن|نفذ|ابدأ|غير|عدل|أبدأ|حاضر.*بناء|سأبدأ|سأبني/i;
+            shouldBuild = buildKeywords.test(reply) || buildKeywords.test(message);
+          }
+        } else {
+          reply = cleaned.replace(/[{}"\n]/g, " ").trim() || rawReply;
+          const buildKeywords = /build|create|make|اعمل|ابن|نفذ|ابدأ|غير|عدل|صمم|أنشئ/i;
+          shouldBuild = buildKeywords.test(message);
+        }
       }
     } catch {
       reply = rawReply;
+      const buildKeywords = /build|create|make|اعمل|ابن|نفذ|ابدأ|غير|عدل|صمم|أنشئ/i;
+      shouldBuild = buildKeywords.test(message);
     }
+
+    if (!reply) reply = shouldBuild ? "سأبدأ البناء الآن..." : rawReply;
 
     const tokensUsed = (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0);
     const costUsd = tokensUsed * 0.000015;
@@ -134,6 +154,8 @@ router.post("/chat/message", async (req, res) => {
         creditBalanceUsd: String(Math.max(0, credits - costUsd)),
       })
       .where(eq(usersTable.id, userId));
+
+    console.log("[CHAT] Final result - shouldBuild:", shouldBuild, "reply:", reply.substring(0, 80));
 
     res.json({
       reply,
