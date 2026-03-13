@@ -96,6 +96,53 @@ export default function Builder() {
   const [cssEditorActive, setCssEditorActive] = useState(false);
   const [cssSaving, setCssSaving] = useState(false);
 
+  const [leftPanelOpen, setLeftPanelOpen] = useState(true);
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const [leftWidth, setLeftWidth] = useState(280);
+  const [rightWidth, setRightWidth] = useState(340);
+  const leftDragRef = useRef<{ startX: number; startW: number } | null>(null);
+  const rightDragRef = useRef<{ startX: number; startW: number } | null>(null);
+
+  const handleLeftDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    leftDragRef.current = { startX: e.clientX, startW: leftWidth };
+    const onMove = (ev: MouseEvent) => {
+      if (!leftDragRef.current) return;
+      const isRtl = lang === "ar";
+      const delta = isRtl
+        ? leftDragRef.current.startX - ev.clientX
+        : ev.clientX - leftDragRef.current.startX;
+      setLeftWidth(Math.max(220, Math.min(480, leftDragRef.current.startW + delta)));
+    };
+    const onUp = () => {
+      leftDragRef.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, [leftWidth, lang]);
+
+  const handleRightDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    rightDragRef.current = { startX: e.clientX, startW: rightWidth };
+    const onMove = (ev: MouseEvent) => {
+      if (!rightDragRef.current) return;
+      const isRtl = lang === "ar";
+      const delta = isRtl
+        ? ev.clientX - rightDragRef.current.startX
+        : rightDragRef.current.startX - ev.clientX;
+      setRightWidth(Math.max(260, Math.min(600, rightDragRef.current.startW + delta)));
+    };
+    const onUp = () => {
+      rightDragRef.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, [rightWidth, lang]);
+
   const { data: project } = useGetProject(id || "");
   const { data: me } = useGetMe({ query: { queryKey: ["getMe"], retry: false } });
   const { data: tokenSummary } = useGetTokenSummary();
@@ -510,7 +557,7 @@ export default function Builder() {
   return (
     <div className="flex h-screen bg-[#0e1525] text-[#e1e4e8] overflow-hidden">
 
-      <div className="w-[280px] flex flex-col border-e border-[#1c2333] bg-[#0d1117] flex-shrink-0">
+      {leftPanelOpen && <div style={{ width: leftWidth }} className="flex flex-col border-e border-[#1c2333] bg-[#0d1117] flex-shrink-0 relative">
         <div className="border-b border-[#1c2333]">
           <div className="px-3 py-2 flex items-center gap-2">
             <Link href="/dashboard" className="p-1.5 text-[#8b949e] hover:text-[#e1e4e8] transition-colors rounded hover:bg-[#1c2333]">
@@ -868,7 +915,27 @@ export default function Builder() {
             </button>
           </div>
         </div>
-      </div>
+      </div>}
+
+      {leftPanelOpen && (
+        <div
+          onMouseDown={handleLeftDragStart}
+          className="w-1 cursor-col-resize bg-transparent hover:bg-[#1f6feb] active:bg-[#1f6feb] transition-colors flex-shrink-0 relative group"
+        >
+          <div className="absolute inset-y-0 -inset-x-1 z-10" />
+        </div>
+      )}
+
+      <button
+        onClick={() => setLeftPanelOpen(v => !v)}
+        className="w-5 flex-shrink-0 flex items-center justify-center bg-[#161b22] border-e border-[#1c2333] hover:bg-[#1c2333] transition-colors group"
+        title={leftPanelOpen ? "Collapse chat" : "Expand chat"}
+      >
+        {leftPanelOpen
+          ? <ChevronLeft className={cn("w-3.5 h-3.5 text-[#484f58] group-hover:text-[#e1e4e8] transition-colors", lang === "ar" && "rotate-180")} />
+          : <ChevronRight className={cn("w-3.5 h-3.5 text-[#484f58] group-hover:text-[#e1e4e8] transition-colors", lang === "ar" && "rotate-180")} />
+        }
+      </button>
 
       <div className="flex-1 flex flex-col border-e border-[#1c2333] min-w-0">
         <BuildProgress currentPhase={currentPhase} failed={phaseFailed} allComplete={buildStatus?.status === "completed"} />
@@ -1095,6 +1162,26 @@ export default function Builder() {
         </div>
       </div>
 
+      <button
+        onClick={() => setRightPanelOpen(v => !v)}
+        className="w-5 flex-shrink-0 flex items-center justify-center bg-[#161b22] border-s border-[#1c2333] hover:bg-[#1c2333] transition-colors group"
+        title={rightPanelOpen ? "Collapse panel" : "Expand panel"}
+      >
+        {rightPanelOpen
+          ? <ChevronRight className={cn("w-3.5 h-3.5 text-[#484f58] group-hover:text-[#e1e4e8] transition-colors", lang === "ar" && "rotate-180")} />
+          : <ChevronLeft className={cn("w-3.5 h-3.5 text-[#484f58] group-hover:text-[#e1e4e8] transition-colors", lang === "ar" && "rotate-180")} />
+        }
+      </button>
+
+      {rightPanelOpen && (
+        <div
+          onMouseDown={handleRightDragStart}
+          className="w-1 cursor-col-resize bg-transparent hover:bg-[#1f6feb] active:bg-[#1f6feb] transition-colors flex-shrink-0 relative group"
+        >
+          <div className="absolute inset-y-0 -inset-x-1 z-10" />
+        </div>
+      )}
+
       {cssEditorActive ? (
         <CSSEditorPanel
           selectedElement={cssEditor.selectedElement}
@@ -1110,8 +1197,8 @@ export default function Builder() {
           generatedCSS={cssEditor.generateCSS()}
           isSaving={cssSaving}
         />
-      ) : (
-        <div className="w-[340px] flex flex-col bg-[#0d1117] flex-shrink-0 border-s border-[#1c2333]">
+      ) : rightPanelOpen ? (
+        <div style={{ width: rightWidth }} className="flex flex-col bg-[#0d1117] flex-shrink-0 border-s border-[#1c2333]">
           <div className="h-9 flex items-center border-b border-[#1c2333] bg-[#161b22] flex-shrink-0 px-1 overflow-x-auto">
             <button
               onClick={() => setRightTab("code")}
@@ -1292,7 +1379,7 @@ export default function Builder() {
             />
           )}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
