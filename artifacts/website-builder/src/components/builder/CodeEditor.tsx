@@ -1,15 +1,19 @@
-import React, { useState, useCallback, useRef, useEffect } from "react";
-import { Save, FileCode2 } from "lucide-react";
+import React, { useRef, useEffect, useCallback, useState } from "react";
+import { Save, FileCode2, Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
-import Prism from "prismjs";
-import "prismjs/components/prism-javascript";
-import "prismjs/components/prism-typescript";
-import "prismjs/components/prism-css";
-import "prismjs/components/prism-json";
-import "prismjs/components/prism-markup";
-import "prismjs/components/prism-python";
-import "prismjs/components/prism-bash";
+import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, rectangularSelection, crosshairCursor, highlightSpecialChars } from "@codemirror/view";
+import { EditorState, Compartment } from "@codemirror/state";
+import { defaultKeymap, indentWithTab, history, historyKeymap, undo, redo } from "@codemirror/commands";
+import { syntaxHighlighting, defaultHighlightStyle, indentOnInput, bracketMatching, foldGutter, foldKeymap } from "@codemirror/language";
+import { javascript } from "@codemirror/lang-javascript";
+import { html } from "@codemirror/lang-html";
+import { css } from "@codemirror/lang-css";
+import { python } from "@codemirror/lang-python";
+import { json } from "@codemirror/lang-json";
+import { oneDark } from "@codemirror/theme-one-dark";
+import { autocompletion, closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
+import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 
 interface CodeEditorProps {
   content: string;
@@ -19,100 +23,250 @@ interface CodeEditorProps {
   className?: string;
 }
 
-function getLanguage(filePath: string): string {
+function getLanguageExtension(filePath: string) {
   const ext = filePath.split(".").pop()?.toLowerCase() || "";
-  const map: Record<string, string> = {
-    js: "javascript", jsx: "javascript", ts: "typescript", tsx: "typescript",
-    css: "css", scss: "css", html: "markup", htm: "markup", xml: "markup",
-    svg: "markup", json: "json", py: "python", sh: "bash", bash: "bash",
-    md: "markup", txt: "markup",
-  };
-  return map[ext] || "markup";
+  switch (ext) {
+    case "js": case "jsx": return javascript({ jsx: true });
+    case "ts": case "tsx": return javascript({ jsx: true, typescript: true });
+    case "html": case "htm": case "svg": case "xml": return html();
+    case "css": case "scss": return css();
+    case "py": return python();
+    case "json": return json();
+    default: return [];
+  }
 }
 
-function highlightCode(code: string, language: string): string {
-  try {
-    const grammar = Prism.languages[language];
-    if (grammar) {
-      return Prism.highlight(code, grammar, language);
-    }
-  } catch {}
-  return escapeHtml(code);
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
+const darkTheme = EditorView.theme({
+  "&": {
+    backgroundColor: "#0d1117",
+    color: "#c9d1d9",
+    fontSize: "13px",
+    height: "100%",
+  },
+  ".cm-content": {
+    fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace",
+    padding: "4px 0",
+    caretColor: "#58a6ff",
+  },
+  ".cm-cursor": {
+    borderLeftColor: "#58a6ff",
+    borderLeftWidth: "2px",
+  },
+  ".cm-activeLine": {
+    backgroundColor: "#161b2280",
+  },
+  ".cm-activeLineGutter": {
+    backgroundColor: "#161b2280",
+    color: "#e1e4e8",
+  },
+  ".cm-gutters": {
+    backgroundColor: "#0d1117",
+    color: "#484f58",
+    borderRight: "1px solid #1c2333",
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: "12px",
+  },
+  ".cm-lineNumbers .cm-gutterElement": {
+    padding: "0 8px 0 12px",
+    minWidth: "3ch",
+  },
+  ".cm-foldGutter .cm-gutterElement": {
+    padding: "0 4px",
+  },
+  ".cm-selectionBackground": {
+    backgroundColor: "#1f6feb40 !important",
+  },
+  "&.cm-focused .cm-selectionBackground": {
+    backgroundColor: "#1f6feb60 !important",
+  },
+  ".cm-matchingBracket": {
+    backgroundColor: "#17e5e640",
+    outline: "1px solid #17e5e680",
+  },
+  ".cm-searchMatch": {
+    backgroundColor: "#e2b71440",
+    outline: "1px solid #e2b71480",
+  },
+  ".cm-searchMatch.cm-searchMatch-selected": {
+    backgroundColor: "#e2b71480",
+  },
+  ".cm-tooltip": {
+    backgroundColor: "#161b22",
+    border: "1px solid #30363d",
+    borderRadius: "6px",
+  },
+  ".cm-tooltip-autocomplete": {
+    "& > ul > li": {
+      padding: "2px 8px",
+    },
+    "& > ul > li[aria-selected]": {
+      backgroundColor: "#1f6feb40",
+      color: "#e1e4e8",
+    },
+  },
+  ".cm-panels": {
+    backgroundColor: "#161b22",
+    borderTop: "1px solid #30363d",
+    color: "#c9d1d9",
+  },
+  ".cm-panel.cm-search": {
+    padding: "4px 8px",
+  },
+  ".cm-panel.cm-search input": {
+    backgroundColor: "#0d1117",
+    border: "1px solid #30363d",
+    color: "#c9d1d9",
+    borderRadius: "4px",
+    padding: "2px 6px",
+  },
+  ".cm-panel.cm-search button": {
+    backgroundColor: "#21262d",
+    border: "1px solid #30363d",
+    color: "#c9d1d9",
+    borderRadius: "4px",
+    padding: "2px 8px",
+  },
+  ".cm-scroller": {
+    overflow: "auto",
+  },
+});
 
 export default function CodeEditor({ content, filePath, onSave, readOnly = false, className }: CodeEditorProps) {
   const { t } = useI18n();
-  const [editedContent, setEditedContent] = useState(content);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const viewRef = useRef<EditorView | null>(null);
+  const langCompartment = useRef(new Compartment());
+  const readOnlyCompartment = useRef(new Compartment());
   const [isDirty, setIsDirty] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const preRef = useRef<HTMLPreElement>(null);
-
-  useEffect(() => {
-    setEditedContent(content);
-    setIsDirty(false);
-  }, [content, filePath]);
-
-  const language = getLanguage(filePath);
-
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newVal = e.target.value;
-    setEditedContent(newVal);
-    setIsDirty(newVal !== content);
-  }, [content]);
-
-  const canSave = !!onSave && !readOnly;
+  const [copied, setCopied] = useState(false);
+  const contentRef = useRef(content);
+  const onSaveRef = useRef(onSave);
+  onSaveRef.current = onSave;
+  contentRef.current = content;
 
   const handleSave = useCallback(() => {
-    if (canSave && isDirty) {
-      onSave!(editedContent);
+    if (viewRef.current && onSaveRef.current && !readOnly) {
+      const currentContent = viewRef.current.state.doc.toString();
+      onSaveRef.current(currentContent);
       setIsDirty(false);
     }
-  }, [canSave, isDirty, editedContent, onSave]);
+  }, [readOnly]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-      e.preventDefault();
-      handleSave();
+  const handleCopy = useCallback(() => {
+    if (viewRef.current) {
+      navigator.clipboard.writeText(viewRef.current.state.doc.toString());
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
-    if (e.key === "Tab") {
-      e.preventDefault();
-      const ta = textareaRef.current;
-      if (!ta) return;
-      const start = ta.selectionStart;
-      const end = ta.selectionEnd;
-      const val = ta.value;
-      const newVal = val.substring(0, start) + "  " + val.substring(end);
-      setEditedContent(newVal);
-      setIsDirty(newVal !== content);
-      requestAnimationFrame(() => {
-        ta.selectionStart = ta.selectionEnd = start + 2;
+  }, []);
+
+  useEffect(() => {
+    if (!editorRef.current) return;
+
+    const saveKeymap = keymap.of([{
+      key: "Mod-s",
+      run: () => {
+        if (onSaveRef.current && !readOnly) {
+          const currentContent = viewRef.current?.state.doc.toString() || "";
+          onSaveRef.current(currentContent);
+          setIsDirty(false);
+        }
+        return true;
+      },
+    }]);
+
+    const updateListener = EditorView.updateListener.of((update) => {
+      if (update.docChanged) {
+        const newContent = update.state.doc.toString();
+        setIsDirty(newContent !== contentRef.current);
+      }
+    });
+
+    const state = EditorState.create({
+      doc: content,
+      extensions: [
+        lineNumbers(),
+        highlightActiveLineGutter(),
+        highlightSpecialChars(),
+        history(),
+        foldGutter(),
+        drawSelection(),
+        indentOnInput(),
+        bracketMatching(),
+        closeBrackets(),
+        autocompletion(),
+        rectangularSelection(),
+        crosshairCursor(),
+        highlightActiveLine(),
+        highlightSelectionMatches(),
+        syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+        langCompartment.current.of(getLanguageExtension(filePath)),
+        readOnlyCompartment.current.of(EditorState.readOnly.of(readOnly)),
+        darkTheme,
+        oneDark,
+        saveKeymap,
+        keymap.of([
+          ...closeBracketsKeymap,
+          ...defaultKeymap,
+          ...searchKeymap,
+          ...historyKeymap,
+          ...foldKeymap,
+          indentWithTab,
+        ]),
+        updateListener,
+        EditorView.lineWrapping,
+      ],
+    });
+
+    const view = new EditorView({
+      state,
+      parent: editorRef.current,
+    });
+
+    viewRef.current = view;
+
+    return () => {
+      view.destroy();
+      viewRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    const currentContent = view.state.doc.toString();
+    if (currentContent !== content) {
+      view.dispatch({
+        changes: { from: 0, to: currentContent.length, insert: content },
       });
+      setIsDirty(false);
     }
-  }, [handleSave, content]);
+  }, [content]);
 
-  const handleScroll = () => {
-    if (textareaRef.current && preRef.current) {
-      preRef.current.scrollTop = textareaRef.current.scrollTop;
-      preRef.current.scrollLeft = textareaRef.current.scrollLeft;
-    }
-  };
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: langCompartment.current.reconfigure(getLanguageExtension(filePath)),
+    });
+  }, [filePath]);
 
-  const lines = editedContent.split("\n");
-  const lineCount = lines.length;
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: readOnlyCompartment.current.reconfigure(EditorState.readOnly.of(readOnly)),
+    });
+  }, [readOnly]);
+
+  const canSave = !!onSave && !readOnly;
 
   return (
     <div className={cn("flex flex-col h-full", className)}>
       <div className="h-8 flex items-center justify-between px-3 bg-[#161b22] border-b border-[#1c2333] flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <FileCode2 className="w-3.5 h-3.5 text-[#8b949e]" />
-          <span className="text-[11px] text-[#8b949e] font-mono">
+        <div className="flex items-center gap-2 min-w-0">
+          <FileCode2 className="w-3.5 h-3.5 text-[#8b949e] flex-shrink-0" />
+          <span className="text-[11px] text-[#8b949e] font-mono truncate">
             {filePath}
           </span>
           {canSave && isDirty && (
@@ -120,6 +274,13 @@ export default function CodeEditor({ content, filePath, onSave, readOnly = false
           )}
         </div>
         <div className="flex items-center gap-1">
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-1 px-2 py-0.5 text-[11px] text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#21262d] rounded transition-colors"
+            title="Copy"
+          >
+            {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+          </button>
           {canSave && isDirty && (
             <button
               onClick={handleSave}
@@ -132,41 +293,7 @@ export default function CodeEditor({ content, filePath, onSave, readOnly = false
         </div>
       </div>
 
-      <div className="flex-1 relative overflow-hidden bg-[#0d1117]">
-        <div className="absolute inset-0 flex">
-          <div className="flex-shrink-0 bg-[#0d1117] border-e border-[#1c2333] py-[4px] select-none">
-            {Array.from({ length: lineCount }, (_, i) => (
-              <div
-                key={i}
-                className="px-3 text-[12px] leading-[1.5] text-[#484f58] text-end font-mono"
-              >
-                {i + 1}
-              </div>
-            ))}
-          </div>
-
-          <div className="flex-1 relative overflow-auto">
-            <pre
-              ref={preRef}
-              className="absolute inset-0 p-[4px] ps-2 text-[12px] leading-[1.5] font-mono text-[#c9d1d9] whitespace-pre overflow-auto pointer-events-none"
-              dangerouslySetInnerHTML={{
-                __html: highlightCode(editedContent, language),
-              }}
-            />
-            <textarea
-              ref={textareaRef}
-              value={editedContent}
-              onChange={handleChange}
-              onKeyDown={handleKeyDown}
-              onScroll={handleScroll}
-              readOnly={readOnly}
-              spellCheck={false}
-              className="absolute inset-0 p-[4px] ps-2 text-[12px] leading-[1.5] font-mono text-transparent caret-[#e1e4e8] bg-transparent resize-none outline-none overflow-auto whitespace-pre"
-              style={{ caretColor: "#e1e4e8" }}
-            />
-          </div>
-        </div>
-      </div>
+      <div ref={editorRef} className="flex-1 overflow-hidden" />
     </div>
   );
 }

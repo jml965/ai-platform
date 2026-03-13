@@ -8,7 +8,8 @@ import {
   FileText, FileJson, FileImage, File, Folder, ArrowLeft, Clock,
   RotateCw, Monitor, Smartphone, Tablet, Laptop, ChevronLeft,
   Rocket, ExternalLink, Square, RefreshCw, Globe, Archive, BarChart3,
-  Smartphone as SmartphoneIcon, Users, Lock, Unlock, Paintbrush, Puzzle, Languages
+  Smartphone as SmartphoneIcon, Users, Lock, Unlock, Paintbrush, Puzzle, Languages,
+  Upload
 } from "lucide-react";
 import { format } from "date-fns";
 import { useI18n } from "@/lib/i18n";
@@ -102,6 +103,8 @@ export default function Builder() {
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [cssEditorActive, setCssEditorActive] = useState(false);
   const [cssSaving, setCssSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
@@ -858,6 +861,8 @@ export default function Builder() {
       code = code.replace(/import\\.meta\\.env\\.\\w+/g, '""');
       code = code.replace(/import\\.meta/g, '({})');
       code = code.replace(/process\\.env\\.\\w+/g, '""');
+      code = code.replace(/\\bconst \\{ [^}]+ \\} = require\\([^)]+\\);?/g, '');
+      code = code.replace(/\\brequire\\([^)]+\\)/g, '({})');
       var transformed = Babel.transform(code, { presets: ['react', 'typescript'], filename: 'preview.tsx' }).code;
       transformed = transformed.replace(/\\bconst\\s+/g, 'var ');
       transformed = transformed.replace(/\\blet\\s+/g, 'var ');
@@ -865,7 +870,7 @@ export default function Builder() {
       var root = ReactDOM.createRoot(document.getElementById('root'));
       var AppComp = window.App || (typeof App !== 'undefined' ? App : null);
       if (!AppComp) {
-        var possibleNames = ['App', 'HomePage', 'Home', 'Main', 'Page', 'Root'];
+        var possibleNames = ['App', 'HomePage', 'Home', 'Main', 'Page', 'Root', 'Landing', 'LandingPage', 'Dashboard', 'Layout', 'AppLayout'];
         for (var i = 0; i < possibleNames.length; i++) {
           try { AppComp = window[possibleNames[i]] || eval(possibleNames[i]); if (typeof AppComp === 'function') break; AppComp = null; } catch(ex) { AppComp = null; }
         }
@@ -877,7 +882,10 @@ export default function Builder() {
       }
     } catch(e) {
       console.error('Preview render error:', e);
-      document.getElementById('root').innerHTML = '<div style="padding:40px;text-align:center;font-family:sans-serif;color:#666"><h3 style="margin-bottom:12px">Preview Error</h3><p style="font-size:14px">' + e.message + '</p></div>';
+      var errMsg = (e.message || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      var errLine = '';
+      if (e.loc) errLine = '<p style="font-size:12px;color:#888;margin-top:4px">Line ' + e.loc.line + ', Column ' + e.loc.column + '</p>';
+      document.getElementById('root').innerHTML = '<div style="padding:40px;text-align:center;font-family:sans-serif;color:#666"><h3 style="margin-bottom:12px;color:#e53e3e">Preview Error</h3><pre style="text-align:left;background:#f7f7f7;padding:16px;border-radius:8px;font-size:13px;white-space:pre-wrap;word-break:break-word;max-height:300px;overflow:auto;color:#c53030">' + errMsg + '</pre>' + errLine + '</div>';
     }
   <\/script>
 </body>
@@ -949,6 +957,55 @@ export default function Builder() {
     setPreviewKey(k => k + 1);
     setTimeout(() => setIsRefreshing(false), 600);
   };
+
+  const handleFileUpload = useCallback(async (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0 || !id) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      for (let i = 0; i < fileList.length; i++) {
+        formData.append("files", fileList[i]);
+      }
+      formData.append("directory", "public/assets");
+      const baseUrl = import.meta.env.VITE_API_URL || "";
+      const res = await fetch(`${baseUrl}/api/projects/${id}/upload`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        queryClient.invalidateQueries({ queryKey: ["listProjectFiles", id] });
+        setPreviewKey(k => k + 1);
+        setMessages(prev => [...prev, {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: `${t.upload_success}: ${(data.files || []).map((f: any) => f.filePath).join(", ")}`,
+          timestamp: new Date(),
+        }]);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        const errMsg = errData?.error?.message || t.upload_error;
+        setMessages(prev => [...prev, {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: `${t.upload_error}: ${errMsg}`,
+          timestamp: new Date(),
+        }]);
+      }
+    } catch (err) {
+      console.error("Upload failed:", err);
+      setMessages(prev => [...prev, {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: t.upload_error,
+        timestamp: new Date(),
+      }]);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }, [id, queryClient, t]);
 
   const handleNavBack = () => {
     try { iframeRef.current?.contentWindow?.history.back(); } catch {}
@@ -1734,8 +1791,26 @@ export default function Builder() {
 
           {rightTab === "code" ? (
             <div className="flex-1 flex flex-col min-h-0">
-              <div className="h-8 flex items-center px-3 border-b border-[#1c2333] bg-[#161b22]">
+              <div className="h-8 flex items-center justify-between px-3 border-b border-[#1c2333] bg-[#161b22]">
                 <span className="text-[11px] font-semibold text-[#8b949e] uppercase tracking-wider">{t.explorer}</span>
+                <div className="flex items-center gap-1">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*,.css,.js,.json,.html,.svg,.woff,.woff2,.ttf,.pdf"
+                    className="hidden"
+                    onChange={(e) => handleFileUpload(e.target.files)}
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading || !id}
+                    className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-[#8b949e] hover:text-[#58a6ff] hover:bg-[#1c2333] rounded transition-colors disabled:opacity-50"
+                    title={t.upload_files}
+                  >
+                    {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                  </button>
+                </div>
               </div>
               <div className="flex-1 flex flex-col min-h-0">
                 <div className="max-h-[200px] overflow-y-auto border-b border-[#1c2333]">

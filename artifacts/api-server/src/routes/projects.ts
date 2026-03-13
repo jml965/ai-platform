@@ -7,6 +7,27 @@ import {
   UpdateProjectBody,
 } from "@workspace/api-zod";
 import { requireProjectAccess, getUserId, getUserTeamRole, hasPermission } from "../middlewares/permissions";
+import multer from "multer";
+import path from "path";
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowedMimes = [
+      "image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml", "image/x-icon",
+      "font/woff", "font/woff2", "font/ttf",
+      "application/pdf",
+      "text/plain", "text/css", "text/html", "text/javascript",
+      "application/json", "application/javascript",
+    ];
+    if (allowedMimes.includes(file.mimetype) || file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error(`File type not allowed: ${file.mimetype}`));
+    }
+  },
+});
 
 const router: IRouter = Router();
 
@@ -253,5 +274,85 @@ function mapFile(f: typeof projectFilesTable.$inferSelect) {
     updatedAt: f.updatedAt.toISOString(),
   };
 }
+
+router.post("/projects/:projectId/upload", requireProjectAccess("project.edit"), (req, res, next) => {
+  upload.array("files", 10)(req, res, (err) => {
+    if (err) {
+      if (err instanceof multer.MulterError) {
+        if (err.code === "LIMIT_FILE_SIZE") {
+          res.status(413).json({ error: { code: "FILE_TOO_LARGE", message: "File exceeds 2MB limit" } });
+          return;
+        }
+        if (err.code === "LIMIT_FILE_COUNT") {
+          res.status(400).json({ error: { code: "TOO_MANY_FILES", message: "Maximum 10 files per upload" } });
+          return;
+        }
+        res.status(400).json({ error: { code: "UPLOAD_ERROR", message: err.message } });
+        return;
+      }
+      res.status(400).json({ error: { code: "UPLOAD_ERROR", message: err.message || "Upload failed" } });
+      return;
+    }
+    next();
+  });
+}, async (req, res) => {
+  try {
+    const projectId = req.params.projectId;
+    const files = req.files as Express.Multer.File[];
+    if (!files || files.length === 0) {
+      res.status(400).json({ error: { code: "BAD_REQUEST", message: "No files uploaded" } });
+      return;
+    }
+
+    const allowedDirs = ["public/assets", "public/images", "src/assets", "assets"];
+    const rawDir = (req.body.directory as string) || "public/assets";
+    const normalizedDir = path.normalize(rawDir).replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/+$/, "");
+    if (normalizedDir.includes("..") || path.isAbsolute(rawDir) || !allowedDirs.some(d => normalizedDir.startsWith(d))) {
+      res.status(400).json({ error: { code: "BAD_REQUEST", message: "Invalid upload directory" } });
+      return;
+    }
+    const targetDir = normalizedDir;
+
+    const savedFiles: { filePath: string; size: number; mimeType: string }[] = [];
+
+    for (const file of files) {
+      const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const filePath = `${targetDir}/${safeName}`;
+      const isTextFile = file.mimetype.startsWith("text/") || file.mimetype === "application/json" || file.mimetype === "application/javascript";
+      const content = isTextFile
+        ? file.buffer.toString("utf-8")
+        : `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
+
+      const ext = path.extname(safeName).slice(1) || "bin";
+      const existing = await db
+        .select()
+        .from(projectFilesTable)
+        .where(and(eq(projectFilesTable.projectId, projectId), eq(projectFilesTable.filePath, filePath)))
+        .limit(1);
+
+      if (existing.length > 0) {
+        await db
+          .update(projectFilesTable)
+          .set({ content, updatedAt: new Date(), version: sql`${projectFilesTable.version} + 1` })
+          .where(eq(projectFilesTable.id, existing[0].id));
+      } else {
+        await db.insert(projectFilesTable).values({
+          projectId,
+          filePath,
+          content,
+          fileType: ext,
+          version: 1,
+        });
+      }
+
+      savedFiles.push({ filePath, size: file.size, mimeType: file.mimetype });
+    }
+
+    res.json({ success: true, files: savedFiles });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "Upload failed";
+    res.status(500).json({ error: { code: "INTERNAL", message: msg } });
+  }
+});
 
 export default router;
