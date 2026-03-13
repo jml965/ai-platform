@@ -15,7 +15,7 @@ export interface LineEdit {
 
 export class SurgicalEditAgent extends BaseAgent {
   readonly agentType = "surgical_edit" as const;
-  readonly modelConfig: ModelConfig = { provider: "anthropic", model: "claude-sonnet-4-20250514" };
+  readonly modelConfig: ModelConfig = { provider: "openai", model: "gpt-4o" };
 
   readonly systemPrompt = `You are a surgical code editor AI agent. Your job is to make precise, minimal edits to existing code files based on user modification requests.
 

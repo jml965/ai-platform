@@ -10,7 +10,7 @@ interface TranslationRequest {
 
 export class TranslationAgent extends BaseAgent {
   readonly agentType = "translator" as const;
-  readonly modelConfig: ModelConfig = { provider: "anthropic", model: "claude-sonnet-4-20250514" };
+  readonly modelConfig: ModelConfig = { provider: "openai", model: "gpt-4o-mini" };
 
   readonly systemPrompt = `You are a professional website content translator AI. Your job is to translate website content from one language to another while preserving:
 
