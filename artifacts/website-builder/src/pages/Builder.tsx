@@ -736,8 +736,26 @@ export default function Builder() {
   <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"><\/script>
   <script>
     var useState = React.useState, useEffect = React.useEffect, useCallback = React.useCallback,
-        useMemo = React.useMemo, useRef = React.useRef, createContext = React.createContext,
-        useContext = React.useContext, Fragment = React.Fragment;
+        useMemo = React.useMemo, useRef = React.useRef, Fragment = React.Fragment,
+        useReducer = React.useReducer, useLayoutEffect = React.useLayoutEffect,
+        useImperativeHandle = React.useImperativeHandle, useDebugValue = React.useDebugValue,
+        forwardRef = React.forwardRef, memo = React.memo, Children = React.Children,
+        isValidElement = React.isValidElement, cloneElement = React.cloneElement,
+        createElement = React.createElement, Component = React.Component, PureComponent = React.PureComponent,
+        StrictMode = React.StrictMode;
+    var createContext = function(defaultValue) {
+      var ctx = React.createContext(defaultValue);
+      var OrigProvider = ctx.Provider;
+      return ctx;
+    };
+    var useContext = function(ctx) {
+      try { var v = React.useContext(ctx); return v; } catch(e) { return null; }
+    };
+    var useId = function() { return 'id-' + Math.random().toString(36).slice(2, 8); };
+    var useSyncExternalStore = function(sub, getSnapshot) { var _s = useState(0); useEffect(function() { return sub(function() { _s[1](function(c) { return c+1; }); }); }, []); return getSnapshot(); };
+    var useDeferredValue = function(v) { return v; };
+    var useTransition = function() { return [false, function(fn) { fn(); }]; };
+    var startTransition = function(fn) { fn(); };
     var useNavigate = function() { return function(p) { window.location.hash = p; }; };
     var useParams = function() {
       var hash = window.location.hash.slice(1) || '/';
@@ -897,7 +915,27 @@ export default function Builder() {
         }
       }
       if (AppComp) {
-        root.render(React.createElement(AppComp));
+        var ErrorBoundary = (function() {
+          function EB(props) {
+            this.state = { hasError: false, error: null };
+          }
+          EB.prototype = Object.create(React.Component.prototype);
+          EB.prototype.constructor = EB;
+          EB.getDerivedStateFromError = function(error) { return { hasError: true, error: error }; };
+          EB.prototype.componentDidCatch = function(error, info) { console.error('Component error:', error); };
+          EB.prototype.render = function() {
+            if (this.state.hasError) {
+              var msg = this.state.error ? (this.state.error.message || String(this.state.error)) : 'Unknown error';
+              return React.createElement('div', { style: { padding: '40px', textAlign: 'center', fontFamily: 'sans-serif', color: '#666' } },
+                React.createElement('h3', { style: { marginBottom: '12px', color: '#e53e3e' } }, 'Render Error'),
+                React.createElement('pre', { style: { textAlign: 'left', background: '#f7f7f7', padding: '16px', borderRadius: '8px', fontSize: '13px', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '300px', overflow: 'auto', color: '#c53030' } }, msg)
+              );
+            }
+            return this.props.children;
+          };
+          return EB;
+        })();
+        root.render(React.createElement(ErrorBoundary, null, React.createElement(AppComp)));
       } else {
         document.getElementById('root').innerHTML = '<div style="padding:40px;text-align:center;font-family:sans-serif;color:#666"><h3>No App Component</h3><p>Could not find main component to render.</p></div>';
       }
