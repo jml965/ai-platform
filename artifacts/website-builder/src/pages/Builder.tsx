@@ -447,72 +447,76 @@ export default function Builder() {
     <div className="flex h-screen bg-[#0e1525] text-[#e1e4e8] overflow-hidden">
 
       <div className="w-[280px] flex flex-col border-e border-[#1c2333] bg-[#0d1117] flex-shrink-0">
-        <div className="px-3 py-3 border-b border-[#1c2333] flex items-center gap-2">
-          <Link href="/dashboard" className="p-1.5 text-[#8b949e] hover:text-[#e1e4e8] transition-colors rounded hover:bg-[#1c2333]">
-            <ArrowLeft className={cn("w-4 h-4", lang === "ar" && "rotate-180")} />
-          </Link>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-sm font-semibold text-[#e1e4e8] truncate">{project?.name || t.loading}</h1>
+        <div className="border-b border-[#1c2333]">
+          <div className="px-3 py-2 flex items-center gap-2">
+            <Link href="/dashboard" className="p-1.5 text-[#8b949e] hover:text-[#e1e4e8] transition-colors rounded hover:bg-[#1c2333]">
+              <ArrowLeft className={cn("w-4 h-4", lang === "ar" && "rotate-180")} />
+            </Link>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-sm font-semibold text-[#e1e4e8] truncate">{project?.name || t.loading}</h1>
+            </div>
+            <CollaboratorAvatars collaborators={collaborators} currentUserId={me?.id} />
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#1f6feb]/20 text-[#58a6ff] font-medium flex items-center gap-1.5 flex-shrink-0">
+              {isBuilding && <span className="w-1.5 h-1.5 rounded-full bg-[#58a6ff] animate-pulse" />}
+              {t.agent_label} • {actionCount}
+            </span>
           </div>
-          <CollaboratorAvatars collaborators={collaborators} currentUserId={me?.id} />
-          <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#1f6feb]/20 text-[#58a6ff] font-medium flex items-center gap-1.5 flex-shrink-0">
-            {isBuilding && <span className="w-1.5 h-1.5 rounded-full bg-[#58a6ff] animate-pulse" />}
-            {t.agent_label} • {actionCount}
-          </span>
-          <Link
-            href={`/project/${id}/analytics`}
-            className="text-[11px] px-2.5 py-1 rounded-full font-medium flex items-center gap-1.5 flex-shrink-0 transition-all bg-[#d2a8ff]/10 text-[#d2a8ff] hover:bg-[#d2a8ff]/20"
-          >
-            <BarChart3 className="w-3 h-3" />
-            {t.analytics}
-          </Link>
-          <button
-            onClick={() => { setShowTranslationsPanel(v => !v); setShowDeployPanel(false); setShowPwaPanel(false); }}
-            className={cn(
-              "text-[11px] px-2.5 py-1 rounded-full font-medium flex items-center gap-1.5 flex-shrink-0 transition-all",
-              showTranslationsPanel
-                ? "bg-cyan-500/20 text-cyan-400"
-                : "bg-[#1c2333] text-[#8b949e] hover:bg-[#30363d] hover:text-[#e1e4e8]"
-            )}
-          >
-            <Languages className="w-3 h-3" />
-            {t.translations_panel}
-          </button>
-          <button
-            onClick={() => { setShowPwaPanel(v => !v); setShowDeployPanel(false); setShowTranslationsPanel(false); }}
-            className={cn(
-              "text-[11px] px-2.5 py-1 rounded-full font-medium flex items-center gap-1.5 flex-shrink-0 transition-all",
-              showPwaPanel
-                ? "bg-purple-500/20 text-purple-400"
-                : "bg-[#1c2333] text-[#8b949e] hover:bg-[#30363d] hover:text-[#e1e4e8]"
-            )}
-          >
-            <SmartphoneIcon className="w-3 h-3" />
-            PWA
-          </button>
-          <button
-            onClick={() => { setShowDeployPanel(v => !v); setShowPwaPanel(false); setShowTranslationsPanel(false); }}
-            disabled={!canDeploy && !isDeployed && !deploymentStatus}
-            className={cn(
-              "text-[11px] px-2.5 py-1 rounded-full font-medium flex items-center gap-1.5 flex-shrink-0 transition-all",
-              isDeployed
-                ? "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30"
-                : isDeploying
-                  ? "bg-yellow-500/20 text-yellow-400"
-                  : deploymentStatus?.status === "stopped"
-                    ? "bg-[#484f58]/20 text-[#8b949e] hover:bg-[#484f58]/30"
-                    : "bg-[#1f6feb]/20 text-[#58a6ff] hover:bg-[#1f6feb]/30 disabled:opacity-40"
-            )}
-          >
-            {isDeploying ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
-            ) : isDeployed ? (
-              <Globe className="w-3 h-3" />
-            ) : (
-              <Rocket className="w-3 h-3" />
-            )}
-            {isDeploying ? t.deploying : isDeployed ? t.deploy_status_active : t.deploy}
-          </button>
+          <div className="px-3 pb-2 flex items-center gap-1.5 flex-wrap">
+            <Link
+              href={`/project/${id}/analytics`}
+              className="text-[10px] px-2 py-1 rounded-md font-medium flex items-center gap-1 flex-shrink-0 transition-all bg-[#d2a8ff]/10 text-[#d2a8ff] hover:bg-[#d2a8ff]/20"
+            >
+              <BarChart3 className="w-3 h-3" />
+              {t.analytics}
+            </Link>
+            <button
+              onClick={() => { setShowTranslationsPanel(v => !v); setShowDeployPanel(false); setShowPwaPanel(false); }}
+              className={cn(
+                "text-[10px] px-2 py-1 rounded-md font-medium flex items-center gap-1 flex-shrink-0 transition-all",
+                showTranslationsPanel
+                  ? "bg-cyan-500/20 text-cyan-400"
+                  : "bg-[#1c2333] text-[#8b949e] hover:bg-[#30363d] hover:text-[#e1e4e8]"
+              )}
+            >
+              <Languages className="w-3 h-3" />
+              {t.translations_panel}
+            </button>
+            <button
+              onClick={() => { setShowPwaPanel(v => !v); setShowDeployPanel(false); setShowTranslationsPanel(false); }}
+              className={cn(
+                "text-[10px] px-2 py-1 rounded-md font-medium flex items-center gap-1 flex-shrink-0 transition-all",
+                showPwaPanel
+                  ? "bg-purple-500/20 text-purple-400"
+                  : "bg-[#1c2333] text-[#8b949e] hover:bg-[#30363d] hover:text-[#e1e4e8]"
+              )}
+            >
+              <SmartphoneIcon className="w-3 h-3" />
+              PWA
+            </button>
+            <button
+              onClick={() => { setShowDeployPanel(v => !v); setShowPwaPanel(false); setShowTranslationsPanel(false); }}
+              disabled={!canDeploy && !isDeployed && !deploymentStatus}
+              className={cn(
+                "text-[10px] px-2 py-1 rounded-md font-medium flex items-center gap-1 flex-shrink-0 transition-all",
+                isDeployed
+                  ? "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30"
+                  : isDeploying
+                    ? "bg-yellow-500/20 text-yellow-400"
+                    : deploymentStatus?.status === "stopped"
+                      ? "bg-[#484f58]/20 text-[#8b949e] hover:bg-[#484f58]/30"
+                      : "bg-[#1f6feb]/20 text-[#58a6ff] hover:bg-[#1f6feb]/30 disabled:opacity-40"
+              )}
+            >
+              {isDeploying ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : isDeployed ? (
+                <Globe className="w-3 h-3" />
+              ) : (
+                <Rocket className="w-3 h-3" />
+              )}
+              {isDeploying ? t.deploying : isDeployed ? t.deploy_status_active : t.deploy}
+            </button>
+          </div>
         </div>
 
         <AnimatePresence>
