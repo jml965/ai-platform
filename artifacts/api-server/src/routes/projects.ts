@@ -192,6 +192,40 @@ router.get("/projects/:projectId/files/:fileId", requireProjectAccess("project.v
   }
 });
 
+router.patch("/projects/:projectId/files/:fileId", requireProjectAccess("project.edit"), async (req, res) => {
+  try {
+    const { content } = req.body;
+    if (typeof content !== "string") {
+      res.status(400).json({ error: { code: "BAD_REQUEST", message: "content is required" } });
+      return;
+    }
+
+    const [updated] = await db
+      .update(projectFilesTable)
+      .set({
+        content,
+        version: sql`${projectFilesTable.version} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(projectFilesTable.id, req.params.fileId),
+          eq(projectFilesTable.projectId, req.params.projectId)
+        )
+      )
+      .returning();
+
+    if (!updated) {
+      res.status(404).json({ error: { code: "NOT_FOUND", message: "File not found" } });
+      return;
+    }
+
+    res.json(mapFile(updated));
+  } catch (error) {
+    res.status(500).json({ error: { code: "INTERNAL", message: "Failed to update file" } });
+  }
+});
+
 function mapProject(p: typeof projectsTable.$inferSelect) {
   return {
     id: p.id,

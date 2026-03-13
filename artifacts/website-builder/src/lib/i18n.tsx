@@ -239,7 +239,25 @@ const en = {
   monitoring_refreshing: "Refreshing...",
   monitoring_last_updated: "Last updated",
   monitoring_overview: "System Overview",
-  monitoring_runbook: "Runbook"
+  monitoring_runbook: "Runbook",
+  terminal: "Terminal",
+  terminal_lines: "lines",
+  terminal_empty: "No output yet. Start a build to see logs here.",
+  phase_planning: "Planning",
+  phase_generating: "Generating",
+  phase_installing: "Installing",
+  phase_running: "Running",
+  phase_ready: "Ready",
+  editor_save: "Save",
+  editor_unsaved: "Unsaved changes",
+  plan_title: "Project Plan",
+  plan_approve: "Approve",
+  plan_modify: "Modify",
+  plan_approved: "Approved",
+  plan_modify_prompt: "I'd like to modify the plan...",
+  preview_open_external: "Open in new tab",
+  preview_server_url: "Server URL",
+  explorer: "Explorer",
 };
 
 const ar = {
@@ -481,7 +499,25 @@ const ar = {
   monitoring_refreshing: "جاري التحديث...",
   monitoring_last_updated: "آخر تحديث",
   monitoring_overview: "نظرة عامة على النظام",
-  monitoring_runbook: "دليل التشغيل"
+  monitoring_runbook: "دليل التشغيل",
+  terminal: "الطرفية",
+  terminal_lines: "سطر",
+  terminal_empty: "لا يوجد مخرجات بعد. ابدأ البناء لرؤية السجلات هنا.",
+  phase_planning: "التخطيط",
+  phase_generating: "التوليد",
+  phase_installing: "التثبيت",
+  phase_running: "التشغيل",
+  phase_ready: "جاهز",
+  editor_save: "حفظ",
+  editor_unsaved: "تغييرات غير محفوظة",
+  plan_title: "خطة المشروع",
+  plan_approve: "موافقة",
+  plan_modify: "تعديل",
+  plan_approved: "تمت الموافقة",
+  plan_modify_prompt: "أود تعديل الخطة...",
+  preview_open_external: "فتح في تبويب جديد",
+  preview_server_url: "رابط السيرفر",
+  explorer: "المستكشف",
 };
 
 type Language = "en" | "ar";
