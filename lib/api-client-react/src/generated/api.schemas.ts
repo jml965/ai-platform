@@ -532,6 +532,75 @@ export interface DeploymentListResponse {
   data: DeploymentResponse[];
 }
 
+export type PwaSettingsDisplay =
+  (typeof PwaSettingsDisplay)[keyof typeof PwaSettingsDisplay];
+
+export const PwaSettingsDisplay = {
+  standalone: "standalone",
+  fullscreen: "fullscreen",
+  "minimal-ui": "minimal-ui",
+  browser: "browser",
+} as const;
+
+export type PwaSettingsOrientation =
+  (typeof PwaSettingsOrientation)[keyof typeof PwaSettingsOrientation];
+
+export const PwaSettingsOrientation = {
+  any: "any",
+  natural: "natural",
+  landscape: "landscape",
+  portrait: "portrait",
+} as const;
+
+export interface PwaSettings {
+  projectId: string;
+  enabled: boolean;
+  appName: string;
+  shortName: string;
+  description?: string | null;
+  themeColor: string;
+  backgroundColor: string;
+  display: PwaSettingsDisplay;
+  orientation: PwaSettingsOrientation;
+  iconUrl?: string | null;
+  startUrl: string;
+  offlineEnabled: boolean;
+}
+
+export type UpdatePwaSettingsRequestDisplay =
+  (typeof UpdatePwaSettingsRequestDisplay)[keyof typeof UpdatePwaSettingsRequestDisplay];
+
+export const UpdatePwaSettingsRequestDisplay = {
+  standalone: "standalone",
+  fullscreen: "fullscreen",
+  "minimal-ui": "minimal-ui",
+  browser: "browser",
+} as const;
+
+export type UpdatePwaSettingsRequestOrientation =
+  (typeof UpdatePwaSettingsRequestOrientation)[keyof typeof UpdatePwaSettingsRequestOrientation];
+
+export const UpdatePwaSettingsRequestOrientation = {
+  any: "any",
+  natural: "natural",
+  landscape: "landscape",
+  portrait: "portrait",
+} as const;
+
+export interface UpdatePwaSettingsRequest {
+  enabled?: boolean;
+  appName?: string;
+  shortName?: string;
+  description?: string | null;
+  themeColor?: string;
+  backgroundColor?: string;
+  display?: UpdatePwaSettingsRequestDisplay;
+  orientation?: UpdatePwaSettingsRequestOrientation;
+  iconUrl?: string | null;
+  startUrl?: string;
+  offlineEnabled?: boolean;
+}
+
 export type GetAuthProvider200Provider =
   (typeof GetAuthProvider200Provider)[keyof typeof GetAuthProvider200Provider];
 
@@ -592,3 +661,5 @@ export type ListInvoicesParams = {
   page?: number;
   limit?: number;
 };
+
+export type GetPwaManifest200 = { [key: string]: unknown };

@@ -36,6 +36,7 @@ import type {
   ErrorResponse,
   ExecutionLogListResponse,
   GetAuthProvider200,
+  GetPwaManifest200,
   GetTokenUsageParams,
   HealthStatus,
   InviteMemberRequest,
@@ -50,6 +51,7 @@ import type {
   ProjectFile,
   ProjectFileListResponse,
   ProjectListResponse,
+  PwaSettings,
   Snapshot,
   SnapshotCompareResponse,
   SnapshotListResponse,
@@ -68,6 +70,7 @@ import type {
   UpdateNotificationPreferencesRequest,
   UpdateProfileRequest,
   UpdateProjectRequest,
+  UpdatePwaSettingsRequest,
   UpdateTeamRequest,
   UpdateTokenLimitsRequest,
   User,
@@ -5101,6 +5104,362 @@ export function useListDeployments<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getListDeploymentsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns PWA settings for a project
+ * @summary Get PWA settings
+ */
+export const getGetPwaSettingsUrl = (projectId: string) => {
+  return `/api/projects/${projectId}/pwa`;
+};
+
+export const getPwaSettings = async (
+  projectId: string,
+  options?: RequestInit,
+): Promise<PwaSettings> => {
+  return customFetch<PwaSettings>(getGetPwaSettingsUrl(projectId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPwaSettingsQueryKey = (projectId: string) => {
+  return [`/api/projects/${projectId}/pwa`] as const;
+};
+
+export const getGetPwaSettingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPwaSettings>>,
+  TError = ErrorType<unknown>,
+>(
+  projectId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPwaSettings>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetPwaSettingsQueryKey(projectId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getPwaSettings>>> = ({
+    signal,
+  }) => getPwaSettings(projectId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!projectId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPwaSettings>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPwaSettingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPwaSettings>>
+>;
+export type GetPwaSettingsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get PWA settings
+ */
+
+export function useGetPwaSettings<
+  TData = Awaited<ReturnType<typeof getPwaSettings>>,
+  TError = ErrorType<unknown>,
+>(
+  projectId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPwaSettings>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPwaSettingsQueryOptions(projectId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Create or update PWA settings for a project
+ * @summary Update PWA settings
+ */
+export const getUpdatePwaSettingsUrl = (projectId: string) => {
+  return `/api/projects/${projectId}/pwa`;
+};
+
+export const updatePwaSettings = async (
+  projectId: string,
+  updatePwaSettingsRequest: UpdatePwaSettingsRequest,
+  options?: RequestInit,
+): Promise<PwaSettings> => {
+  return customFetch<PwaSettings>(getUpdatePwaSettingsUrl(projectId), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updatePwaSettingsRequest),
+  });
+};
+
+export const getUpdatePwaSettingsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updatePwaSettings>>,
+    TError,
+    { projectId: string; data: BodyType<UpdatePwaSettingsRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updatePwaSettings>>,
+  TError,
+  { projectId: string; data: BodyType<UpdatePwaSettingsRequest> },
+  TContext
+> => {
+  const mutationKey = ["updatePwaSettings"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updatePwaSettings>>,
+    { projectId: string; data: BodyType<UpdatePwaSettingsRequest> }
+  > = (props) => {
+    const { projectId, data } = props ?? {};
+
+    return updatePwaSettings(projectId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdatePwaSettingsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updatePwaSettings>>
+>;
+export type UpdatePwaSettingsMutationBody = BodyType<UpdatePwaSettingsRequest>;
+export type UpdatePwaSettingsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update PWA settings
+ */
+export const useUpdatePwaSettings = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updatePwaSettings>>,
+    TError,
+    { projectId: string; data: BodyType<UpdatePwaSettingsRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updatePwaSettings>>,
+  TError,
+  { projectId: string; data: BodyType<UpdatePwaSettingsRequest> },
+  TContext
+> => {
+  return useMutation(getUpdatePwaSettingsMutationOptions(options));
+};
+
+/**
+ * Returns a generated manifest.json for the project
+ * @summary Get PWA manifest
+ */
+export const getGetPwaManifestUrl = (projectId: string) => {
+  return `/api/projects/${projectId}/pwa/manifest`;
+};
+
+export const getPwaManifest = async (
+  projectId: string,
+  options?: RequestInit,
+): Promise<GetPwaManifest200> => {
+  return customFetch<GetPwaManifest200>(getGetPwaManifestUrl(projectId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPwaManifestQueryKey = (projectId: string) => {
+  return [`/api/projects/${projectId}/pwa/manifest`] as const;
+};
+
+export const getGetPwaManifestQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPwaManifest>>,
+  TError = ErrorType<unknown>,
+>(
+  projectId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPwaManifest>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetPwaManifestQueryKey(projectId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getPwaManifest>>> = ({
+    signal,
+  }) => getPwaManifest(projectId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!projectId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPwaManifest>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPwaManifestQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPwaManifest>>
+>;
+export type GetPwaManifestQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get PWA manifest
+ */
+
+export function useGetPwaManifest<
+  TData = Awaited<ReturnType<typeof getPwaManifest>>,
+  TError = ErrorType<unknown>,
+>(
+  projectId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPwaManifest>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPwaManifestQueryOptions(projectId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns a generated service worker script for the project
+ * @summary Get PWA service worker
+ */
+export const getGetPwaServiceWorkerUrl = (projectId: string) => {
+  return `/api/projects/${projectId}/pwa/service-worker`;
+};
+
+export const getPwaServiceWorker = async (
+  projectId: string,
+  options?: RequestInit,
+): Promise<string> => {
+  return customFetch<string>(getGetPwaServiceWorkerUrl(projectId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPwaServiceWorkerQueryKey = (projectId: string) => {
+  return [`/api/projects/${projectId}/pwa/service-worker`] as const;
+};
+
+export const getGetPwaServiceWorkerQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPwaServiceWorker>>,
+  TError = ErrorType<unknown>,
+>(
+  projectId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPwaServiceWorker>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetPwaServiceWorkerQueryKey(projectId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getPwaServiceWorker>>
+  > = ({ signal }) =>
+    getPwaServiceWorker(projectId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!projectId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getPwaServiceWorker>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetPwaServiceWorkerQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPwaServiceWorker>>
+>;
+export type GetPwaServiceWorkerQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get PWA service worker
+ */
+
+export function useGetPwaServiceWorker<
+  TData = Awaited<ReturnType<typeof getPwaServiceWorker>>,
+  TError = ErrorType<unknown>,
+>(
+  projectId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPwaServiceWorker>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPwaServiceWorkerQueryOptions(projectId, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

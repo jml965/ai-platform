@@ -16,6 +16,7 @@ import domainsRouter from "./domains";
 import notificationsRouter from "./notifications";
 import snapshotsRouter from "./snapshots";
 import templatesRouter from "./templates";
+import pwaRouter from "./pwa";
 import { requireAuth } from "../middlewares/authSession";
 
 const router: IRouter = Router();
@@ -39,5 +40,6 @@ router.use(domainsRouter);
 router.use(notificationsRouter);
 router.use(snapshotsRouter);
 router.use(templatesRouter);
+router.use(pwaRouter);
 
 export default router;

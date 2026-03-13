@@ -43,6 +43,32 @@ API endpoints (all under `/api/sandbox`, auth required):
 
 Limits: Max 10 concurrent sandboxes, 64-512MB memory, 30-600s timeout, auto-cleanup after 10min inactivity.
 
+## PWA (Progressive Web App) Support
+
+Converts any project into a Progressive Web App installable on mobile devices.
+
+Key files:
+- `lib/db/src/schema/pwa-settings.ts` — DB table for per-project PWA settings
+- `artifacts/api-server/src/routes/pwa.ts` — REST API for PWA settings, manifest.json and service worker generation
+- `artifacts/website-builder/src/components/builder/PwaSettings.tsx` — PWA settings UI panel
+
+API endpoints (all under `/api/projects/:projectId/pwa`, auth required):
+- `GET /pwa` — Get PWA settings for a project
+- `PUT /pwa` — Create or update PWA settings
+- `GET /pwa/manifest` — Generate manifest.json (only when PWA is enabled)
+- `GET /pwa/service-worker` — Generate service worker JS (only when PWA is enabled)
+
+Features:
+- Enable/disable PWA per project
+- Configure app name, short name, description
+- Theme color and background color pickers
+- Display mode (standalone, fullscreen, minimal-ui, browser)
+- Screen orientation (any, portrait, landscape, natural)
+- Custom icon URL support
+- Offline caching via service worker (network-first with cache fallback)
+- Auto-generated default icons from app initial
+- Manifest and service worker URL display with copy buttons
+
 ## Deployment System
 
 Deployment management allowing users to deploy projects to public URLs with subdomains.

@@ -28,6 +28,8 @@ tags:
     description: Project deployment management
   - name: notifications
     description: Email notification preferences
+  - name: pwa
+    description: Progressive Web App settings and generation
   - name: preview
     description: Live preview of generated websites
   - name: domains
@@ -1187,6 +1189,74 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DeploymentListResponse"
+
+  /projects/{projectId}/pwa:
+    get:
+      operationId: getPwaSettings
+      tags: [pwa]
+      summary: Get PWA settings
+      description: Returns PWA settings for a project
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: PWA settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PwaSettings"
+    put:
+      operationId: updatePwaSettings
+      tags: [pwa]
+      summary: Update PWA settings
+      description: Create or update PWA settings for a project
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePwaSettingsRequest"
+      responses:
+        "200":
+          description: Updated PWA settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PwaSettings"
+
+  /projects/{projectId}/pwa/manifest:
+    get:
+      operationId: getPwaManifest
+      tags: [pwa]
+      summary: Get PWA manifest
+      description: Returns a generated manifest.json for the project
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Web app manifest
+          content:
+            application/manifest+json:
+              schema:
+                type: object
+
+  /projects/{projectId}/pwa/service-worker:
+    get:
+      operationId: getPwaServiceWorker
+      tags: [pwa]
+      summary: Get PWA service worker
+      description: Returns a generated service worker script for the project
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Service worker JavaScript
+          content:
+            application/javascript:
+              schema:
+                type: string
 
   /preview/{projectId}:
     get:
@@ -2365,3 +2435,77 @@ components:
                       type: string
                     value:
                       type: string
+
+    PwaSettings:
+      type: object
+      properties:
+        projectId:
+          type: string
+          format: uuid
+        enabled:
+          type: boolean
+        appName:
+          type: string
+        shortName:
+          type: string
+        description:
+          type: string
+          nullable: true
+        themeColor:
+          type: string
+        backgroundColor:
+          type: string
+        display:
+          type: string
+          enum: [standalone, fullscreen, minimal-ui, browser]
+        orientation:
+          type: string
+          enum: [any, natural, landscape, portrait]
+        iconUrl:
+          type: string
+          nullable: true
+        startUrl:
+          type: string
+        offlineEnabled:
+          type: boolean
+      required:
+        - projectId
+        - enabled
+        - appName
+        - shortName
+        - themeColor
+        - backgroundColor
+        - display
+        - orientation
+        - startUrl
+        - offlineEnabled
+
+    UpdatePwaSettingsRequest:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        appName:
+          type: string
+        shortName:
+          type: string
+        description:
+          type: string
+          nullable: true
+        themeColor:
+          type: string
+        backgroundColor:
+          type: string
+        display:
+          type: string
+          enum: [standalone, fullscreen, minimal-ui, browser]
+        orientation:
+          type: string
+          enum: [any, natural, landscape, portrait]
+        iconUrl:
+          type: string
+          nullable: true
+        startUrl:
+          type: string
+        offlineEnabled:
+          type: boolean

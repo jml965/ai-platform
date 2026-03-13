@@ -6,7 +6,8 @@ import {
   FileCode2, User, Bot, Search, ChevronRight, ChevronDown,
   FileText, FileJson, FileImage, File, Folder, ArrowLeft, Clock,
   RotateCw, Monitor, Smartphone, Tablet, Laptop, ChevronLeft,
-  Terminal as TerminalIcon, Rocket, ExternalLink, Square, RefreshCw, Globe, Archive
+  Terminal as TerminalIcon, Rocket, ExternalLink, Square, RefreshCw, Globe, Archive,
+  Smartphone as SmartphoneIcon
 } from "lucide-react";
 import { format } from "date-fns";
 import { useI18n } from "@/lib/i18n";
@@ -31,6 +32,7 @@ import CodeEditor from "@/components/builder/CodeEditor";
 import ProjectPlan from "@/components/builder/ProjectPlan";
 import DomainSettings from "@/components/builder/DomainSettings";
 import SnapshotsPanel from "@/components/builder/SnapshotsPanel";
+import PwaSettingsPanel from "@/components/builder/PwaSettings";
 import { useUpdateFile } from "@/hooks/useUpdateFile";
 import "@/components/builder/prism-theme.css";
 
@@ -72,6 +74,7 @@ export default function Builder() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const [showDeployPanel, setShowDeployPanel] = useState(false);
+  const [showPwaPanel, setShowPwaPanel] = useState(false);
 
   const { data: project } = useGetProject(id || "");
   const { data: tokenSummary } = useGetTokenSummary();
@@ -379,7 +382,19 @@ export default function Builder() {
             {t.agent_label} • {actionCount}
           </span>
           <button
-            onClick={() => setShowDeployPanel(v => !v)}
+            onClick={() => { setShowPwaPanel(v => !v); setShowDeployPanel(false); }}
+            className={cn(
+              "text-[11px] px-2.5 py-1 rounded-full font-medium flex items-center gap-1.5 flex-shrink-0 transition-all",
+              showPwaPanel
+                ? "bg-purple-500/20 text-purple-400"
+                : "bg-[#1c2333] text-[#8b949e] hover:bg-[#30363d] hover:text-[#e1e4e8]"
+            )}
+          >
+            <SmartphoneIcon className="w-3 h-3" />
+            PWA
+          </button>
+          <button
+            onClick={() => { setShowDeployPanel(v => !v); setShowPwaPanel(false); }}
             disabled={!canDeploy && !isDeployed && !deploymentStatus}
             className={cn(
               "text-[11px] px-2.5 py-1 rounded-full font-medium flex items-center gap-1.5 flex-shrink-0 transition-all",
@@ -485,6 +500,19 @@ export default function Builder() {
                   )}
                 </div>
               </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showPwaPanel && id && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden border-b border-[#1c2333]"
+            >
+              <PwaSettingsPanel projectId={id} />
             </motion.div>
           )}
         </AnimatePresence>

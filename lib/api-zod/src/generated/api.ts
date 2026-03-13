@@ -999,6 +999,84 @@ export const ListDeploymentsResponse = zod.object({
 });
 
 /**
+ * Returns PWA settings for a project
+ * @summary Get PWA settings
+ */
+export const GetPwaSettingsParams = zod.object({
+  projectId: zod.coerce.string().uuid(),
+});
+
+export const GetPwaSettingsResponse = zod.object({
+  projectId: zod.string().uuid(),
+  enabled: zod.boolean(),
+  appName: zod.string(),
+  shortName: zod.string(),
+  description: zod.string().nullish(),
+  themeColor: zod.string(),
+  backgroundColor: zod.string(),
+  display: zod.enum(["standalone", "fullscreen", "minimal-ui", "browser"]),
+  orientation: zod.enum(["any", "natural", "landscape", "portrait"]),
+  iconUrl: zod.string().nullish(),
+  startUrl: zod.string(),
+  offlineEnabled: zod.boolean(),
+});
+
+/**
+ * Create or update PWA settings for a project
+ * @summary Update PWA settings
+ */
+export const UpdatePwaSettingsParams = zod.object({
+  projectId: zod.coerce.string().uuid(),
+});
+
+export const UpdatePwaSettingsBody = zod.object({
+  enabled: zod.boolean().optional(),
+  appName: zod.string().optional(),
+  shortName: zod.string().optional(),
+  description: zod.string().nullish(),
+  themeColor: zod.string().optional(),
+  backgroundColor: zod.string().optional(),
+  display: zod
+    .enum(["standalone", "fullscreen", "minimal-ui", "browser"])
+    .optional(),
+  orientation: zod.enum(["any", "natural", "landscape", "portrait"]).optional(),
+  iconUrl: zod.string().nullish(),
+  startUrl: zod.string().optional(),
+  offlineEnabled: zod.boolean().optional(),
+});
+
+export const UpdatePwaSettingsResponse = zod.object({
+  projectId: zod.string().uuid(),
+  enabled: zod.boolean(),
+  appName: zod.string(),
+  shortName: zod.string(),
+  description: zod.string().nullish(),
+  themeColor: zod.string(),
+  backgroundColor: zod.string(),
+  display: zod.enum(["standalone", "fullscreen", "minimal-ui", "browser"]),
+  orientation: zod.enum(["any", "natural", "landscape", "portrait"]),
+  iconUrl: zod.string().nullish(),
+  startUrl: zod.string(),
+  offlineEnabled: zod.boolean(),
+});
+
+/**
+ * Returns a generated manifest.json for the project
+ * @summary Get PWA manifest
+ */
+export const GetPwaManifestParams = zod.object({
+  projectId: zod.coerce.string().uuid(),
+});
+
+/**
+ * Returns a generated service worker script for the project
+ * @summary Get PWA service worker
+ */
+export const GetPwaServiceWorkerParams = zod.object({
+  projectId: zod.coerce.string().uuid(),
+});
+
+/**
  * Returns the preview URL for a generated website
  * @summary Live preview
  */
