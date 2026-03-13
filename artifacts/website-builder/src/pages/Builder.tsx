@@ -414,18 +414,38 @@ export default function Builder() {
       }]);
 
       if (chatRes.shouldBuild && chatRes.buildId) {
-        console.log("[BUILD] Build started by server:", chatRes.buildId);
-        setActiveBuildId(chatRes.buildId);
-        localStorage.setItem(`latestBuild_${id}`, chatRes.buildId);
-        setPlanApproved(false);
+        const isFix = (chatRes as any).actionType === "fix";
+        const fixResult = (chatRes as any).fixResult;
 
-        setMessages(prev => [...prev, {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: t.agents_working,
-          buildId: chatRes.buildId,
-          timestamp: new Date(),
-        }]);
+        if (isFix && fixResult) {
+          console.log("[FIX] Surgical fix completed:", fixResult);
+          queryClient.invalidateQueries({ queryKey: ["listProjectFiles", id] });
+          queryClient.invalidateQueries({ queryKey: ["getProject", id] });
+          setTimeout(() => {
+            setPreviewKey(k => k + 1);
+          }, 2000);
+          if (fixResult.success && fixResult.fixedFiles?.length > 0) {
+            setMessages(prev => [...prev, {
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content: `✅ ${lang === "ar" ? "تم إصلاح" : "Fixed"}: ${fixResult.fixedFiles.join(", ")}`,
+              timestamp: new Date(),
+            }]);
+          }
+        } else {
+          console.log("[BUILD] Build started by server:", chatRes.buildId);
+          setActiveBuildId(chatRes.buildId);
+          localStorage.setItem(`latestBuild_${id}`, chatRes.buildId);
+          setPlanApproved(false);
+
+          setMessages(prev => [...prev, {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: t.agents_working,
+            buildId: chatRes.buildId,
+            timestamp: new Date(),
+          }]);
+        }
       }
     } catch (err: any) {
       console.error("[FLOW] Error:", err);
