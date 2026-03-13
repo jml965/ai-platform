@@ -307,6 +307,8 @@ export default function Builder() {
         queryClient.invalidateQueries({ queryKey: ["getProject", id] });
         setTimeout(() => {
           setPreviewKey(k => k + 1);
+          setActiveBuildId(null);
+          if (id) localStorage.removeItem(`latestBuild_${id}`);
         }, 2000);
       }
     } else if (buildStatus?.status === "failed" && activeBuildId) {
@@ -321,6 +323,10 @@ export default function Builder() {
           timestamp: new Date(),
         }]);
         queryClient.invalidateQueries({ queryKey: ["listProjectFiles", id] });
+        setTimeout(() => {
+          setActiveBuildId(null);
+          if (id) localStorage.removeItem(`latestBuild_${id}`);
+        }, 2000);
       }
     }
   }, [buildStatus?.status, activeBuildId]);
