@@ -73,12 +73,14 @@ export abstract class BaseAgent {
       .filter(m => m.role !== "system")
       .map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
 
-    const response = await anthropic.messages.create({
+    const stream = anthropic.messages.stream({
       model: this.modelConfig.model,
       max_tokens: maxCompletion,
       system: systemMessage?.content,
       messages: chatMessages,
     });
+
+    const response = await stream.finalMessage();
 
     const content = response.content
       .filter((block: { type: string }) => block.type === "text")
