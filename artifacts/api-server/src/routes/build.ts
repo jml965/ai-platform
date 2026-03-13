@@ -119,7 +119,19 @@ router.get("/build/:buildId/status", async (req, res) => {
       res.status(404).json({ error: { code: "NOT_FOUND", message: "Build not found" } });
       return;
     } else if (tasks.some((t) => t.status === "in_progress")) {
-      status = "in_progress";
+      const stuckThreshold = 15 * 60 * 1000;
+      const oldestInProgress = tasks
+        .filter((t) => t.status === "in_progress")
+        .sort((a, b) => (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0))[0];
+      const elapsed = oldestInProgress?.createdAt ? Date.now() - oldestInProgress.createdAt.getTime() : 0;
+      if (elapsed > stuckThreshold) {
+        const coreAgents = ["codegen", "reviewer", "fixer", "filemanager"];
+        const coreTasks = tasks.filter((t) => coreAgents.includes(t.agentType));
+        const coreAllCompleted = coreTasks.length > 0 && coreTasks.every((t) => t.status === "completed");
+        status = coreAllCompleted ? "completed" : "failed";
+      } else {
+        status = "in_progress";
+      }
     } else if (tasks.every((t) => t.status === "completed")) {
       status = "completed";
     } else if (tasks.some((t) => t.status === "failed")) {

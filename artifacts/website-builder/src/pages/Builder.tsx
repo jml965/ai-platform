@@ -292,6 +292,14 @@ export default function Builder() {
   }, [logs, activeBuildId, lang]);
 
   useEffect(() => {
+    if (activeBuildId && project?.status === "ready" && buildStatus?.status !== "in_progress" && buildStatus?.status !== "pending") {
+      setActiveBuildId(null);
+      if (id) localStorage.removeItem(`latestBuild_${id}`);
+      setPreviewKey(k => k + 1);
+    }
+  }, [project?.status, activeBuildId, buildStatus?.status, id]);
+
+  useEffect(() => {
     if (buildStatus?.status === "completed" && activeBuildId) {
       const alreadyReplied = messages.some(m => m.buildId === activeBuildId && m.content?.includes(t.preview_ready));
       if (!alreadyReplied) {
