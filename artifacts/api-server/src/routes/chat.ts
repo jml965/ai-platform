@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { openai } from "@workspace/integrations-openai-ai-server";
+import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { db } from "@workspace/db";
 import { projectsTable, usersTable, projectFilesTable, buildTasksTable } from "@workspace/db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -147,18 +147,17 @@ router.post("/chat/message", async (req, res) => {
 
     messages.push({ role: "user", content: message });
 
-    const openaiMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
-      { role: "system", content: AGENT_SYSTEM_PROMPT + contextInfo },
-      ...messages,
-    ];
-
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      max_tokens: 200,
-      messages: openaiMessages,
+    const response = await anthropic.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 150,
+      system: AGENT_SYSTEM_PROMPT + contextInfo,
+      messages,
     });
 
-    const rawReply = response.choices?.[0]?.message?.content || "";
+    const rawReply = response.content
+      .filter((block: { type: string }) => block.type === "text")
+      .map((block: { type: string; text: string }) => block.text)
+      .join("");
 
     console.log("[CHAT] Raw AI response:", rawReply);
 
@@ -201,8 +200,8 @@ router.post("/chat/message", async (req, res) => {
 
     if (!reply) reply = shouldBuild ? "سأبدأ البناء الآن..." : rawReply;
 
-    const tokensUsed = (response.usage?.prompt_tokens ?? 0) + (response.usage?.completion_tokens ?? 0);
-    const costUsd = tokensUsed * 0.000002;
+    const tokensUsed = (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0);
+    const costUsd = tokensUsed * 0.000015;
 
     await db
       .update(usersTable)
