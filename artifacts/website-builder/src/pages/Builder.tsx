@@ -300,6 +300,28 @@ export default function Builder() {
   }, [project?.status, activeBuildId, buildStatus?.status, id]);
 
   useEffect(() => {
+    if (!activeBuildId) return;
+    if (project && project.status !== "building") {
+      const isStale = buildStatus && buildStatus.status !== "in_progress" && buildStatus.status !== "pending";
+      const noStatusYet = !buildStatus;
+      if (isStale || noStatusYet) {
+        console.log("[PREVIEW] Clearing stale build ID:", activeBuildId, "project:", project.status, "build:", buildStatus?.status);
+        setActiveBuildId(null);
+        if (id) localStorage.removeItem(`latestBuild_${id}`);
+        setPreviewKey(k => k + 1);
+        return;
+      }
+    }
+    const timeout = setTimeout(() => {
+      if (buildStatus?.status === "in_progress" || buildStatus?.status === "pending") {
+        queryClient.invalidateQueries({ queryKey: ["getBuildStatus", activeBuildId] });
+        queryClient.invalidateQueries({ queryKey: ["getProject", id] });
+      }
+    }, 15000);
+    return () => clearTimeout(timeout);
+  }, [activeBuildId, buildStatus?.status, project?.status, id, queryClient]);
+
+  useEffect(() => {
     if (buildStatus?.status === "completed" && activeBuildId) {
       const alreadyReplied = messages.some(m => m.buildId === activeBuildId && m.content?.includes(t.preview_ready));
       if (!alreadyReplied) {
