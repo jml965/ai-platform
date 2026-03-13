@@ -1089,6 +1089,164 @@ ${prompt}`;
   }
 }
 
+export async function startSurgicalFix(
+  projectId: string,
+  userId: string,
+  errorMessage: string,
+  targetFiles?: { path: string; description: string }[]
+): Promise<{ success: boolean; buildId: string; fixedFiles: string[]; error?: string }> {
+  const constitution = getConstitution();
+  const buildId = uuidv4();
+  const fileManager = new FileManagerAgent(constitution);
+  const fixerAgent = new FixerAgent(constitution);
+  const reviewerAgent = new ReviewerAgent(constitution);
+
+  const fixedFilesList: string[] = [];
+  let totalTokens = 0;
+  let totalCost = 0;
+
+  try {
+    activeBuilds.set(buildId, {
+      buildId,
+      projectId,
+      userId,
+      status: "in_progress",
+      cancelRequested: false,
+    });
+
+    await db.update(projectsTable).set({ status: "building" }).where(eq(projectsTable.id, projectId));
+
+    await db.insert(buildTasksTable).values({
+      buildId,
+      projectId,
+      agentType: "surgical_fix",
+      status: "in_progress",
+      prompt: `Fix: ${errorMessage}`,
+    });
+
+    await logExecution(buildId, projectId, null, "system", "surgical_fix_started", "in_progress", {
+      errorMessage,
+      targetFiles: targetFiles?.map(f => f.path),
+    });
+
+    const existingFiles = await fileManager.getProjectFiles(projectId);
+    if (existingFiles.length === 0) {
+      await logExecution(buildId, projectId, null, "system", "surgical_fix_no_files", "failed", {});
+      await finalizeBuild(buildId, projectId, "failed", 0, 0);
+      return { success: false, buildId, fixedFiles: [], error: "No files to fix" };
+    }
+
+    const filesToAnalyze = targetFiles?.length
+      ? existingFiles.filter(f => targetFiles.some(t => f.filePath.includes(t.path) || t.path.includes(f.filePath)))
+      : existingFiles;
+
+    const analysisFiles = filesToAnalyze.length > 0 ? filesToAnalyze : existingFiles;
+
+    await logExecution(buildId, projectId, null, "analyzer", "analyze_error", "in_progress", {
+      errorMessage,
+      analyzingFiles: analysisFiles.map(f => f.filePath),
+    });
+
+    const issues = [{
+      severity: "error" as const,
+      file: analysisFiles[0]?.filePath || "unknown",
+      message: errorMessage + (targetFiles?.length ? ` | Context: ${targetFiles.map(t => t.description).join('; ')}` : ''),
+      suggestion: "Fix the code to resolve this error",
+    }];
+
+    const context: BuildContext = {
+      buildId,
+      projectId,
+      userId,
+      prompt: `Fix error: ${errorMessage}`,
+      existingFiles: analysisFiles,
+      tokensUsedSoFar: 0,
+    };
+
+    await logExecution(buildId, projectId, null, "fixer", "fix_code", "in_progress", {
+      issueCount: issues.length,
+      filesBeingFixed: analysisFiles.map(f => f.filePath),
+    });
+
+    const fixResult = await fixerAgent.executeWithIssues(context, issues);
+    totalTokens += fixResult.tokensUsed;
+    const fixCost = estimateCost(fixResult.tokensUsed, fixerAgent.modelConfig.model);
+    totalCost += fixCost;
+
+    await recordTokenUsage(userId, projectId, buildId, "fixer", fixerAgent.modelConfig.model, fixResult.tokensUsed, fixCost);
+
+    if (!fixResult.success) {
+      await logExecution(buildId, projectId, null, "fixer", "fix_code", "failed", {
+        error: fixResult.error,
+      });
+      await finalizeBuild(buildId, projectId, "failed", totalTokens, totalCost);
+      return { success: false, buildId, fixedFiles: [], error: fixResult.error };
+    }
+
+    const patchedFiles = fixResult.data?.files as GeneratedFile[];
+    if (!patchedFiles?.length) {
+      await logExecution(buildId, projectId, null, "fixer", "fix_code", "failed", {
+        error: "No files returned from fixer",
+      });
+      await finalizeBuild(buildId, projectId, "failed", totalTokens, totalCost);
+      return { success: false, buildId, fixedFiles: [], error: "Fixer returned no files" };
+    }
+
+    for (const pf of patchedFiles) fixedFilesList.push(pf.filePath);
+
+    await logExecution(buildId, projectId, null, "fixer", "fix_code", "completed", {
+      fixedFiles: fixedFilesList,
+      tokensUsed: fixResult.tokensUsed,
+    });
+
+    await logExecution(buildId, projectId, null, "reviewer", "review_fix", "in_progress", {
+      reviewingFiles: fixedFilesList,
+    });
+
+    const reviewContext: BuildContext = {
+      ...context,
+      existingFiles: patchedFiles.map(f => ({ filePath: f.filePath, content: f.content })),
+      tokensUsedSoFar: totalTokens,
+    };
+
+    const reviewResult = await reviewerAgent.execute(reviewContext);
+    totalTokens += reviewResult.tokensUsed;
+    const reviewCost = estimateCost(reviewResult.tokensUsed, reviewerAgent.modelConfig.model);
+    totalCost += reviewCost;
+
+    await recordTokenUsage(userId, projectId, buildId, "reviewer", reviewerAgent.modelConfig.model, reviewResult.tokensUsed, reviewCost);
+
+    const reviewIssues = (reviewResult.data?.issues as { severity: string }[]) || [];
+    const hasErrors = reviewIssues.some(i => i.severity === "error");
+
+    await logExecution(buildId, projectId, null, "reviewer", "review_fix", "completed", {
+      issueCount: reviewIssues.length,
+      hasErrors,
+    });
+
+    const allFiles = mergeFiles(existingFiles, patchedFiles);
+
+    const saveResult = await fileManager.saveFiles(projectId, allFiles);
+
+    await logExecution(buildId, projectId, null, "filemanager", "save_fixed_files", saveResult.success ? "completed" : "failed", {
+      savedCount: allFiles.length,
+      fixedCount: patchedFiles.length,
+    });
+
+    await finalizeBuild(buildId, projectId, "completed", totalTokens, totalCost);
+
+    return { success: true, buildId, fixedFiles: fixedFilesList };
+
+  } catch (error) {
+    console.error(`[SURGICAL FIX] Error:`, error);
+    await logExecution(buildId, projectId, null, "system", "surgical_fix_error", "failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    await finalizeBuild(buildId, projectId, "failed", totalTokens, totalCost);
+    return { success: false, buildId, fixedFiles: [], error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 async function finalizeBuild(
   buildId: string,
   projectId: string,

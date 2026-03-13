@@ -4,7 +4,7 @@ import { db } from "@workspace/db";
 import { projectsTable, usersTable, projectFilesTable, buildTasksTable } from "@workspace/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { getUserId } from "../middlewares/permissions";
-import { startBuild, checkBuildLimits } from "../lib/agents/execution-engine";
+import { startBuild, checkBuildLimits, startSurgicalFix } from "../lib/agents/execution-engine";
 
 const router: IRouter = Router();
 
@@ -133,8 +133,9 @@ router.post("/chat/message", async (req, res) => {
         .where(eq(projectFilesTable.projectId, projectId));
       if (files.length > 0) {
         isAlreadyBuilt = true;
-        contextInfo += `\n- Has ${files.length} files already generated`;
-        contextInfo += `\n- The project is already built with ${files.length} files. DO NOT rebuild unless user explicitly asks to change/modify something specific.`;
+        const fileList = files.map(f => f.filePath).join(', ');
+        contextInfo += `\n- Has ${files.length} files: ${fileList}`;
+        contextInfo += `\n- The project is already built. For errors or small changes, use action="fix" with the specific file path. Use action="build" ONLY for creating new sites or major redesigns.`;
         contextInfo += `\n- If user says "كمل" or "continue" or similar, and project is already built (status=ready), tell them the project is complete and ask what they want to modify.`;
       } else {
         contextInfo += `\n- No files yet. User needs to describe what website they want to build.`;
@@ -161,7 +162,7 @@ router.post("/chat/message", async (req, res) => {
 
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 150,
+      max_tokens: 300,
       system: AGENT_SYSTEM_PROMPT + contextInfo,
       messages,
     });
@@ -175,6 +176,8 @@ router.post("/chat/message", async (req, res) => {
 
     let reply = "";
     let shouldBuild = false;
+    let shouldFix = false;
+    let fixFiles: { path: string; description: string }[] = [];
 
     try {
       const cleaned = rawReply
@@ -182,35 +185,34 @@ router.post("/chat/message", async (req, res) => {
         .replace(/```\s*/g, "")
         .trim();
 
-      const jsonMatch = cleaned.match(/\{"reply"\s*:\s*"[^"]*"\s*,\s*"action"\s*:\s*"(?:build|chat)"\s*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        reply = parsed.reply || "";
-        shouldBuild = parsed.action === "build";
-      } else {
-        const fallbackMatch = cleaned.match(/\{[\s\S]*?"action"\s*:\s*"(build|chat)"[\s\S]*?\}/);
-        if (fallbackMatch) {
-          try {
-            const parsed = JSON.parse(fallbackMatch[0]);
-            reply = parsed.reply || cleaned;
-            shouldBuild = parsed.action === "build";
-          } catch {
-            reply = cleaned.replace(/[{}"\n]/g, " ").trim();
-            shouldBuild = false;
+      const fullJsonMatch = cleaned.match(/\{[\s\S]*?"action"\s*:\s*"(build|chat|fix)"[\s\S]*?\}/);
+      if (fullJsonMatch) {
+        try {
+          const parsed = JSON.parse(fullJsonMatch[0]);
+          reply = parsed.reply || "";
+          if (parsed.action === "build") {
+            shouldBuild = true;
+          } else if (parsed.action === "fix") {
+            shouldFix = true;
+            if (parsed.fix_files && Array.isArray(parsed.fix_files)) {
+              fixFiles = parsed.fix_files;
+            }
           }
-        } else {
-          reply = cleaned.replace(/[{}"\n]/g, " ").trim() || rawReply;
-          shouldBuild = false;
+        } catch {
+          reply = cleaned.replace(/[{}"\n]/g, " ").trim();
         }
+      } else {
+        reply = cleaned.replace(/[{}"\n]/g, " ").trim() || rawReply;
       }
 
-      console.log("[CHAT] AI decided action:", shouldBuild ? "build" : "chat");
+      console.log("[CHAT] AI decided action:", shouldBuild ? "build" : shouldFix ? "fix" : "chat", fixFiles.length ? `(${fixFiles.length} files)` : "");
     } catch {
       reply = rawReply;
       shouldBuild = false;
+      shouldFix = false;
     }
 
-    if (!reply) reply = shouldBuild ? "سأبدأ البناء الآن..." : rawReply;
+    if (!reply) reply = shouldBuild ? "سأبدأ البناء الآن..." : shouldFix ? "جاري إصلاح المشكلة..." : rawReply;
 
     const tokensUsed = (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0);
     const costUsd = tokensUsed * 0.000015;
@@ -223,10 +225,36 @@ router.post("/chat/message", async (req, res) => {
       .where(eq(usersTable.id, userId));
 
     let buildId: string | undefined;
+    let fixResult: { success: boolean; fixedFiles: string[] } | undefined;
 
-    if (shouldBuild && isCurrentlyBuilding) {
+    if ((shouldBuild || shouldFix) && isCurrentlyBuilding) {
       shouldBuild = false;
-      console.log("[CHAT] Blocked build: project is currently building");
+      shouldFix = false;
+      console.log("[CHAT] Blocked action: project is currently building");
+    }
+
+    if (shouldFix && projectId && project && !isCurrentlyBuilding) {
+      try {
+        const limitCheck = await checkBuildLimits(userId, projectId);
+        if (limitCheck.allowed) {
+          console.log("[CHAT] Starting SURGICAL FIX for project:", projectId, "files:", fixFiles);
+          const result = await startSurgicalFix(projectId, userId, message, fixFiles.length > 0 ? fixFiles : undefined);
+          buildId = result.buildId;
+          fixResult = { success: result.success, fixedFiles: result.fixedFiles };
+          console.log("[CHAT] Surgical fix result:", result.success ? "SUCCESS" : "FAILED", "files:", result.fixedFiles);
+          if (!result.success) {
+            reply += "\n⚠️ " + (result.error || "فشل الإصلاح");
+          }
+        } else {
+          console.log("[CHAT] Fix limit reached:", limitCheck.reason);
+          reply += "\n⚠️ " + (limitCheck.reasonAr || limitCheck.reason || "تم الوصول للحد الأقصى");
+          shouldFix = false;
+        }
+      } catch (fixErr: any) {
+        console.error("[CHAT] Failed surgical fix:", fixErr);
+        reply += "\n⚠️ " + (fixErr?.message || "فشل الإصلاح");
+        shouldFix = false;
+      }
     }
 
     if (shouldBuild && projectId && project) {
@@ -269,13 +297,16 @@ router.post("/chat/message", async (req, res) => {
       }
     }
 
-    console.log("[CHAT] Final result - shouldBuild:", shouldBuild, "buildId:", buildId, "reply:", reply.substring(0, 80));
+    const actionType = shouldBuild ? "build" : shouldFix ? "fix" : "chat";
+    console.log("[CHAT] Final result - action:", actionType, "buildId:", buildId, "reply:", reply.substring(0, 80));
 
     res.json({
       reply,
-      shouldBuild,
+      shouldBuild: shouldBuild || shouldFix,
       buildId,
       buildPrompt: shouldBuild ? message : undefined,
+      actionType,
+      fixResult,
       tokensUsed,
       costUsd: parseFloat(costUsd.toFixed(6)),
     });
