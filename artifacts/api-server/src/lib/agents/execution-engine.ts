@@ -619,14 +619,7 @@ async function executeBuildPipeline(
       }
     }
 
-    const runnerFailed = saveResult.success &&
-      (await db.select({ status: buildTasksTable.status })
-        .from(buildTasksTable)
-        .where(and(eq(buildTasksTable.buildId, buildId), eq(buildTasksTable.agentType, "package_runner")))
-        .limit(1)
-        .then(rows => rows.length > 0 && rows[0].status === "failed"));
-
-    const finalStatus = !saveResult.success ? "failed" : runnerFailed ? "failed" : "completed";
+    const finalStatus = !saveResult.success ? "failed" : "completed";
     await finalizeBuild(buildId, projectId, finalStatus, totalTokens, totalCost);
   } catch (error) {
     console.error(`Build ${buildId} error:`, error);
@@ -759,14 +752,7 @@ async function savePatchedFilesAndRun(
     }
   }
 
-  const runnerFailed = saveResult.success &&
-    (await db.select({ status: buildTasksTable.status })
-      .from(buildTasksTable)
-      .where(and(eq(buildTasksTable.buildId, buildId), eq(buildTasksTable.agentType, "package_runner")))
-      .limit(1)
-      .then(rows => rows.length > 0 && rows[0].status === "failed"));
-
-  const finalStatus = !saveResult.success ? "failed" : runnerFailed ? "failed" : "completed";
+  const finalStatus = !saveResult.success ? "failed" : "completed";
   await finalizeBuild(buildId, projectId, finalStatus, totalTokens, totalCost);
 }
 
@@ -1050,14 +1036,7 @@ ${prompt}`;
       }
     }
 
-    const runnerFailed = saveResult.success &&
-      (await db.select({ status: buildTasksTable.status })
-        .from(buildTasksTable)
-        .where(and(eq(buildTasksTable.buildId, buildId), eq(buildTasksTable.agentType, "package_runner")))
-        .limit(1)
-        .then(rows => rows.length > 0 && rows[0].status === "failed"));
-
-    const finalStatus = !saveResult.success ? "failed" : runnerFailed ? "failed" : "completed";
+    const finalStatus = !saveResult.success ? "failed" : "completed";
     await finalizeBuild(buildId, projectId, finalStatus, totalTokens, totalCost);
   } catch (error) {
     console.error(`Build ${buildId} (with plan) error:`, error);

@@ -209,21 +209,54 @@ IMPORTANT:
     devDependencies?: Record<string, string>;
     scripts?: Record<string, string>;
   } {
-    const jsonMatch = content.match(/\{[\s\S]*"files"[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("Agent did not return valid JSON with files array");
+    let cleaned = content.trim();
+    cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "");
+    cleaned = cleaned.trim();
+
+    let parsed: any;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch {
+      const jsonMatch = cleaned.match(/\{[\s\S]*"files"\s*:\s*\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        throw new Error("Agent did not return valid JSON with files array");
+      }
+      let jsonStr = jsonMatch[0];
+      let braceCount = 0;
+      let endPos = -1;
+      for (let i = 0; i < jsonStr.length; i++) {
+        if (jsonStr[i] === "{") braceCount++;
+        else if (jsonStr[i] === "}") {
+          braceCount--;
+          if (braceCount === 0) { endPos = i; break; }
+        }
+      }
+      if (endPos > 0) {
+        jsonStr = jsonStr.substring(0, endPos + 1);
+      } else {
+        jsonStr += "}";
+      }
+      try {
+        parsed = JSON.parse(jsonStr);
+      } catch (e2) {
+        jsonStr = jsonStr
+          .replace(/,\s*([}\]])/g, "$1")
+          .replace(/[\x00-\x1f]/g, (c) => c === "\n" || c === "\r" || c === "\t" ? c : "");
+        parsed = JSON.parse(jsonStr);
+      }
     }
 
-    const parsed = JSON.parse(jsonMatch[0]);
     if (!Array.isArray(parsed.files)) {
       throw new Error("Response missing files array");
     }
 
-    const files: GeneratedFile[] = parsed.files.map((f: Record<string, string>) => ({
-      filePath: f.filePath,
-      content: f.content,
-      fileType: f.fileType || f.filePath.split(".").pop() || "txt",
-    }));
+    const files: GeneratedFile[] = parsed.files
+      .filter((f: any) => f && f.filePath && typeof f.content === "string")
+      .map((f: Record<string, string>) => ({
+        filePath: f.filePath,
+        content: f.content,
+        fileType: f.fileType || f.filePath.split(".").pop() || "txt",
+      }));
 
     return {
       framework: parsed.framework as ProjectFramework | undefined,

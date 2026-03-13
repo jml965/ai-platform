@@ -38,6 +38,23 @@ app.use(cors());
 app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+if (process.env.NODE_ENV === "development") {
+  app.post("/api/internal/test-build", async (req, res) => {
+    try {
+      const { startBuild } = await import("./lib/agents/execution-engine");
+      const { projectId, userId, prompt } = req.body;
+      console.log("[TEST-BUILD] Starting:", projectId);
+      const buildId = await startBuild(projectId, userId, prompt);
+      console.log("[TEST-BUILD] Build ID:", buildId);
+      res.json({ buildId, status: "started" });
+    } catch (err: any) {
+      console.error("[TEST-BUILD] Error:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+}
+
 app.use(authSession);
 
 app.use("/api", router);
