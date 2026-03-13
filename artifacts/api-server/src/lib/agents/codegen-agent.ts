@@ -78,6 +78,39 @@ STATIC HTML PROJECTS:
 - Use modern CSS (flexbox, grid, variables, @media queries)
 - No build tools needed — files run directly in browser
 
+EXPRESS (Node.js) PROJECTS:
+- Use TypeScript with proper types
+- Structure: src/index.ts (entry), src/routes/*.ts, src/controllers/*.ts, src/middleware/*.ts
+- Use express.json() middleware for JSON parsing
+- Add CORS middleware with cors package
+- Use proper HTTP status codes (200, 201, 400, 404, 500)
+- Add input validation for all endpoints
+- Use async/await with try/catch for all route handlers
+- Include proper error handling middleware
+- Use environment variables for PORT, DATABASE_URL, etc.
+- Do NOT use ES module imports in Express — use CommonJS-compatible TypeScript
+- Include proper TypeScript types for request/response
+
+NEXTJS PROJECTS:
+- Use App Router (src/app/) NOT Pages Router
+- Structure: src/app/page.tsx, src/app/layout.tsx, src/app/[slug]/page.tsx
+- Use server components by default, add "use client" only when needed
+- Use next/link for navigation, next/image for images
+- Generate proper metadata exports for SEO
+- Use CSS modules or Tailwind — NOT inline styles
+- Include proper loading.tsx and error.tsx files
+
+FASTAPI (Python) PROJECTS:
+- Structure: main.py (entry), routes/*.py, models/*.py, schemas/*.py
+- Use Pydantic v2 models for request/response validation
+- Add proper type hints to all functions
+- Use async def for all route handlers
+- Include CORS middleware
+- Use proper HTTP status codes and HTTPException
+- Include requirements.txt with all dependencies
+- Use Python 3.10+ features (type unions with |, match statements)
+- Use environment variables with os.environ.get()
+
 === END CRITICAL RULES ===
 
 Project Generation Rules:

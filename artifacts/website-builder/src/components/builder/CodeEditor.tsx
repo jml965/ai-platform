@@ -11,6 +11,9 @@ import { html } from "@codemirror/lang-html";
 import { css } from "@codemirror/lang-css";
 import { python } from "@codemirror/lang-python";
 import { json } from "@codemirror/lang-json";
+import { markdown } from "@codemirror/lang-markdown";
+import { yaml } from "@codemirror/lang-yaml";
+import { sql } from "@codemirror/lang-sql";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { autocompletion, closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
@@ -25,14 +28,28 @@ interface CodeEditorProps {
 
 function getLanguageExtension(filePath: string) {
   const ext = filePath.split(".").pop()?.toLowerCase() || "";
+  const fileName = filePath.split("/").pop()?.toLowerCase() || "";
   switch (ext) {
-    case "js": case "jsx": return javascript({ jsx: true });
-    case "ts": case "tsx": return javascript({ jsx: true, typescript: true });
-    case "html": case "htm": case "svg": case "xml": return html();
-    case "css": case "scss": return css();
-    case "py": return python();
-    case "json": return json();
-    default: return [];
+    case "js": case "jsx": case "mjs": case "cjs": return javascript({ jsx: true });
+    case "ts": case "tsx": case "mts": case "cts": return javascript({ jsx: true, typescript: true });
+    case "html": case "htm": case "svg": case "xml": case "ejs": case "hbs": return html();
+    case "css": case "scss": case "less": return css();
+    case "py": case "pyw": return python();
+    case "json": case "jsonc": return json();
+    case "md": case "mdx": case "markdown": return markdown();
+    case "yml": case "yaml": return yaml();
+    case "sql": return sql();
+    case "sh": case "bash": case "zsh": return [];
+    case "graphql": case "gql": return [];
+    case "prisma": return [];
+    case "env": return [];
+    case "toml": return [];
+    case "txt": return [];
+    default:
+      if (fileName === "dockerfile" || fileName === ".dockerignore") return [];
+      if (fileName === ".gitignore" || fileName === ".env" || fileName.startsWith(".env.")) return [];
+      if (fileName === "makefile") return [];
+      return [];
   }
 }
 

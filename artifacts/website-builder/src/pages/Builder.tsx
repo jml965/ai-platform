@@ -610,15 +610,36 @@ export default function Builder() {
     );
 
     if (!isReactProject) {
-      return files.reduce((html: string, f) => {
-        if (f.filePath?.endsWith('.css') && f.content) {
-          html = html.replace('</head>', `<style>${f.content}</style></head>`);
+      let resultHtml = htmlFile.content;
+      const cssContents: string[] = [];
+      const jsContents: string[] = [];
+      for (const f of files) {
+        if (f.filePath?.endsWith('.css') && f.content && f.filePath !== htmlFile.filePath) {
+          cssContents.push(`/* ${f.filePath} */\n${f.content}`);
         }
-        if (f.filePath?.endsWith('.js') && f.content) {
-          html = html.replace('</body>', `<script>${f.content}<\/script></body>`);
+        if (f.filePath?.endsWith('.js') && f.content && f.filePath !== htmlFile.filePath) {
+          jsContents.push(`// ${f.filePath}\n${f.content}`);
         }
-        return html;
-      }, htmlFile.content);
+      }
+      if (cssContents.length > 0) {
+        const cssBlock = `<style>\n${cssContents.join('\n')}\n</style>`;
+        if (resultHtml.includes('</head>')) {
+          resultHtml = resultHtml.replace('</head>', `${cssBlock}\n</head>`);
+        } else {
+          resultHtml = cssBlock + resultHtml;
+        }
+      }
+      if (jsContents.length > 0) {
+        const jsBlock = `<script>\n${jsContents.join('\n')}\n<\/script>`;
+        if (resultHtml.includes('</body>')) {
+          resultHtml = resultHtml.replace('</body>', `${jsBlock}\n</body>`);
+        } else {
+          resultHtml += jsBlock;
+        }
+      }
+      resultHtml = resultHtml.replace(/<link\s+rel=["']stylesheet["']\s+href=["'][^"']*["']\s*\/?>/gi, '');
+      resultHtml = resultHtml.replace(/<script\s+src=["'][^"']*["']\s*>\s*<\/script>/gi, '');
+      return resultHtml;
     }
 
     const allCSS = cssFiles.map(f => f.content).join('\n');
