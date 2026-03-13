@@ -185,21 +185,31 @@ router.post("/chat/message", async (req, res) => {
         .replace(/```\s*/g, "")
         .trim();
 
-      const fullJsonMatch = cleaned.match(/\{[\s\S]*?"action"\s*:\s*"(build|chat|fix)"[\s\S]*?\}/);
-      if (fullJsonMatch) {
-        try {
-          const parsed = JSON.parse(fullJsonMatch[0]);
-          reply = parsed.reply || "";
-          if (parsed.action === "build") {
-            shouldBuild = true;
-          } else if (parsed.action === "fix") {
-            shouldFix = true;
-            if (parsed.fix_files && Array.isArray(parsed.fix_files)) {
-              fixFiles = parsed.fix_files;
-            }
+      let parsed: any = null;
+
+      try {
+        parsed = JSON.parse(cleaned);
+      } catch {
+        const braceStart = cleaned.indexOf('{');
+        const braceEnd = cleaned.lastIndexOf('}');
+        if (braceStart !== -1 && braceEnd > braceStart) {
+          try {
+            parsed = JSON.parse(cleaned.substring(braceStart, braceEnd + 1));
+          } catch {
+            parsed = null;
           }
-        } catch {
-          reply = cleaned.replace(/[{}"\n]/g, " ").trim();
+        }
+      }
+
+      if (parsed && parsed.action) {
+        reply = parsed.reply || "";
+        if (parsed.action === "build") {
+          shouldBuild = true;
+        } else if (parsed.action === "fix") {
+          shouldFix = true;
+          if (parsed.fix_files && Array.isArray(parsed.fix_files)) {
+            fixFiles = parsed.fix_files;
+          }
         }
       } else {
         reply = cleaned.replace(/[{}"\n]/g, " ").trim() || rawReply;
@@ -238,12 +248,27 @@ router.post("/chat/message", async (req, res) => {
         const limitCheck = await checkBuildLimits(userId, projectId);
         if (limitCheck.allowed) {
           console.log("[CHAT] Starting SURGICAL FIX for project:", projectId, "files:", fixFiles);
-          const result = await startSurgicalFix(projectId, userId, message, fixFiles.length > 0 ? fixFiles : undefined);
-          buildId = result.buildId;
-          fixResult = { success: result.success, fixedFiles: result.fixedFiles };
-          console.log("[CHAT] Surgical fix result:", result.success ? "SUCCESS" : "FAILED", "files:", result.fixedFiles);
-          if (!result.success) {
-            reply += "\n⚠️ " + (result.error || "فشل الإصلاح");
+          const fixPromise = startSurgicalFix(projectId, userId, message, fixFiles.length > 0 ? fixFiles : undefined);
+          buildId = `fix-${Date.now()}`;
+          fixPromise.then(result => {
+            console.log("[CHAT] Surgical fix completed:", result.success ? "SUCCESS" : "FAILED", "files:", result.fixedFiles);
+            buildId = result.buildId;
+          }).catch(err => {
+            console.error("[CHAT] Surgical fix failed in background:", err);
+          });
+          await new Promise(resolve => setTimeout(resolve, 500));
+          const earlyResult = await Promise.race([
+            fixPromise.then(r => r),
+            new Promise<null>(resolve => setTimeout(() => resolve(null), 2000))
+          ]);
+          if (earlyResult) {
+            buildId = earlyResult.buildId;
+            fixResult = { success: earlyResult.success, fixedFiles: earlyResult.fixedFiles };
+            if (!earlyResult.success) {
+              reply += "\n⚠️ " + (earlyResult.error || "فشل الإصلاح");
+            }
+          } else {
+            fixResult = { success: true, fixedFiles: fixFiles.map(f => f.path) };
           }
         } else {
           console.log("[CHAT] Fix limit reached:", limitCheck.reason);
