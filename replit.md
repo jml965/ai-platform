@@ -158,6 +158,22 @@ DNS verification supports both A records (platform IP) and CNAME records (platfo
 - `domains` — Custom domains linked to projects with DNS verification status, SSL certificate tracking
 - `snapshots` — Project backup snapshots storing all project files as JSONB for one-click restore and comparison
 
+## Template System
+
+Ready-made template library with 12 templates spanning 10 categories (ecommerce, restaurant, corporate, portfolio, blog, medical, legal, marketing, landing, personal). Users can browse templates, preview them live, and create projects from them.
+
+Key files:
+- `artifacts/website-builder/src/lib/templates.ts` — Frontend template definitions with full HTML/CSS content for live preview
+- `artifacts/website-builder/src/pages/Templates.tsx` — Template gallery page with category filters, search, and live iframe preview
+- `artifacts/api-server/src/lib/template-data.ts` — Backend template definitions (must stay in sync with frontend)
+- `artifacts/api-server/src/routes/templates.ts` — API routes for listing templates and creating projects from them
+
+API endpoints (all under `/api`, auth required):
+- `GET /templates` — List all templates (metadata only, no file content)
+- `POST /templates/use` — Create a project from a template (body: `{ templateId: string }`)
+
+The template project creation uses a DB transaction to ensure atomicity (project + files are created together or not at all).
+
 ## Agent Engine
 
 Located in `artifacts/api-server/src/lib/agents/`:

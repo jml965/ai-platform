@@ -10,6 +10,7 @@ import Teams from "@/pages/Teams";
 import QualityAssurance from "@/pages/QualityAssurance";
 import Monitoring from "@/pages/Monitoring";
 import NotificationSettings from "@/pages/NotificationSettings";
+import Templates from "@/pages/Templates";
 import NotFound from "@/pages/not-found";
 import { useGetMe } from "@workspace/api-client-react";
 import { Loader2 } from "lucide-react";
@@ -60,6 +61,9 @@ function Router() {
       </Route>
       <Route path="/qa">
         <AuthGuard><QualityAssurance /></AuthGuard>
+      </Route>
+      <Route path="/templates">
+        <AuthGuard><Templates /></AuthGuard>
       </Route>
       <Route path="/monitoring">
         <AuthGuard><Monitoring /></AuthGuard>

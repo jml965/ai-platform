@@ -372,6 +372,15 @@ const en = {
   snapshot_auto_label: "Auto-backup",
   snapshot_creating: "Creating backup...",
   snapshot_restoring: "Restoring...",
+  templates_title: "Templates",
+  templates_browse: "Browse Templates",
+  templates_subtitle: "Choose a ready-made template as a starting point, then customize it with AI.",
+  templates_search: "Search templates...",
+  templates_preview: "Preview",
+  templates_use: "Use Template",
+  templates_no_results: "No templates match your search.",
+  templates_from: "From template",
+  browse_templates: "Browse Templates",
 };
 
 const ar = {
@@ -746,6 +755,15 @@ const ar = {
   snapshot_auto_label: "نسخة تلقائية",
   snapshot_creating: "جاري إنشاء النسخة...",
   snapshot_restoring: "جاري الاستعادة...",
+  templates_title: "القوالب الجاهزة",
+  templates_browse: "تصفح القوالب",
+  templates_subtitle: "اختر قالباً جاهزاً كنقطة بداية، ثم عدّله بالذكاء الاصطناعي حسب احتياجاتك.",
+  templates_search: "ابحث في القوالب...",
+  templates_preview: "معاينة",
+  templates_use: "استخدم القالب",
+  templates_no_results: "لا توجد قوالب تطابق بحثك.",
+  templates_from: "من قالب",
+  browse_templates: "تصفح القوالب",
 };
 
 type Language = "en" | "ar";

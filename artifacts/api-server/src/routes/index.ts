@@ -15,6 +15,7 @@ import deploymentsRouter from "./deployments";
 import domainsRouter from "./domains";
 import notificationsRouter from "./notifications";
 import snapshotsRouter from "./snapshots";
+import templatesRouter from "./templates";
 import { requireAuth } from "../middlewares/authSession";
 
 const router: IRouter = Router();
@@ -37,5 +38,6 @@ router.use(deploymentsRouter);
 router.use(domainsRouter);
 router.use(notificationsRouter);
 router.use(snapshotsRouter);
+router.use(templatesRouter);
 
 export default router;

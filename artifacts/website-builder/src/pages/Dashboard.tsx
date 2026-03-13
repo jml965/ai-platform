@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, LayoutTemplate, Trash2, Loader2, Coins, LogOut, CreditCard, Users, ShieldCheck, Activity, Globe, ExternalLink, Square, RefreshCw, Rocket, Bell } from "lucide-react";
+import { Plus, LayoutTemplate, Trash2, Loader2, Coins, LogOut, CreditCard, Users, ShieldCheck, Activity, Globe, ExternalLink, Square, RefreshCw, Rocket, Bell, Palette } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import type { Project, ProjectStatus as ProjectStatusType } from "@workspace/api-client-react";
@@ -86,13 +86,22 @@ export default function Dashboard() {
       <main className="flex-1 max-w-7xl w-full mx-auto p-6 lg:p-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
           <h2 className="text-2xl font-bold">{t.projects}</h2>
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-xl font-medium shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5 active:translate-y-0"
-          >
-            <Plus className="w-4 h-4" />
-            {t.new_project}
-          </button>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/templates"
+              className="flex items-center gap-2 border border-white/10 hover:border-primary/30 text-foreground px-4 py-2 rounded-xl font-medium transition-all hover:-translate-y-0.5 active:translate-y-0 hover:bg-primary/5"
+            >
+              <Palette className="w-4 h-4 text-primary" />
+              {t.browse_templates}
+            </Link>
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 rounded-xl font-medium shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5 active:translate-y-0"
+            >
+              <Plus className="w-4 h-4" />
+              {t.new_project}
+            </button>
+          </div>
         </div>
 
         {loadingProjects ? (
