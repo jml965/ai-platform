@@ -35,10 +35,15 @@ const DEFAULT_CONSTITUTION: AgentConstitution = {
   maxTotalTokensPerBuild: 800000,
   allowedFileExtensions: [
     ".html", ".css", ".js", ".ts", ".tsx", ".jsx",
-    ".json", ".svg", ".md", ".txt",
+    ".json", ".svg", ".md", ".txt", ".xml",
     ".py", ".yaml", ".yml", ".toml", ".cfg", ".ini",
     ".env", ".gitignore", ".dockerignore",
-    ".mjs", ".cjs",
+    ".mjs", ".cjs", ".map",
+    ".example", ".sample", ".template",
+    ".sh", ".bash",
+    ".prisma", ".graphql", ".gql",
+    ".woff", ".woff2", ".ttf", ".eot",
+    ".png", ".jpg", ".jpeg", ".gif", ".ico", ".webp",
   ],
   maxFileSizeBytes: 512 * 1024,
   maxFilesPerProject: 100,
@@ -76,8 +81,24 @@ export function validateDirectoryPath(dirPath: string, maxDepth?: number): boole
 }
 
 export function validateFileExtension(filePath: string, constitution: AgentConstitution): boolean {
-  const ext = filePath.substring(filePath.lastIndexOf("."));
-  return constitution.allowedFileExtensions.includes(ext.toLowerCase());
+  const fileName = filePath.split("/").pop() || filePath;
+  const dotIndex = fileName.lastIndexOf(".");
+  if (dotIndex < 0) {
+    return constitution.allowedFileExtensions.includes("." + fileName.toLowerCase());
+  }
+  const ext = fileName.substring(dotIndex).toLowerCase();
+  if (constitution.allowedFileExtensions.includes(ext)) return true;
+  const firstDotIndex = fileName.indexOf(".");
+  if (firstDotIndex !== dotIndex) {
+    const firstExt = fileName.substring(firstDotIndex).toLowerCase();
+    const parts = firstExt.split(".");
+    return parts.some((_part, i) => {
+      if (i === 0) return false;
+      const subExt = "." + parts.slice(i).join(".");
+      return constitution.allowedFileExtensions.includes(subExt);
+    });
+  }
+  return false;
 }
 
 export function checkTokenBudget(

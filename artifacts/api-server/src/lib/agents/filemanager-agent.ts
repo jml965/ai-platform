@@ -103,8 +103,11 @@ export class FileManagerAgent {
       }
     }
 
+    const criticalErrors = errors.filter(e =>
+      !e.includes("Disallowed file extension") && !e.includes("File too large")
+    );
     return {
-      success: errors.length === 0,
+      success: savedFiles.length > 0 && criticalErrors.length === 0,
       tokensUsed: 0,
       durationMs: Date.now() - startTime,
       data: { savedFiles, createdDirectories, errors },

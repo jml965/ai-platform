@@ -745,7 +745,32 @@ export default function Builder() {
       return match && match.props ? match.props.element : null;
     };
     var Route = function() { return null; };
-    var Outlet = function() { return null; };
+    var Outlet = function(props) { return props && props.children ? React.createElement(Fragment, null, props.children) : null; };
+    var HashRouter = BrowserRouter;
+    var MemoryRouter = BrowserRouter;
+    var Router = BrowserRouter;
+    var RouterProvider = function(props) {
+      var router = props.router;
+      if (router && router.routes) {
+        var firstRoute = router.routes[0];
+        if (firstRoute && firstRoute.element) return firstRoute.element;
+        if (firstRoute && firstRoute.children && firstRoute.children.length > 0) {
+          var indexRoute = firstRoute.children.find(function(r) { return r.index; }) || firstRoute.children[0];
+          if (indexRoute && indexRoute.element) {
+            return firstRoute.element ? React.createElement(Fragment, null, firstRoute.element, indexRoute.element) : indexRoute.element;
+          }
+        }
+      }
+      return null;
+    };
+    var createBrowserRouter = function(routes) { return { routes: routes }; };
+    var createHashRouter = createBrowserRouter;
+    var createMemoryRouter = createBrowserRouter;
+    var ScrollRestoration = function() { return null; };
+    var useMatch = function() { return null; };
+    var useRouteError = function() { return null; };
+    var useLoaderData = function() { return {}; };
+    var Form = function(props) { return React.createElement('form', props, props.children); };
     var Suspense = function(props) { return React.createElement(Fragment, null, props.children); };
     var lazy = function(fn) { return function(props) { return null; }; };
 
