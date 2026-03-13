@@ -220,6 +220,8 @@ export default function Builder() {
     }
   });
 
+  const logs = buildLogs?.data || [];
+
   const { data: projectFiles } = useListProjectFiles(id || "", {
     query: {
       queryKey: ["listProjectFiles", id || ""],
@@ -433,7 +435,6 @@ export default function Builder() {
 
   const isBuilding = buildStatus?.status === "pending" || buildStatus?.status === "in_progress" || startBuildMut.isPending;
 
-  const logs = buildLogs?.data || [];
   const actionCount = logs.length;
   const isDeploying = deployMut.isPending || redeployMut.isPending || deploymentStatus?.status === "deploying";
   const isDeployed = deploymentStatus?.status === "active";
