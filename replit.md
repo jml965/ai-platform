@@ -67,6 +67,29 @@ Features:
 - **API Codegen:** Orval generates API client hooks and Zod schemas from an OpenAPI specification, ensuring type safety and consistency.
 - **Build System:** esbuild handles CJS bundling for production, while `tsc --build --emitDeclarationOnly` manages type checking across the monorepo.
 
+## SEO Analysis System
+
+AI-powered SEO analysis and optimization tool integrated into the Builder page. Uses an AI agent to analyze project HTML files and provide scores, suggestions, and auto-fix capabilities.
+
+Key files:
+- `artifacts/api-server/src/lib/agents/seo-agent.ts` — SEO AI agent extending BaseAgent, analyzes HTML for 11 SEO categories
+- `artifacts/api-server/src/routes/seo.ts` — REST API endpoints for SEO analysis and auto-fix
+- `lib/api-client-react/src/seo-hooks.ts` — React hooks for SEO API integration
+- `artifacts/website-builder/src/components/builder/SeoPanel.tsx` — SEO report UI with score, checks, and auto-apply button
+
+API endpoints (all under `/api/projects/:projectId/seo`, auth required):
+- `POST /projects/:projectId/seo/analyze` — Run AI SEO analysis on project files, returns score (0-100), checks, and meta suggestions
+- `POST /projects/:projectId/seo/apply` — Apply AI-suggested meta tag improvements to HTML files automatically
+
+Features:
+- Score from 0-100 with visual ring indicator
+- 11 SEO check categories: title, description, keywords, headings, images, links, mobile, performance, structured data, social, accessibility
+- Bilingual results (Arabic/English) with full i18n support
+- AI-generated meta tag suggestions with one-click auto-apply
+- Error severity levels (error, warning, info) with expandable category groups
+
+## Deployment System
+
 **Feature Specifications:**
 - **Bilingual Support:** Full Arabic/English support for UI and content, including RTL/LTR layout adjustments.
 - **User Authentication:** Supports Replit Auth (default) and local email/password authentication.
