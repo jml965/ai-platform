@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Send, Loader2, Code2, Eye,
+  Send, Loader2, Code2, Eye, Check, AlertTriangle, XCircle,
   FileCode2, User, Bot, Search, ChevronRight, ChevronDown,
   FileText, FileJson, FileImage, File, Folder, ArrowLeft, Clock,
   RotateCw, Monitor, Smartphone, Tablet, Laptop, ChevronLeft,
@@ -600,7 +600,16 @@ export default function Builder() {
 
     const componentScripts = componentFiles.map(f => {
       const name = f.filePath?.split('/').pop()?.replace(/\.(tsx|jsx|ts|js)$/, '') || 'Component';
-      return stripImportsExports(f.content || '', name);
+      const stripped = stripImportsExports(f.content || '', name);
+      const funcMatch = stripped.match(/(?:function|var|const|let)\s+([A-Z]\w*)\s*[=(]/g);
+      const exportedNames = (funcMatch || []).map(m => {
+        const n = m.match(/(?:function|var|const|let)\s+([A-Z]\w*)/);
+        return n ? n[1] : null;
+      }).filter(Boolean);
+      const exports = exportedNames.length > 0
+        ? exportedNames.map(n => `if (typeof ${n} !== 'undefined') window.${n} = ${n};`).join('\n')
+        : '';
+      return `(function() {\n${stripped}\n${exports}\n})();`;
     }).join('\n\n');
 
     const dir = files.some(f => f.content?.includes('dir="rtl"') || f.content?.includes("dir='rtl'") || f.content?.includes('direction: rtl'))
@@ -743,11 +752,11 @@ export default function Builder() {
       transformed = transformed.replace(/\\blet\\s+/g, 'var ');
       (0, eval)(transformed);
       var root = ReactDOM.createRoot(document.getElementById('root'));
-      var AppComp = typeof App !== 'undefined' ? App : null;
+      var AppComp = window.App || (typeof App !== 'undefined' ? App : null);
       if (!AppComp) {
         var possibleNames = ['App', 'HomePage', 'Home', 'Main', 'Page', 'Root'];
         for (var i = 0; i < possibleNames.length; i++) {
-          try { AppComp = eval(possibleNames[i]); if (typeof AppComp === 'function') break; AppComp = null; } catch(ex) { AppComp = null; }
+          try { AppComp = window[possibleNames[i]] || eval(possibleNames[i]); if (typeof AppComp === 'function') break; AppComp = null; } catch(ex) { AppComp = null; }
         }
       }
       if (AppComp) {
@@ -2085,148 +2094,109 @@ function ExecutionLogTimeline({ logs, isBuilding }: { logs: ExecutionLog[]; isBu
 
 function LiveBuildView({ logs, buildStatus, lang, t }: { logs: ExecutionLog[]; buildStatus?: string; lang: string; t: Record<string, string> }) {
   const logEndRef = useRef<HTMLDivElement>(null);
+  const isRtl = lang === "ar";
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs.length]);
 
-  const agents = [
-    { key: "codegen", en: "Code Generator", ar: "مولّد الكود", icon: "⚡" },
-    { key: "reviewer", en: "Code Reviewer", ar: "مراجع الكود", icon: "🔍" },
-    { key: "fixer", en: "Code Fixer", ar: "مصلح الكود", icon: "🔧" },
-    { key: "filemanager", en: "File Manager", ar: "مدير الملفات", icon: "📁" },
-    { key: "package_runner", en: "Package Runner", ar: "مشغّل الحزم", icon: "📦" },
-    { key: "qa", en: "Quality Assurance", ar: "ضمان الجودة", icon: "✅" },
+  const agentSteps = [
+    { key: "codegen", ar: "توليد الكود", en: "Generating Code", descAr: "يكتب الملفات والمكونات", descEn: "Writing files & components" },
+    { key: "reviewer", ar: "مراجعة الكود", en: "Reviewing Code", descAr: "يفحص الجودة والأخطاء", descEn: "Checking quality & errors" },
+    { key: "fixer", ar: "إصلاح الأخطاء", en: "Fixing Issues", descAr: "يصلح المشاكل المكتشفة", descEn: "Fixing detected problems" },
+    { key: "filemanager", ar: "حفظ الملفات", en: "Saving Files", descAr: "يحفظ الملفات في المشروع", descEn: "Saving files to project" },
+    { key: "package_runner", ar: "تثبيت الحزم", en: "Installing Packages", descAr: "يثبت المكتبات المطلوبة", descEn: "Installing dependencies" },
+    { key: "qa", ar: "فحص الجودة", en: "Quality Check", descAr: "يتأكد من عمل الموقع", descEn: "Verifying site works" },
   ];
 
-  const getAgentStatus = (agentKey: string) => {
-    const agentLogs = logs.filter(l => l.agentType === agentKey);
-    if (agentLogs.length === 0) return "pending";
-    const hasFailed = agentLogs.some(l => l.status === "failed" || l.status === "error");
-    const hasCompleted = agentLogs.some(l => l.status === "completed" || l.status === "success");
-    const last = agentLogs[agentLogs.length - 1];
-    if (last.status === "in_progress") return "running";
-    if (hasFailed && !hasCompleted) return "error";
-    if (hasFailed && hasCompleted) return "warning";
+  const getStepStatus = (key: string) => {
+    const stepLogs = logs.filter(l => l.agentType === key);
+    if (stepLogs.length === 0) return "waiting";
+    const hasFailed = stepLogs.some(l => l.status === "failed" || l.status === "error");
+    const hasCompleted = stepLogs.some(l => l.status === "completed" || l.status === "success");
+    const last = stepLogs[stepLogs.length - 1];
+    if (last.status === "in_progress") return "active";
+    if (hasFailed && hasCompleted) return "partial";
+    if (hasFailed) return "failed";
     if (hasCompleted) return "done";
-    return "running";
+    return "active";
   };
 
-  const currentAgent = agents.find(a => getAgentStatus(a.key) === "running");
-  const isRtl = lang === "ar";
+  const activeStep = agentSteps.findIndex(s => getStepStatus(s.key) === "active");
+  const completedCount = agentSteps.filter(s => getStepStatus(s.key) === "done" || getStepStatus(s.key) === "partial").length;
+  const progress = Math.round((completedCount / agentSteps.length) * 100);
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div className="text-center mb-4">
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#1f6feb]/10 border border-[#1f6feb]/20 mb-2">
-          <Loader2 className="w-4 h-4 animate-spin text-[#58a6ff]" />
-          <span className="text-sm font-medium text-[#58a6ff]">
-            {currentAgent ? (isRtl ? currentAgent.ar : currentAgent.en) : (t.building || "Building...")}
-          </span>
-        </div>
-        {currentAgent && (
-          <p className="text-xs text-[#484f58]">{t.agents_working}</p>
-        )}
-      </div>
-
-      <div className="grid grid-cols-3 gap-3">
-        {agents.map(agent => {
-          const status = getAgentStatus(agent.key);
-          const agentLogs = logs.filter(l => l.agentType === agent.key);
-          const lastLog = agentLogs[agentLogs.length - 1];
-          return (
+    <div className="h-full flex flex-col items-center justify-center p-6" dir={isRtl ? "rtl" : "ltr"}>
+      <div className="w-full max-w-md space-y-6">
+        <div className="text-center space-y-3">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#1f6feb]/10 mb-2">
+            <Loader2 className="w-6 h-6 animate-spin text-[#58a6ff]" />
+          </div>
+          <h3 className="text-lg font-semibold text-[#e6edf3]">
+            {isRtl ? "جاري البناء..." : "Building..."}
+          </h3>
+          <div className="w-full h-2 rounded-full bg-[#1c2333] overflow-hidden">
             <motion.div
-              key={agent.key}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={cn(
-                "rounded-lg border p-3 transition-all duration-300",
-                status === "running" && "bg-[#1f6feb]/5 border-[#1f6feb]/30 shadow-[0_0_15px_rgba(31,111,235,0.1)]",
-                status === "done" && "bg-emerald-500/5 border-emerald-500/20",
-                status === "warning" && "bg-yellow-500/5 border-yellow-500/20",
-                status === "error" && "bg-red-500/5 border-red-500/20",
-                status === "pending" && "bg-[#161b22] border-[#1c2333] opacity-40",
-              )}
-            >
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-base">{agent.icon}</span>
-                <span className={cn(
-                  "text-xs font-semibold truncate",
-                  status === "running" && "text-[#58a6ff]",
-                  status === "done" && "text-emerald-400",
-                  status === "warning" && "text-yellow-400",
-                  status === "error" && "text-red-400",
-                  status === "pending" && "text-[#484f58]",
-                )}>
-                  {isRtl ? agent.ar : agent.en}
-                </span>
-                <div className="ms-auto flex-shrink-0">
-                  {status === "running" && <Loader2 className="w-3.5 h-3.5 animate-spin text-[#58a6ff]" />}
-                  {status === "done" && <span className="text-emerald-400 text-xs">✓</span>}
-                  {status === "warning" && <span className="text-yellow-400 text-xs">⚠</span>}
-                  {status === "error" && <span className="text-red-400 text-xs">✗</span>}
-                </div>
-              </div>
-              {lastLog && (
-                <p className="text-[10px] text-[#8b949e] truncate">{lastLog.action}</p>
-              )}
-              {status === "running" && (
-                <div className="mt-2 h-1 rounded-full bg-[#1c2333] overflow-hidden">
-                  <motion.div
-                    className="h-full bg-[#1f6feb] rounded-full"
-                    initial={{ width: "5%" }}
-                    animate={{ width: "85%" }}
-                    transition={{ duration: 60, ease: "linear" }}
-                  />
-                </div>
-              )}
-            </motion.div>
-          );
-        })}
-      </div>
-
-      {logs.length > 0 && (
-        <div className="rounded-lg border border-[#1c2333] bg-[#0d1117] overflow-hidden">
-          <div className="flex items-center gap-2 px-3 py-2 border-b border-[#1c2333] bg-[#161b22]">
-            <Code2 className="w-3.5 h-3.5 text-[#8b949e]" />
-            <span className="text-[11px] font-semibold text-[#8b949e] uppercase tracking-wider">
-              {isRtl ? "سجل مباشر" : "Live Log"}
-            </span>
-            <span className="text-[10px] text-[#484f58] ms-auto">{logs.length}</span>
+              className="h-full bg-gradient-to-r from-[#1f6feb] to-[#58a6ff] rounded-full"
+              initial={{ width: "0%" }}
+              animate={{ width: `${Math.max(progress, activeStep >= 0 ? ((activeStep + 0.5) / agentSteps.length) * 100 : 5)}%` }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+            />
           </div>
-          <div className="max-h-[200px] overflow-y-auto p-2 space-y-0.5 font-mono">
-            {logs.map((log, i) => {
-              const time = log.createdAt ? new Date(log.createdAt).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
-              const isCompleted = log.status === "completed" || log.status === "success";
-              const isFailed = log.status === "failed" || log.status === "error";
-              const isRunning = log.status === "in_progress" || log.status === "running" || log.status === "pending";
-              return (
-                <motion.div
-                  key={log.id || i}
-                  initial={{ opacity: 0, x: isRtl ? 8 : -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="flex items-center gap-2 py-0.5 px-1 text-[11px]"
-                >
-                  <span className="text-[#484f58] flex-shrink-0 w-16">{time}</span>
-                  <span className="text-[#8b949e] flex-shrink-0 truncate max-w-[120px]">{log.action}</span>
-                  <span className={cn(
-                    "font-bold uppercase text-[10px] flex-shrink-0",
-                    isCompleted && "text-emerald-400",
-                    isFailed && "text-red-400",
-                    isRunning && "text-[#58a6ff]",
-                  )}>
-                    {log.agentType || "SYSTEM"}
-                  </span>
-                  {isRunning && <Loader2 className="w-3 h-3 animate-spin text-[#58a6ff] flex-shrink-0" />}
-                  {isCompleted && <span className="text-emerald-400 flex-shrink-0">✓</span>}
-                  {isFailed && <span className="text-red-400 flex-shrink-0">✗</span>}
-                </motion.div>
-              );
-            })}
-            <div ref={logEndRef} />
-          </div>
+          <p className="text-xs text-[#484f58]">{progress}%</p>
         </div>
-      )}
+
+        <div className="space-y-1">
+          {agentSteps.map((step, idx) => {
+            const status = getStepStatus(step.key);
+            return (
+              <motion.div
+                key={step.key}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.05 }}
+                className={cn(
+                  "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300",
+                  status === "active" && "bg-[#1f6feb]/8 border border-[#1f6feb]/25",
+                  status === "done" && "opacity-70",
+                  status === "partial" && "opacity-70",
+                  status === "failed" && "opacity-70",
+                  status === "waiting" && "opacity-30",
+                )}
+              >
+                <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
+                  {status === "active" && <Loader2 className="w-4 h-4 animate-spin text-[#58a6ff]" />}
+                  {status === "done" && <Check className="w-4 h-4 text-emerald-400" />}
+                  {status === "partial" && <AlertTriangle className="w-4 h-4 text-yellow-400" />}
+                  {status === "failed" && <XCircle className="w-4 h-4 text-red-400" />}
+                  {status === "waiting" && <div className="w-2 h-2 rounded-full bg-[#30363d]" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={cn(
+                    "text-sm font-medium",
+                    status === "active" && "text-[#e6edf3]",
+                    status === "done" && "text-[#8b949e]",
+                    status === "partial" && "text-[#8b949e]",
+                    status === "failed" && "text-[#8b949e]",
+                    status === "waiting" && "text-[#484f58]",
+                  )}>
+                    {isRtl ? step.ar : step.en}
+                  </p>
+                  {status === "active" && (
+                    <p className="text-xs text-[#484f58] mt-0.5">{isRtl ? step.descAr : step.descEn}</p>
+                  )}
+                </div>
+                {status === "active" && (
+                  <div className="flex-shrink-0">
+                    <span className="text-[10px] text-[#58a6ff] animate-pulse">{isRtl ? "جاري..." : "..."}</span>
+                  </div>
+                )}
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
