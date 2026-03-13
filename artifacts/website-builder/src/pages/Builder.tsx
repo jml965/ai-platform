@@ -833,6 +833,7 @@ export default function Builder() {
                           >
                             <FileCode2 className="w-3 h-3" />
                             {f.filePath?.split('/').pop() || `file-${i}`}
+                            <span className="text-[9px] text-[#484f58] font-sans">{getFileDescription(f.filePath || "", t as unknown as Record<string, string>)}</span>
                           </button>
                         ))}
                       </div>
@@ -894,6 +895,45 @@ function getFileIcon(filePath: string) {
   }
 }
 
+function getFileDescription(filePath: string, t: { [key: string]: string }): string {
+  const fileName = filePath.split('/').pop()?.toLowerCase() || "";
+  const ext = fileName.split('.').pop()?.toLowerCase() || "";
+
+  if (fileName === "package.json") return t.file_desc_package_json;
+  if (fileName === "package-lock.json" || fileName === "pnpm-lock.yaml" || fileName === "yarn.lock") return t.file_desc_lock;
+  if (fileName === "tsconfig.json") return t.file_desc_tsconfig;
+  if (fileName === "index.html") return t.file_desc_index_html;
+  if (fileName === "readme.md" || fileName === "readme.txt") return t.file_desc_readme;
+  if (fileName === ".gitignore") return t.file_desc_gitignore;
+  if (fileName === ".env" || fileName.startsWith(".env.")) return t.file_desc_env_file;
+  if (fileName === "vite.config.ts" || fileName === "vite.config.js") return t.file_desc_vite_config;
+  if (fileName === "requirements.txt") return t.file_desc_requirements;
+
+  const descMap: Record<string, string> = {
+    html: t.file_desc_html,
+    css: t.file_desc_css,
+    js: t.file_desc_js,
+    ts: t.file_desc_ts,
+    jsx: t.file_desc_jsx,
+    tsx: t.file_desc_tsx,
+    json: t.file_desc_json,
+    md: t.file_desc_md,
+    txt: t.file_desc_txt,
+    png: t.file_desc_png,
+    jpg: t.file_desc_jpg,
+    jpeg: t.file_desc_jpg,
+    svg: t.file_desc_svg,
+    gif: t.file_desc_gif,
+    py: t.file_desc_py,
+    env: t.file_desc_env,
+    yaml: t.file_desc_yaml,
+    yml: t.file_desc_yml,
+    lock: t.file_desc_lock,
+  };
+
+  return descMap[ext] || t.file_desc_unknown;
+}
+
 interface TreeNode {
   name: string;
   path: string;
@@ -943,6 +983,7 @@ function buildFileTree(files: ProjectFile[]): TreeNode[] {
 
 function FileLibrary({ files, onFileSelect }: { files: ProjectFile[]; onFileSelect: (idx: number) => void }) {
   const { t } = useI18n();
+  const tRecord = t as unknown as Record<string, string>;
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
 
@@ -1011,11 +1052,12 @@ function FileLibrary({ files, onFileSelect }: { files: ProjectFile[]; onFileSele
       <button
         key={node.path}
         onClick={() => node.fileIndex !== undefined && onFileSelect(node.fileIndex)}
-        className="w-full flex items-center gap-1.5 px-2 py-1 text-[12px] text-[#c9d1d9] hover:text-[#e1e4e8] hover:bg-[#1c2333] rounded transition-colors"
+        className="w-full flex items-center gap-1.5 px-2 py-1 text-[12px] text-[#c9d1d9] hover:text-[#e1e4e8] hover:bg-[#1c2333] rounded transition-colors group"
         style={{ paddingInlineStart: `${depth * 12 + 20}px` }}
       >
         {getFileIcon(node.name)}
         <span className="truncate">{node.name}</span>
+        <span className="text-[9px] text-[#484f58] truncate ms-auto opacity-0 group-hover:opacity-100 transition-opacity">{getFileDescription(node.name, tRecord)}</span>
       </button>
     );
   };
@@ -1050,6 +1092,7 @@ function FileLibrary({ files, onFileSelect }: { files: ProjectFile[]; onFileSele
 
 function InlineFileTree({ files, selectedIndex, onFileSelect }: { files: ProjectFile[]; selectedIndex: number; onFileSelect: (idx: number) => void }) {
   const { t } = useI18n();
+  const tRecord = t as unknown as Record<string, string>;
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
 
   const tree = useMemo(() => buildFileTree(files), [files]);
@@ -1102,7 +1145,7 @@ function InlineFileTree({ files, selectedIndex, onFileSelect }: { files: Project
         key={node.path}
         onClick={() => node.fileIndex !== undefined && onFileSelect(node.fileIndex)}
         className={cn(
-          "w-full flex items-center gap-1.5 px-2 py-1 text-[12px] rounded transition-colors",
+          "w-full flex items-center gap-1.5 px-2 py-1 text-[12px] rounded transition-colors group",
           isSelected
             ? "bg-[#1f6feb]/15 text-[#e1e4e8]"
             : "text-[#c9d1d9] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
@@ -1111,6 +1154,7 @@ function InlineFileTree({ files, selectedIndex, onFileSelect }: { files: Project
       >
         {getFileIcon(node.name)}
         <span className="truncate">{node.name}</span>
+        <span className="text-[9px] text-[#484f58] truncate ms-auto opacity-0 group-hover:opacity-100 transition-opacity">{getFileDescription(node.name, tRecord)}</span>
       </button>
     );
   };
