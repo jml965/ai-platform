@@ -81,6 +81,30 @@ UI:
 - Builder page: Deploy button in header + expandable deploy panel (status, URL, redeploy/undeploy)
 - Dashboard: Deployed projects section with status cards and management controls
 
+## Real-time Collaboration System
+
+WebSocket-based real-time collaboration enabling multiple team members to work on the same project simultaneously, like Google Docs.
+
+Key files:
+- `artifacts/api-server/src/lib/collaboration.ts` — WebSocket server with auth, rooms, presence, file locking, edit broadcasting
+- `artifacts/api-server/src/index.ts` — HTTP server with WebSocket upgrade handler
+- `artifacts/website-builder/src/hooks/useCollaboration.ts` — React hook for WebSocket client
+- `artifacts/website-builder/src/components/builder/CollaborationPanel.tsx` — UI panel showing collaborators, locks, notifications
+
+WebSocket endpoint: `/ws/collaborate` (authenticated via cookies)
+
+Features:
+- Room-based connections per project with project access authorization
+- Live presence tracking (connected users, active files, cursor positions)
+- Smart file locking system (prevents simultaneous edits, auto-expires after 15min)
+- Real-time edit broadcasting with file refetch on changes
+- Join/leave notifications with animated toasts
+- Collaborator avatars in Builder header
+- File lock indicators on code editor tabs
+- Lock/unlock buttons in code editor
+- Full bilingual support (EN/AR)
+- Auto-reconnect on disconnect with intentional-close guard
+
 ## Email Notification System
 
 Event-driven email notification system that sends emails on important events (build complete, build error, team invite, subscription renewal).

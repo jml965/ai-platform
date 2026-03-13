@@ -441,6 +441,21 @@ const en = {
   analytics_copied: "Copied!",
   analytics_percentage: "Percentage",
   analytics_weekly_summary: "Weekly Summary",
+  collab_panel_title: "Collaborators",
+  collab_connected: "Connected",
+  collab_disconnected: "Disconnected",
+  collab_online: "Online",
+  collab_you: "You",
+  collab_no_others: "No other collaborators online",
+  collab_locked_files: "Locked Files",
+  collab_locked_by: "Locked by",
+  collab_joined: "joined the project",
+  collab_left: "left the project",
+  collab_file_locked: "File locked",
+  collab_file_unlocked: "File unlocked",
+  collab_lock_rejected: "File is locked by",
+  collab_lock: "Lock",
+  collab_unlock: "Unlock",
 };
 
 const ar = {
@@ -884,6 +899,21 @@ const ar = {
   analytics_copied: "تم النسخ!",
   analytics_percentage: "النسبة",
   analytics_weekly_summary: "ملخص أسبوعي",
+  collab_panel_title: "المتعاونون",
+  collab_connected: "متصل",
+  collab_disconnected: "غير متصل",
+  collab_online: "متصلون",
+  collab_you: "أنت",
+  collab_no_others: "لا يوجد متعاونون آخرون",
+  collab_locked_files: "الملفات المقفلة",
+  collab_locked_by: "مقفل بواسطة",
+  collab_joined: "انضم إلى المشروع",
+  collab_left: "غادر المشروع",
+  collab_file_locked: "تم قفل الملف",
+  collab_file_unlocked: "تم فتح قفل الملف",
+  collab_lock_rejected: "الملف مقفل بواسطة",
+  collab_lock: "قفل",
+  collab_unlock: "فتح القفل",
 };
 
 type Language = "en" | "ar";

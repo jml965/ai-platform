@@ -1,5 +1,7 @@
+import { createServer } from "http";
 import app from "./app";
 import { seedRolesAndPermissions } from "./lib/seedRoles";
+import { setupCollaborationWebSocket } from "./lib/collaboration";
 
 const rawPort = process.env["PORT"];
 
@@ -19,6 +21,10 @@ seedRolesAndPermissions().catch((err) =>
   console.error("[Seed] Failed to seed roles:", err)
 );
 
-app.listen(port, () => {
+const server = createServer(app);
+
+setupCollaborationWebSocket(server);
+
+server.listen(port, () => {
   console.log(`Server listening on port ${port}`);
 });

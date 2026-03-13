@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -7,7 +8,7 @@ import {
   FileText, FileJson, FileImage, File, Folder, ArrowLeft, Clock,
   RotateCw, Monitor, Smartphone, Tablet, Laptop, ChevronLeft,
   Terminal as TerminalIcon, Rocket, ExternalLink, Square, RefreshCw, Globe, Archive, BarChart3,
-  Smartphone as SmartphoneIcon
+  Smartphone as SmartphoneIcon, Users, Lock, Unlock
 } from "lucide-react";
 import { format } from "date-fns";
 import { useI18n } from "@/lib/i18n";
@@ -16,6 +17,7 @@ import { cn } from "@/lib/utils";
 import type { ExecutionLog, ProjectFile } from "@workspace/api-client-react";
 import {
   useGetProject,
+  useGetMe,
   useStartBuild,
   useGetBuildStatus,
   useGetBuildLogs,
@@ -33,6 +35,8 @@ import ProjectPlan from "@/components/builder/ProjectPlan";
 import DomainSettings from "@/components/builder/DomainSettings";
 import SnapshotsPanel from "@/components/builder/SnapshotsPanel";
 import PwaSettingsPanel from "@/components/builder/PwaSettings";
+import CollaborationPanel, { CollaboratorAvatars, FileLockIndicator } from "@/components/builder/CollaborationPanel";
+import { useCollaboration } from "@/hooks/useCollaboration";
 import { useUpdateFile } from "@/hooks/useUpdateFile";
 import "@/components/builder/prism-theme.css";
 
@@ -48,6 +52,7 @@ interface ChatMessage {
 export default function Builder() {
   const { id } = useParams<{ id: string }>();
   const { t, lang } = useI18n();
+  const queryClient = useQueryClient();
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const [prompt, setPrompt] = useState("");
@@ -70,16 +75,34 @@ export default function Builder() {
   const [showDeviceMenu, setShowDeviceMenu] = useState(false);
   const [showTerminal, setShowTerminal] = useState(true);
   const [planApproved, setPlanApproved] = useState(false);
-  const [rightTab, setRightTab] = useState<"library" | "snapshots">("library");
+  const [rightTab, setRightTab] = useState<"library" | "snapshots" | "collab">("library");
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const [showDeployPanel, setShowDeployPanel] = useState(false);
   const [showPwaPanel, setShowPwaPanel] = useState(false);
 
   const { data: project } = useGetProject(id || "");
+  const { data: me } = useGetMe({ query: { queryKey: ["getMe"], retry: false } });
   const { data: tokenSummary } = useGetTokenSummary();
   const startBuildMut = useStartBuild();
   const updateFileMut = useUpdateFile();
+
+  const handleFileChanged = useCallback((data: { userId: string; displayName: string; filePath: string; content: string }) => {
+    if (!id) return;
+    queryClient.invalidateQueries({ queryKey: ["listProjectFiles", id] });
+  }, [id, queryClient]);
+
+  const {
+    collaborators,
+    fileLocks,
+    notifications,
+    connected: wsConnected,
+    sendCursorMove,
+    sendFileOpen,
+    sendFileEdit,
+    lockFile,
+    unlockFile,
+  } = useCollaboration({ projectId: id, onFileChanged: handleFileChanged });
   const deployMut = useDeployProject();
   const undeployMut = useUndeployProject();
   const redeployMut = useRedeployProject();
@@ -377,6 +400,7 @@ export default function Builder() {
           <div className="flex-1 min-w-0">
             <h1 className="text-sm font-semibold text-[#e1e4e8] truncate">{project?.name || t.loading}</h1>
           </div>
+          <CollaboratorAvatars collaborators={collaborators} currentUserId={me?.id} />
           <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#1f6feb]/20 text-[#58a6ff] font-medium flex items-center gap-1.5 flex-shrink-0">
             {isBuilding && <span className="w-1.5 h-1.5 rounded-full bg-[#58a6ff] animate-pulse" />}
             {t.agent_label} • {actionCount}
@@ -874,36 +898,75 @@ export default function Builder() {
                   {files.length > 0 ? (
                     <>
                       <div className="flex items-center gap-1 px-2 py-1.5 border-b border-[#1c2333] bg-[#161b22] overflow-x-auto flex-shrink-0">
-                        {files.map((f, i) => (
-                          <button
-                            key={f.id || i}
-                            onClick={() => setSelectedFileIndex(i)}
-                            className={cn(
-                              "px-2.5 py-1 text-[11px] font-mono rounded transition-colors flex items-center gap-1.5 whitespace-nowrap",
-                              selectedFileIndex === i
-                                ? "bg-[#0d1117] text-[#e1e4e8] border border-[#30363d]"
-                                : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
-                            )}
-                          >
-                            <FileCode2 className="w-3 h-3" />
-                            {f.filePath?.split('/').pop() || `file-${i}`}
-                            <span className="text-[9px] text-[#484f58] font-sans">{getFileDescription(f.filePath || "", t as unknown as Record<string, string>)}</span>
-                          </button>
-                        ))}
+                        {files.map((f, i) => {
+                          const fp = f.filePath || "";
+                          const lock = fileLocks[fp];
+                          const isLockedByOther = lock && lock.userId !== me?.id;
+                          return (
+                            <button
+                              key={f.id || i}
+                              onClick={() => { setSelectedFileIndex(i); sendFileOpen(fp); }}
+                              className={cn(
+                                "px-2.5 py-1 text-[11px] font-mono rounded transition-colors flex items-center gap-1.5 whitespace-nowrap",
+                                selectedFileIndex === i
+                                  ? "bg-[#0d1117] text-[#e1e4e8] border border-[#30363d]"
+                                  : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]",
+                                isLockedByOther && "opacity-60"
+                              )}
+                            >
+                              <FileCode2 className="w-3 h-3" />
+                              {fp.split('/').pop() || `file-${i}`}
+                              <FileLockIndicator filePath={fp} fileLocks={fileLocks} currentUserId={me?.id} />
+                              <span className="text-[9px] text-[#484f58] font-sans">{getFileDescription(fp, t as unknown as Record<string, string>)}</span>
+                            </button>
+                          );
+                        })}
                       </div>
-                      <div className="flex-1 overflow-hidden">
-                        <CodeEditor
-                          content={files[selectedFileIndex]?.content || ""}
-                          filePath={files[selectedFileIndex]?.filePath || "file.txt"}
-                          readOnly={isBuilding}
-                          onSave={!isBuilding && id && files[selectedFileIndex]?.id ? (newContent: string) => {
-                            updateFileMut.mutate({
-                              projectId: id!,
-                              fileId: files[selectedFileIndex].id,
-                              content: newContent,
-                            });
-                          } : undefined}
-                        />
+                      <div className="flex-1 overflow-hidden relative">
+                        {(() => {
+                          const currentFp = files[selectedFileIndex]?.filePath || "";
+                          const currentLock = fileLocks[currentFp];
+                          const isLockedByOther = currentLock && currentLock.userId !== me?.id;
+                          const isLockedByMe = currentLock && currentLock.userId === me?.id;
+                          return (
+                            <>
+                              {currentFp && !isBuilding && (
+                                <div className="absolute top-1 end-2 z-10 flex items-center gap-1">
+                                  {isLockedByMe ? (
+                                    <button
+                                      onClick={() => unlockFile(currentFp)}
+                                      className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
+                                    >
+                                      <Unlock className="w-2.5 h-2.5" />
+                                      {t.collab_unlock}
+                                    </button>
+                                  ) : !currentLock ? (
+                                    <button
+                                      onClick={() => lockFile(currentFp)}
+                                      className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded bg-[#1c2333] text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#30363d] transition-colors"
+                                    >
+                                      <Lock className="w-2.5 h-2.5" />
+                                      {t.collab_lock}
+                                    </button>
+                                  ) : null}
+                                </div>
+                              )}
+                              <CodeEditor
+                                content={files[selectedFileIndex]?.content || ""}
+                                filePath={files[selectedFileIndex]?.filePath || "file.txt"}
+                                readOnly={isBuilding || !!isLockedByOther}
+                                onSave={!isBuilding && !isLockedByOther && id && files[selectedFileIndex]?.id ? (newContent: string) => {
+                                  updateFileMut.mutate({
+                                    projectId: id!,
+                                    fileId: files[selectedFileIndex].id,
+                                    content: newContent,
+                                  });
+                                  sendFileEdit(currentFp, newContent);
+                                } : undefined}
+                              />
+                            </>
+                          );
+                        })()}
                       </div>
                     </>
                   ) : (
@@ -950,12 +1013,39 @@ export default function Builder() {
             <Archive className="w-3 h-3" />
             {t.snapshots}
           </button>
+          <button
+            onClick={() => setRightTab("collab")}
+            className={cn(
+              "px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1.5",
+              rightTab === "collab"
+                ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
+                : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
+            )}
+          >
+            <Users className="w-3 h-3" />
+            {t.collab_panel_title}
+            {collaborators.length > 1 && (
+              <span className="text-[9px] bg-[#1f6feb]/20 text-[#58a6ff] px-1.5 rounded-full">
+                {collaborators.length}
+              </span>
+            )}
+          </button>
         </div>
 
         {rightTab === "library" ? (
           <FileLibrary files={files} onFileSelect={(idx) => { setSelectedFileIndex(idx); setCenterTab("code"); }} />
-        ) : (
+        ) : rightTab === "snapshots" ? (
           id ? <SnapshotsPanel projectId={id} /> : null
+        ) : (
+          <CollaborationPanel
+            collaborators={collaborators}
+            fileLocks={fileLocks}
+            notifications={notifications}
+            connected={wsConnected}
+            currentUserId={me?.id}
+            onLockFile={lockFile}
+            onUnlockFile={unlockFile}
+          />
         )}
       </div>
     </div>
