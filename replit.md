@@ -1,47 +1,28 @@
-# Workspace
-
-## Project
-
-AI Website Builder Platform — users describe websites in natural language (Arabic or English) and AI agents generate, review, and fix the code automatically. Bilingual (AR/EN) with RTL/LTR support.
-
-## Architecture Documentation
-
-Full technical architecture is in `docs/architecture/`:
-- `00-index.md` — Master index with summary of all documents
-- `01-system-architecture.md` — Layered architecture diagram
-- `02-technology-decisions.md` — ADR for every technology choice
-- `03-agent-architecture.md` — Agent system design (4 agents + execution engine)
-- `04-data-flow.md` — 6 main data flows
-- `05-database-schema.md` — 12 tables with columns and relationships
-- `06-api-spec-structural.md` — 41 API endpoints with permissions
-- `07-project-roadmap.md` — 8 phases with weighted progress tracking
+# AI Website Builder Platform
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+The AI Website Builder Platform allows users to describe websites in natural language (Arabic or English), and AI agents automatically generate, review, and fix the corresponding code. It supports both RTL/LTR languages and aims to provide a seamless bilingual experience. The project is a pnpm workspace monorepo using TypeScript, where each package manages its own dependencies.
 
-## Sandbox System
+**Business Vision:** To revolutionize website creation by making it accessible to users without coding knowledge, leveraging advanced AI to translate natural language into functional, high-quality websites.
+**Market Potential:** Targets individuals and small businesses seeking an intuitive, fast, and cost-effective way to establish an online presence.
+**Project Ambition:** To be the leading AI-powered platform for website generation, known for its accuracy, flexibility, and user-friendliness, particularly in bilingual contexts.
 
-Isolated execution environments for projects. Each sandbox gets its own temp directory, port, and child process.
+## User Preferences
 
-Key files:
-- `lib/db/src/schema/sandbox-instances.ts` — DB table tracking sandbox state
-- `artifacts/api-server/src/lib/sandbox/sandbox-manager.ts` — Sandbox lifecycle manager (create, execute, start-server, stop, restart, cleanup)
-- `artifacts/api-server/src/routes/sandbox.ts` — REST API + SSE streaming endpoints
+- I prefer clear and concise explanations.
+- I appreciate iterative development with regular updates.
+- Please ask for confirmation before implementing significant changes.
+- Ensure the codebase remains clean and well-documented.
 
-API endpoints (all under `/api/sandbox`, auth required):
-- `POST /sandbox` — Create sandbox for a project
-- `GET /sandbox` — List user's sandboxes
-- `GET /sandbox/project/:projectId` — Get sandbox by project
-- `GET /sandbox/:sandboxId` — Get sandbox status
-- `POST /sandbox/:sandboxId/execute` — Run command in sandbox
-- `POST /sandbox/:sandboxId/start-server` — Start long-running server
-- `POST /sandbox/:sandboxId/stop` — Stop sandbox
-- `POST /sandbox/:sandboxId/restart` — Restart sandbox
-- `GET /sandbox/:sandboxId/logs` — Get output logs
-- `GET /sandbox/:sandboxId/stream` — SSE stream of real-time output
+## System Architecture
 
-Limits: Max 10 concurrent sandboxes, 64-512MB memory, 30-600s timeout, auto-cleanup after 10min inactivity.
+The platform is built as a pnpm workspace monorepo, separating concerns into `artifacts/` (deployable applications) and `lib/` (shared libraries).
+
+**UI/UX Decisions:**
+- **Frontend:** Developed with React, Vite, and TailwindCSS, supporting bilingual AR/EN with RTL/LTR via an i18n context.
+- **Pages:** Includes Login, Dashboard, Builder (project workspace with chat prompt and live preview), Billing, Teams, Quality Assurance, Monitoring, Analytics, and PWA settings.
+- **Theming:** A consistent design language is applied across all pages, with a language toggle available in the header.
 
 ## PWA (Progressive Web App) Support
 
@@ -69,21 +50,32 @@ Features:
 - Auto-generated default icons from app initial
 - Manifest and service worker URL display with copy buttons
 
-## Deployment System
+**Technical Implementations:**
+- **Monorepo Tool:** pnpm workspaces.
+- **Backend:** Express 5 API server (`api-server`) managing routes, authentication, project data, and AI interactions.
+- **Database:** PostgreSQL with Drizzle ORM for schema management, including user data, projects, build tasks, and billing information.
+- **AI Agents:** A multi-agent system including:
+    - **CodeGenerator:** Generates website files from natural language prompts using Anthropic Claude Sonnet 4.5.
+    - **CodeReviewer:** Reviews generated code for quality and security using OpenAI o1.
+    - **FixAgent:** Automatically fixes identified issues using Anthropic Claude Sonnet 4.5.
+    - **FileManager:** Manages saving and updating files in the database.
+- **Agent Orchestration:** An `execution-engine` orchestrates the build pipeline (codegen → review → fix → save) and integrates with a 3-phase QA pipeline (lint → runtime → functional validation).
+- **Sandbox System:** Provides isolated execution environments for projects, managing lifecycle operations (create, execute, start-server, stop, restart, cleanup) via a dedicated API.
+- **Deployment System:** Manages project deployments to public URLs with subdomains, offering deploy, undeploy, and redeploy functionalities.
+- **Email Notification System:** An event-driven system sends emails for important events like build completion/errors, team invites, and subscription renewals, based on user preferences.
+- **Validation:** Zod is used for schema validation, integrated with `drizzle-zod` for database interactions.
+- **API Codegen:** Orval generates API client hooks and Zod schemas from an OpenAPI specification, ensuring type safety and consistency.
+- **Build System:** esbuild handles CJS bundling for production, while `tsc --build --emitDeclarationOnly` manages type checking across the monorepo.
 
-Deployment management allowing users to deploy projects to public URLs with subdomains.
+**Feature Specifications:**
+- **Bilingual Support:** Full Arabic/English support for UI and content, including RTL/LTR layout adjustments.
+- **User Authentication:** Supports Replit Auth (default) and local email/password authentication.
+- **Billing & Subscriptions:** Manages plans, subscriptions, invoices, credits, and top-ups, integrated with payment gateways.
+- **Teams:** Functionality for team creation, member management, and invitation flows with role-based access control.
+- **Real-time Updates:** Utilizes Server-Sent Events (SSE) for real-time updates on sandbox execution and build processes.
+- **Analytics Dashboard:** Per-project analytics showing visitor stats, daily traffic charts (Recharts), top pages, traffic sources, device/browser breakdowns. Includes a lightweight tracking script for deployed sites. Data stored in `page_views` table with optimized indexes.
 
-Key files:
-- `lib/db/src/schema/deployments.ts` — DB table tracking deployment state (unique per project)
-- `artifacts/api-server/src/lib/deployment-manager.ts` — Deployment lifecycle manager (deploy, undeploy, redeploy, status)
-- `artifacts/api-server/src/routes/deployments.ts` — REST API endpoints
-
-API endpoints (all under `/api/deployments`, auth required):
-- `POST /deployments/deploy` — Deploy a project (creates subdomain URL)
-- `GET /deployments/:projectId/status` — Get deployment status
-- `POST /deployments/:projectId/undeploy` — Stop a deployment
-- `POST /deployments/:projectId/redeploy` — Redeploy with latest changes
-- `GET /deployments` — List all user deployments
+## External Dependencies
 
 UI:
 - Builder page: Deploy button in header + expandable deploy panel (status, URL, redeploy/undeploy)
@@ -162,6 +154,26 @@ API endpoints (all under `/api/projects/:projectId/domains`, auth + project acce
 
 DNS verification supports both A records (platform IP) and CNAME records (platform.dev). SSL certificates auto-issue on successful DNS verification (simulated 90-day validity).
 
+## Analytics Dashboard
+
+Per-project analytics dashboard showing visitor stats, daily traffic charts, top pages, traffic sources, and device/browser breakdowns.
+
+Key files:
+- `lib/db/src/schema/page-views.ts` — DB table for page view tracking with optimized indexes
+- `artifacts/api-server/src/routes/analytics.ts` — REST API for tracking and analytics data
+- `lib/api-client-react/src/analytics-hooks.ts` — React Query hooks for analytics endpoints
+- `artifacts/website-builder/src/pages/Analytics.tsx` — Analytics dashboard page with Recharts
+
+API endpoints:
+- `POST /analytics/track` — Public endpoint for recording page views (UUID-validated, length-capped)
+- `GET /projects/:projectId/analytics/summary` — Summary stats (views, visitors, bounce rate)
+- `GET /projects/:projectId/analytics/daily` — Daily traffic breakdown (views & visitors per day)
+- `GET /projects/:projectId/analytics/pages` — Top pages by view count
+- `GET /projects/:projectId/analytics/sources` — Traffic source breakdown
+- `GET /projects/:projectId/analytics/devices` — Browser, device type, and OS breakdown
+
+Includes lightweight tracking script for embedding in deployed sites with visitor/session ID management.
+
 ## Database Schema
 
 16 tables in `lib/db/src/schema/`:
@@ -183,6 +195,7 @@ DNS verification supports both A records (platform IP) and CNAME records (platfo
 - `qa_reports` — QA validation reports with 3-phase checks (lint/runtime/functional), scores, retry tracking, cost tracking, fix attempts JSONB
 - `domains` — Custom domains linked to projects with DNS verification status, SSL certificate tracking
 - `snapshots` — Project backup snapshots storing all project files as JSONB for one-click restore and comparison
+- `page_views` — Page view tracking for analytics with project, path, referrer, browser, device, OS, session/visitor IDs
 
 ## Template System
 
@@ -231,12 +244,13 @@ Routes in `artifacts/api-server/src/routes/`:
 - `monitoring.ts` — System health, stats, performance, alerts for production monitoring
 - `sandbox.ts` — Sandbox lifecycle management, SSE streaming
 - `snapshots.ts` — CRUD for project snapshots (backup/restore), compare with current files
+- `analytics.ts` — Page view tracking (public) + analytics data endpoints (auth required)
 
 ## Website Builder UI
 
 Frontend artifact at `artifacts/website-builder/` (React + Vite + TailwindCSS):
 - Bilingual AR/EN with RTL/LTR support via i18n context (`src/lib/i18n.tsx`)
-- Pages: Login, Dashboard, Builder (project workspace), Billing, Teams, QualityAssurance, Monitoring
+- Pages: Login, Dashboard, Builder (project workspace), Billing, Teams, QualityAssurance, Monitoring, Analytics
 - Dashboard: project list with status badges, token usage indicator, new project modal, Billing link
 - Builder: chat prompt, live preview (sandboxed iframe with CSS/JS inlining), execution log panel
 - Billing: current subscription, credit balance + top-up, plan comparison, invoice history

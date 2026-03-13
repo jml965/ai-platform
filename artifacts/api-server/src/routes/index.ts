@@ -17,12 +17,14 @@ import notificationsRouter from "./notifications";
 import snapshotsRouter from "./snapshots";
 import templatesRouter from "./templates";
 import pwaRouter from "./pwa";
+import analyticsRouter from "./analytics";
 import { requireAuth } from "../middlewares/authSession";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(authRouter);
+router.use(analyticsRouter);
 
 router.use(requireAuth);
 router.use(projectsRouter);

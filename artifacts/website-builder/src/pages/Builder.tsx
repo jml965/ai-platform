@@ -6,7 +6,7 @@ import {
   FileCode2, User, Bot, Search, ChevronRight, ChevronDown,
   FileText, FileJson, FileImage, File, Folder, ArrowLeft, Clock,
   RotateCw, Monitor, Smartphone, Tablet, Laptop, ChevronLeft,
-  Terminal as TerminalIcon, Rocket, ExternalLink, Square, RefreshCw, Globe, Archive,
+  Terminal as TerminalIcon, Rocket, ExternalLink, Square, RefreshCw, Globe, Archive, BarChart3,
   Smartphone as SmartphoneIcon
 } from "lucide-react";
 import { format } from "date-fns";
@@ -381,6 +381,13 @@ export default function Builder() {
             {isBuilding && <span className="w-1.5 h-1.5 rounded-full bg-[#58a6ff] animate-pulse" />}
             {t.agent_label} • {actionCount}
           </span>
+          <Link
+            href={`/project/${id}/analytics`}
+            className="text-[11px] px-2.5 py-1 rounded-full font-medium flex items-center gap-1.5 flex-shrink-0 transition-all bg-[#d2a8ff]/10 text-[#d2a8ff] hover:bg-[#d2a8ff]/20"
+          >
+            <BarChart3 className="w-3 h-3" />
+            {t.analytics}
+          </Link>
           <button
             onClick={() => { setShowPwaPanel(v => !v); setShowDeployPanel(false); }}
             className={cn(

@@ -5,6 +5,7 @@ import { I18nProvider } from "@/lib/i18n";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import Builder from "@/pages/Builder";
+import Analytics from "@/pages/Analytics";
 import Billing from "@/pages/Billing";
 import Teams from "@/pages/Teams";
 import QualityAssurance from "@/pages/QualityAssurance";
@@ -49,6 +50,9 @@ function Router() {
       </Route>
       <Route path="/project/:id">
         <AuthGuard><Builder /></AuthGuard>
+      </Route>
+      <Route path="/project/:id/analytics">
+        <AuthGuard><Analytics /></AuthGuard>
       </Route>
       <Route path="/billing">
         <AuthGuard><Billing /></AuthGuard>

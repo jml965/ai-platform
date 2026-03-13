@@ -22,3 +22,4 @@ export * from "./notification-preferences";
 export * from "./domains";
 export * from "./snapshots";
 export * from "./pwa-settings";
+export * from "./page-views";
