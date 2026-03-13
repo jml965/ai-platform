@@ -4,6 +4,7 @@ import { db } from "@workspace/db";
 import { projectsTable, usersTable, projectFilesTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import { getUserId } from "../middlewares/permissions";
+import { startBuild, checkBuildLimits } from "../lib/agents/execution-engine";
 
 const router: IRouter = Router();
 
@@ -23,7 +24,7 @@ Format: {"reply":"your short reply","action":"build"} or {"reply":"your short re
 
 Rules:
 - action="build" for ANY request to create, modify, build, edit, change, fix, add, remove, update a website or any part of it
-- action="build" for commands like "نفذ", "ابدأ", "اعمل", "غير", "عدل", "build", "create", "make", "start", "do it"
+- action="build" for commands like "نفذ", "ابدأ", "اعمل", "غير", "عدل", "build", "create", "make", "start", "do it", "كمل"
 - action="chat" ONLY for pure questions, greetings, or discussions with NO build intent
 - Keep reply to 1-2 sentences max
 - Reply in the same language as the user
@@ -128,18 +129,18 @@ router.post("/chat/message", async (req, res) => {
             shouldBuild = parsed.action === "build";
           } catch {
             reply = cleaned.replace(/[{}"\n]/g, " ").trim();
-            const buildKeywords = /build|اعمل|ابن|نفذ|ابدأ|غير|عدل|أبدأ|حاضر.*بناء|سأبدأ|سأبني/i;
+            const buildKeywords = /build|اعمل|ابن|نفذ|ابدأ|غير|عدل|أبدأ|حاضر.*بناء|سأبدأ|سأبني|كمل/i;
             shouldBuild = buildKeywords.test(reply) || buildKeywords.test(message);
           }
         } else {
           reply = cleaned.replace(/[{}"\n]/g, " ").trim() || rawReply;
-          const buildKeywords = /build|create|make|اعمل|ابن|نفذ|ابدأ|غير|عدل|صمم|أنشئ/i;
+          const buildKeywords = /build|create|make|اعمل|ابن|نفذ|ابدأ|غير|عدل|صمم|أنشئ|كمل/i;
           shouldBuild = buildKeywords.test(message);
         }
       }
     } catch {
       reply = rawReply;
-      const buildKeywords = /build|create|make|اعمل|ابن|نفذ|ابدأ|غير|عدل|صمم|أنشئ/i;
+      const buildKeywords = /build|create|make|اعمل|ابن|نفذ|ابدأ|غير|عدل|صمم|أنشئ|كمل/i;
       shouldBuild = buildKeywords.test(message);
     }
 
@@ -155,11 +156,37 @@ router.post("/chat/message", async (req, res) => {
       })
       .where(eq(usersTable.id, userId));
 
-    console.log("[CHAT] Final result - shouldBuild:", shouldBuild, "reply:", reply.substring(0, 80));
+    let buildId: string | undefined;
+
+    if (shouldBuild && projectId && project) {
+      try {
+        if (project.status === "building") {
+          console.log("[CHAT] Project already building, skipping build start");
+        } else {
+          const limitCheck = await checkBuildLimits(userId, projectId);
+          if (limitCheck.allowed) {
+            console.log("[CHAT] Starting build for project:", projectId);
+            buildId = await startBuild(projectId, userId, message);
+            console.log("[CHAT] Build started successfully:", buildId);
+          } else {
+            console.log("[CHAT] Build limit reached:", limitCheck.reason);
+            reply += "\n⚠️ " + (limitCheck.reasonAr || limitCheck.reason || "تم الوصول للحد الأقصى");
+            shouldBuild = false;
+          }
+        }
+      } catch (buildErr: any) {
+        console.error("[CHAT] Failed to start build:", buildErr);
+        reply += "\n⚠️ " + (buildErr?.message || "فشل بدء البناء");
+        shouldBuild = false;
+      }
+    }
+
+    console.log("[CHAT] Final result - shouldBuild:", shouldBuild, "buildId:", buildId, "reply:", reply.substring(0, 80));
 
     res.json({
       reply,
       shouldBuild,
+      buildId,
       buildPrompt: shouldBuild ? message : undefined,
       tokensUsed,
       costUsd: parseFloat(costUsd.toFixed(6)),

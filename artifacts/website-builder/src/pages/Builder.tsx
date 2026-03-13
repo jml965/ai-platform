@@ -336,7 +336,7 @@ export default function Builder() {
       throw new Error(err?.error?.message || "Chat failed");
     }
 
-    return res.json() as Promise<{ reply: string; shouldBuild: boolean; buildPrompt?: string; tokensUsed: number; costUsd: number }>;
+    return res.json() as Promise<{ reply: string; shouldBuild: boolean; buildId?: string; buildPrompt?: string; tokensUsed: number; costUsd: number }>;
   }, [id]);
 
   const handleGenerate = async () => {
@@ -363,53 +363,26 @@ export default function Builder() {
         timestamp: new Date(),
       }]);
 
-      console.log("[CHAT] shouldBuild:", chatRes.shouldBuild, "buildPrompt:", chatRes.buildPrompt);
-      if (chatRes.shouldBuild) {
-        try {
-          const buildPrompt = chatRes.buildPrompt || currentPrompt;
-          console.log("[BUILD] Starting build with prompt:", buildPrompt);
-          const baseUrl = import.meta.env.VITE_API_URL || "";
-          const buildResponse = await fetch(`${baseUrl}/api/build/start`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ projectId: id, prompt: buildPrompt }),
-          });
-          const buildData = await buildResponse.json();
-          console.log("[BUILD] Response:", buildResponse.status, JSON.stringify(buildData));
+      if (chatRes.shouldBuild && chatRes.buildId) {
+        console.log("[BUILD] Build started by server:", chatRes.buildId);
+        setActiveBuildId(chatRes.buildId);
+        localStorage.setItem(`latestBuild_${id}`, chatRes.buildId);
+        setPlanApproved(false);
 
-          if (!buildResponse.ok) {
-            throw new Error(buildData?.error?.message_ar || buildData?.error?.message || `Build failed (${buildResponse.status})`);
-          }
-
-          const buildId = buildData.buildId;
-          console.log("[BUILD] Build started successfully:", buildId);
-          setActiveBuildId(buildId);
-          localStorage.setItem(`latestBuild_${id}`, buildId);
-          setPlanApproved(false);
-
-          setMessages(prev => [...prev, {
-            id: crypto.randomUUID(),
-            role: "assistant",
-            content: t.agents_working,
-            buildId,
-            timestamp: new Date(),
-          }]);
-        } catch (err: any) {
-          console.error("[BUILD] Build error:", err);
-          setMessages(prev => [...prev, {
-            id: crypto.randomUUID(),
-            role: "assistant",
-            content: `⚠️ ${err?.message || t.unknown_error}`,
-            timestamp: new Date(),
-          }]);
-        }
+        setMessages(prev => [...prev, {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: t.agents_working,
+          buildId: chatRes.buildId,
+          timestamp: new Date(),
+        }]);
       }
-    } catch (err) {
+    } catch (err: any) {
+      console.error("[FLOW] Error:", err);
       setMessages(prev => [...prev, {
         id: crypto.randomUUID(),
         role: "assistant",
-        content: t.unknown_error,
+        content: `⚠️ ${err?.message || t.unknown_error}`,
         timestamp: new Date(),
       }]);
     } finally {
