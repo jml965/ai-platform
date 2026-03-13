@@ -63,6 +63,7 @@ export default function Builder() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const [prompt, setPrompt] = useState("");
+  const autoPromptProcessed = useRef(false);
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const saved = localStorage.getItem(`chat_${id}`);
     if (saved) {
@@ -459,6 +460,27 @@ export default function Builder() {
       setIsChatLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (autoPromptProcessed.current || !id) return;
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialPrompt = urlParams.get("prompt");
+    if (initialPrompt && initialPrompt.trim()) {
+      autoPromptProcessed.current = true;
+      window.history.replaceState({}, "", window.location.pathname);
+      const idea = initialPrompt.trim();
+      console.log("[AUTO-PROMPT] Starting build with idea:", idea);
+      setTimeout(() => {
+        setPrompt(idea);
+        setTimeout(() => {
+          const btn = document.querySelector("[data-auto-submit]") as HTMLButtonElement;
+          if (btn && !btn.disabled) {
+            btn.click();
+          }
+        }, 300);
+      }, 1500);
+    }
+  }, [id]);
 
   const handleDeploy = async () => {
     if (!id) return;
@@ -1257,6 +1279,7 @@ export default function Builder() {
               }}
             />
             <button
+              data-auto-submit
               onClick={handleGenerate}
               disabled={isBuilding || !prompt.trim()}
               className="absolute end-2 bottom-2 p-1.5 bg-[#1f6feb] text-white rounded-md hover:bg-[#388bfd] disabled:opacity-40 disabled:hover:bg-[#1f6feb] transition-colors"
