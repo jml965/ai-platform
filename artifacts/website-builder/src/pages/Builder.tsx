@@ -86,7 +86,6 @@ export default function Builder() {
   });
   const [lastCompletedBuildId, setLastCompletedBuildId] = useState<string | null>(null);
   const [retainedLogs, setRetainedLogs] = useState<ExecutionLog[]>([]);
-  const [centerTab, setCenterTab] = useState<"canvas" | "domains" | "seo">("canvas");
   const [selectedFileIndex, setSelectedFileIndex] = useState(0);
   const [selectedDevice, setSelectedDevice] = useState("responsive");
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -94,7 +93,7 @@ export default function Builder() {
   const [showDeviceMenu, setShowDeviceMenu] = useState(false);
   
   const [planApproved, setPlanApproved] = useState(false);
-  const [rightTab, setRightTab] = useState<"code" | "library" | "snapshots" | "plugins" | "collab">("code");
+  const [rightTab, setRightTab] = useState<"code" | "library" | "snapshots" | "plugins" | "collab" | "domains" | "seo">("code");
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const [showDeployPanel, setShowDeployPanel] = useState(false);
@@ -188,7 +187,6 @@ export default function Builder() {
     } else {
       cssEditor.activate();
       setCssEditorActive(true);
-      setCenterTab("canvas");
     }
   }, [cssEditorActive, cssEditor]);
 
@@ -1699,65 +1697,7 @@ export default function Builder() {
       <div className="flex-1 flex flex-col border-e border-[#1c2333] min-w-0">
         <BuildProgress currentPhase={currentPhase} failed={phaseFailed} allComplete={buildStatus?.status === "completed"} />
 
-        <div className="h-9 flex items-center border-b border-[#1c2333] bg-[#161b22] px-1 flex-shrink-0">
-          <button
-            onClick={() => setCenterTab("canvas")}
-            className={cn(
-              "px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5",
-              centerTab === "canvas"
-                ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
-                : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
-            )}
-          >
-            <Eye className="w-3.5 h-3.5" />
-            {t.canvas_tab}
-          </button>
-          <button
-            onClick={() => setCenterTab("domains")}
-            className={cn(
-              "px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5",
-              centerTab === "domains"
-                ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
-                : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
-            )}
-          >
-            <Globe className="w-3.5 h-3.5" />
-            {t.domain_settings}
-          </button>
-          <button
-            onClick={() => setCenterTab("seo")}
-            className={cn(
-              "px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5",
-              centerTab === "seo"
-                ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
-                : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
-            )}
-          >
-            <Search className="w-3.5 h-3.5" />
-            {t.seo_tab}
-          </button>
-
-          <div className="flex-1" />
-
-          {(hasPreview || previewUrl) && !isBuilding && (
-            <button
-              onClick={handleToggleCSSEditor}
-              className={cn(
-                "px-2 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1.5 me-1",
-                cssEditorActive
-                  ? "bg-[#1f6feb]/20 text-[#58a6ff] ring-1 ring-[#1f6feb]/50"
-                  : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
-              )}
-            >
-              <Paintbrush className="w-3.5 h-3.5" />
-              {t.css_editor_tab}
-            </button>
-          )}
-
-          
-        </div>
-
-        {centerTab === "canvas" && (hasPreview || previewUrl) && !isBuilding && (
+        {(hasPreview || previewUrl) && (
           <div className="h-8 flex items-center gap-1 px-2 border-b border-[#1c2333] bg-[#161b22] flex-shrink-0">
             <button
               onClick={handleNavBack}
@@ -1850,61 +1790,67 @@ export default function Builder() {
                 </div>
               )}
             </div>
+            {!isBuilding && (
+              <button
+                onClick={handleToggleCSSEditor}
+                className={cn(
+                  "p-1 rounded transition-colors",
+                  cssEditorActive
+                    ? "text-[#58a6ff] bg-[#1f6feb]/20"
+                    : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
+                )}
+                title={t.css_editor_tab}
+              >
+                <Paintbrush className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         )}
 
         <div className="flex-1 relative bg-[#0d1117] overflow-hidden flex flex-col" onClick={() => showDeviceMenu && setShowDeviceMenu(false)}>
-          <div className="flex-1 overflow-hidden">
-            {centerTab === "seo" ? (
-              <div className="h-full overflow-y-auto">
-                <SeoPanel projectId={id || ""} />
-              </div>
-            ) : centerTab === "domains" ? (
-              <div className="h-full overflow-y-auto">
-                <DomainSettings projectId={id || ""} />
-              </div>
+          <div className="flex-1 overflow-hidden relative">
+            {(hasPreview || previewUrl) ? (
+              <DevicePreviewFrame device={currentDevice} previewKey={previewKey}>
+                {previewUrl ? (
+                  <iframe
+                    key={`url-${previewKey}`}
+                    ref={iframeRef}
+                    src={previewUrl}
+                    className="border-0 bg-white"
+                    style={{ width: "100%", height: "100%", display: "block" }}
+                    title={t.live_preview}
+                  />
+                ) : (
+                  <iframe
+                    key={`doc-${previewKey}`}
+                    ref={iframeRef}
+                    srcDoc={buildPreviewHtml()}
+                    sandbox="allow-scripts"
+                    className="border-0 bg-white"
+                    style={{ width: "100%", height: "100%", display: "block" }}
+                    title={t.live_preview}
+                  />
+                )}
+              </DevicePreviewFrame>
             ) : (
-              isBuilding ? (
-                <div className="h-full flex flex-col bg-[#0d1117]">
-                  <div className="flex-1 overflow-y-auto p-4">
+              <div className="h-full flex items-center justify-center text-[#484f58]">
+                <div className="text-center">
+                  <Eye className="w-10 h-10 mx-auto mb-3 opacity-40" />
+                  <p className="text-sm">{t.preview_unavailable}</p>
+                </div>
+              </div>
+            )}
+
+            {isBuilding && (
+              <div className="absolute bottom-0 start-0 end-0 z-30">
+                <div className="bg-[#0d1117]/95 backdrop-blur-sm border-t border-[#1c2333] max-h-[280px] overflow-y-auto">
+                  <div className="p-3">
                     <LiveBuildView logs={logs} buildStatus={buildStatus?.status} lang={lang} t={t} />
                   </div>
                 </div>
-              ) : (hasPreview || previewUrl) ? (
-                <DevicePreviewFrame device={currentDevice} previewKey={previewKey}>
-                  {previewUrl ? (
-                    <iframe
-                      key={`url-${previewKey}`}
-                      ref={iframeRef}
-                      src={previewUrl}
-                      className="border-0 bg-white"
-                      style={{ width: "100%", height: "100%", display: "block" }}
-                      title={t.live_preview}
-                    />
-                  ) : (
-                    <iframe
-                      key={`doc-${previewKey}`}
-                      ref={iframeRef}
-                      srcDoc={buildPreviewHtml()}
-                      sandbox="allow-scripts"
-                      className="border-0 bg-white"
-                      style={{ width: "100%", height: "100%", display: "block" }}
-                      title={t.live_preview}
-                    />
-                  )}
-                </DevicePreviewFrame>
-              ) : (
-                <div className="h-full flex items-center justify-center text-[#484f58]">
-                  <div className="text-center">
-                    <Eye className="w-10 h-10 mx-auto mb-3 opacity-40" />
-                    <p className="text-sm">{t.preview_unavailable}</p>
-                  </div>
-                </div>
-              )
+              </div>
             )}
           </div>
-
-          
         </div>
       </div>
 
@@ -2011,6 +1957,30 @@ export default function Builder() {
                   {collaborators.length}
                 </span>
               )}
+            </button>
+            <button
+              onClick={() => setRightTab("domains")}
+              className={cn(
+                "px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1",
+                rightTab === "domains"
+                  ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
+                  : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
+              )}
+            >
+              <Globe className="w-3 h-3" />
+              {t.domain_settings}
+            </button>
+            <button
+              onClick={() => setRightTab("seo")}
+              className={cn(
+                "px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1",
+                rightTab === "seo"
+                  ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
+                  : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
+              )}
+            >
+              <Search className="w-3 h-3" />
+              {t.seo_tab}
             </button>
           </div>
 
@@ -2133,6 +2103,14 @@ export default function Builder() {
             id ? <PluginStore projectId={id} /> : null
           ) : rightTab === "snapshots" ? (
             id ? <SnapshotsPanel projectId={id} /> : null
+          ) : rightTab === "domains" ? (
+            <div className="flex-1 overflow-y-auto">
+              <DomainSettings projectId={id || ""} />
+            </div>
+          ) : rightTab === "seo" ? (
+            <div className="flex-1 overflow-y-auto">
+              <SeoPanel projectId={id || ""} />
+            </div>
           ) : (
             <CollaborationPanel
               collaborators={collaborators}
