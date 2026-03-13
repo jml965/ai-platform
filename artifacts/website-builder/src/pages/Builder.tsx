@@ -7,7 +7,7 @@ import {
   FileCode2, User, Bot, Search, ChevronRight, ChevronDown,
   FileText, FileJson, FileImage, File, Folder, ArrowLeft, Clock,
   RotateCw, Monitor, Smartphone, Tablet, Laptop, ChevronLeft,
-  Terminal as TerminalIcon, Rocket, ExternalLink, Square, RefreshCw, Globe, Archive, BarChart3,
+  Rocket, ExternalLink, Square, RefreshCw, Globe, Archive, BarChart3,
   Smartphone as SmartphoneIcon, Users, Lock, Unlock, Paintbrush, Puzzle, Languages
 } from "lucide-react";
 import { format } from "date-fns";
@@ -28,7 +28,6 @@ import {
   useUndeployProject,
   useRedeployProject,
 } from "@workspace/api-client-react";
-import BuildTerminal from "@/components/builder/Terminal";
 import BuildProgress, { inferPhase } from "@/components/builder/BuildProgress";
 import CodeEditor from "@/components/builder/CodeEditor";
 import ProjectPlan from "@/components/builder/ProjectPlan";
@@ -73,14 +72,14 @@ export default function Builder() {
   const [activeBuildId, setActiveBuildId] = useState<string | null>(() => {
     return localStorage.getItem(`latestBuild_${id}`);
   });
-  const [centerTab, setCenterTab] = useState<"canvas" | "code" | "domains" | "seo">("canvas");
+  const [centerTab, setCenterTab] = useState<"canvas" | "domains" | "seo">("canvas");
   const [selectedFileIndex, setSelectedFileIndex] = useState(0);
   const [selectedDevice, setSelectedDevice] = useState("responsive");
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showDeviceMenu, setShowDeviceMenu] = useState(false);
-  const [showTerminal, setShowTerminal] = useState(true);
+  
   const [planApproved, setPlanApproved] = useState(false);
-  const [rightTab, setRightTab] = useState<"library" | "snapshots" | "plugins" | "collab">("library");
+  const [rightTab, setRightTab] = useState<"code" | "library" | "snapshots" | "plugins" | "collab">("code");
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const [showDeployPanel, setShowDeployPanel] = useState(false);
@@ -770,6 +769,57 @@ export default function Builder() {
               </div>
             </div>
           )}
+
+          {logs.length > 0 && (
+            <div className="space-y-2 mt-2">
+              <div className="flex items-center gap-2 px-1">
+                <div className="flex-1 h-px bg-[#1c2333]" />
+                <span className="text-[10px] text-[#8b949e] font-semibold uppercase tracking-wider">{t.execution_log}</span>
+                <div className="flex-1 h-px bg-[#1c2333]" />
+              </div>
+              {logs.map((log, i) => {
+                const time = log.createdAt ? new Date(log.createdAt).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
+                const isCompleted = log.status === "completed" || log.status === "success";
+                const isFailed = log.status === "failed" || log.status === "error";
+                const isRunning = log.status === "in_progress" || log.status === "running" || log.status === "pending";
+                const detailStr = log.details && typeof log.details === "object"
+                  ? Object.entries(log.details as Record<string, unknown>).filter(([k]) => k !== "type").map(([k, v]) => `${k} ${typeof v === "string" ? v : JSON.stringify(v)}`).join("  ")
+                  : "";
+                return (
+                  <motion.div
+                    key={log.id || i}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="flex items-center gap-3 bg-[#161b22] border border-[#1c2333] rounded-xl px-3 py-2.5"
+                  >
+                    <span className="text-[11px] text-[#484f58] font-mono flex-shrink-0">{time}</span>
+                    <div className="flex-1 min-w-0 text-center">
+                      <p className="text-[12px] font-bold text-[#e1e4e8] uppercase tracking-wide">{log.agentType || "SYSTEM"}</p>
+                      <p className="text-[11px] text-[#8b949e]">{log.action}</p>
+                      {detailStr && <p className="text-[10px] text-[#484f58] font-mono mt-0.5">{detailStr}</p>}
+                    </div>
+                    <div className={cn(
+                      "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 border-2",
+                      isCompleted ? "border-emerald-500/50 bg-emerald-500/10" :
+                      isFailed ? "border-red-400/50 bg-red-400/10" :
+                      isRunning ? "border-[#58a6ff]/50 bg-[#58a6ff]/10" :
+                      "border-[#8b949e]/30 bg-[#8b949e]/5"
+                    )}>
+                      {isCompleted ? (
+                        <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                      ) : isFailed ? (
+                        <span className="text-red-400 text-sm font-bold">!</span>
+                      ) : (
+                        <Loader2 className="w-4 h-4 text-[#58a6ff] animate-spin" />
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
+
           <div ref={chatEndRef} />
         </div>
 
@@ -819,18 +869,6 @@ export default function Builder() {
             {t.canvas_tab}
           </button>
           <button
-            onClick={() => setCenterTab("code")}
-            className={cn(
-              "px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5",
-              centerTab === "code"
-                ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
-                : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
-            )}
-          >
-            <Code2 className="w-3.5 h-3.5" />
-            {t.code_tab}
-          </button>
-          <button
             onClick={() => setCenterTab("domains")}
             className={cn(
               "px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5",
@@ -872,18 +910,7 @@ export default function Builder() {
             </button>
           )}
 
-          <button
-            onClick={() => setShowTerminal(v => !v)}
-            className={cn(
-              "px-2 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1.5 me-1",
-              showTerminal
-                ? "bg-[#0d1117] text-[#e1e4e8]"
-                : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
-            )}
-          >
-            <TerminalIcon className="w-3.5 h-3.5" />
-            {t.terminal}
-          </button>
+          
         </div>
 
         {centerTab === "canvas" && (hasPreview || previewUrl) && !isBuilding && (
@@ -992,7 +1019,7 @@ export default function Builder() {
               <div className="h-full overflow-y-auto">
                 <DomainSettings projectId={id || ""} />
               </div>
-            ) : centerTab === "canvas" ? (
+            ) : (
               isBuilding ? (
                 <div className="h-full flex items-center justify-center">
                   <div className="flex flex-col items-center">
@@ -1043,19 +1070,111 @@ export default function Builder() {
                   </div>
                 </div>
               )
-            ) : (
-              <div className="h-full flex">
-                <div className="w-[200px] flex flex-col border-e border-[#1c2333] bg-[#0d1117] flex-shrink-0">
-                  <div className="h-8 flex items-center px-3 border-b border-[#1c2333] bg-[#161b22]">
-                    <span className="text-[11px] font-semibold text-[#8b949e] uppercase tracking-wider">{t.explorer}</span>
-                  </div>
+            )}
+          </div>
+
+          
+        </div>
+      </div>
+
+      {cssEditorActive ? (
+        <CSSEditorPanel
+          selectedElement={cssEditor.selectedElement}
+          onChangeProperty={cssEditor.changeProperty}
+          onUndo={cssEditor.undo}
+          onRedo={cssEditor.redo}
+          onSave={handleSaveCSS}
+          onClose={handleToggleCSSEditor}
+          onClear={cssEditor.clearAll}
+          canUndo={cssEditor.canUndo}
+          canRedo={cssEditor.canRedo}
+          changeCount={cssEditor.changeCount}
+          generatedCSS={cssEditor.generateCSS()}
+          isSaving={cssSaving}
+        />
+      ) : (
+        <div className="w-[340px] flex flex-col bg-[#0d1117] flex-shrink-0 border-s border-[#1c2333]">
+          <div className="h-9 flex items-center border-b border-[#1c2333] bg-[#161b22] flex-shrink-0 px-1 overflow-x-auto">
+            <button
+              onClick={() => setRightTab("code")}
+              className={cn(
+                "px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1",
+                rightTab === "code"
+                  ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
+                  : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
+              )}
+            >
+              <Code2 className="w-3 h-3" />
+              {t.code_tab}
+            </button>
+            <button
+              onClick={() => setRightTab("library")}
+              className={cn(
+                "px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors",
+                rightTab === "library"
+                  ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
+                  : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
+              )}
+            >
+              {t.library}
+            </button>
+            <button
+              onClick={() => setRightTab("plugins")}
+              className={cn(
+                "px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1",
+                rightTab === "plugins"
+                  ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
+                  : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
+              )}
+            >
+              <Puzzle className="w-3 h-3" />
+              {t.plugin_store}
+            </button>
+            <button
+              onClick={() => setRightTab("snapshots")}
+              className={cn(
+                "px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1",
+                rightTab === "snapshots"
+                  ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
+                  : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
+              )}
+            >
+              <Archive className="w-3 h-3" />
+              {t.snapshots}
+            </button>
+            <button
+              onClick={() => setRightTab("collab")}
+              className={cn(
+                "px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1.5",
+                rightTab === "collab"
+                  ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
+                  : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
+              )}
+            >
+              <Users className="w-3 h-3" />
+              {t.collab_panel_title}
+              {collaborators.length > 1 && (
+                <span className="text-[9px] bg-[#1f6feb]/20 text-[#58a6ff] px-1.5 rounded-full">
+                  {collaborators.length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {rightTab === "code" ? (
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="h-8 flex items-center px-3 border-b border-[#1c2333] bg-[#161b22]">
+                <span className="text-[11px] font-semibold text-[#8b949e] uppercase tracking-wider">{t.explorer}</span>
+              </div>
+              <div className="flex-1 flex flex-col min-h-0">
+                <div className="max-h-[200px] overflow-y-auto border-b border-[#1c2333]">
                   <InlineFileTree
                     files={files}
                     selectedIndex={selectedFileIndex}
                     onFileSelect={setSelectedFileIndex}
                   />
                 </div>
-                <div className="flex-1 flex flex-col min-w-0">
+                <div className="flex-1 flex flex-col min-h-0">
                   {files.length > 0 ? (
                     <>
                       <div className="flex items-center gap-1 px-2 py-1.5 border-b border-[#1c2333] bg-[#161b22] overflow-x-auto flex-shrink-0">
@@ -1078,7 +1197,6 @@ export default function Builder() {
                               <FileCode2 className="w-3 h-3" />
                               {fp.split('/').pop() || `file-${i}`}
                               <FileLockIndicator filePath={fp} fileLocks={fileLocks} currentUserId={me?.id} />
-                              <span className="text-[9px] text-[#484f58] font-sans">{getFileDescription(fp, t as unknown as Record<string, string>)}</span>
                             </button>
                           );
                         })}
@@ -1137,92 +1255,9 @@ export default function Builder() {
                   )}
                 </div>
               </div>
-            )}
-          </div>
-
-          {showTerminal && (
-            <BuildTerminal
-              logs={logs}
-              isBuilding={isBuilding}
-            />
-          )}
-        </div>
-      </div>
-
-      {cssEditorActive ? (
-        <CSSEditorPanel
-          selectedElement={cssEditor.selectedElement}
-          onChangeProperty={cssEditor.changeProperty}
-          onUndo={cssEditor.undo}
-          onRedo={cssEditor.redo}
-          onSave={handleSaveCSS}
-          onClose={handleToggleCSSEditor}
-          onClear={cssEditor.clearAll}
-          canUndo={cssEditor.canUndo}
-          canRedo={cssEditor.canRedo}
-          changeCount={cssEditor.changeCount}
-          generatedCSS={cssEditor.generateCSS()}
-          isSaving={cssSaving}
-        />
-      ) : (
-        <div className="w-[240px] flex flex-col bg-[#0d1117] flex-shrink-0">
-          <div className="h-9 flex items-center border-b border-[#1c2333] bg-[#161b22] flex-shrink-0 px-1">
-            <button
-              onClick={() => setRightTab("library")}
-              className={cn(
-                "px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors",
-                rightTab === "library"
-                  ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
-                  : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
-              )}
-            >
-              {t.library}
-            </button>
-            <button
-              onClick={() => setRightTab("plugins")}
-              className={cn(
-                "px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1",
-                rightTab === "plugins"
-                  ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
-                  : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
-              )}
-            >
-              <Puzzle className="w-3 h-3" />
-              {t.plugin_store}
-            </button>
-            <button
-              onClick={() => setRightTab("snapshots")}
-              className={cn(
-                "px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1",
-                rightTab === "snapshots"
-                  ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
-                  : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
-              )}
-            >
-              <Archive className="w-3 h-3" />
-              {t.snapshots}
-            </button>
-            <button
-              onClick={() => setRightTab("collab")}
-              className={cn(
-                "px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1.5",
-                rightTab === "collab"
-                  ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
-                  : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
-              )}
-            >
-              <Users className="w-3 h-3" />
-              {t.collab_panel_title}
-              {collaborators.length > 1 && (
-                <span className="text-[9px] bg-[#1f6feb]/20 text-[#58a6ff] px-1.5 rounded-full">
-                  {collaborators.length}
-                </span>
-              )}
-            </button>
-          </div>
-
-          {rightTab === "library" ? (
-            <FileLibrary files={files} onFileSelect={(idx) => { setSelectedFileIndex(idx); setCenterTab("code"); }} />
+            </div>
+          ) : rightTab === "library" ? (
+            <FileLibrary files={files} onFileSelect={(idx) => { setSelectedFileIndex(idx); setRightTab("code"); }} />
           ) : rightTab === "plugins" ? (
             id ? <PluginStore projectId={id} /> : null
           ) : rightTab === "snapshots" ? (
