@@ -51,6 +51,9 @@ interface ChatMessage {
   buildId?: string;
   timestamp: Date;
   plan?: { title: string; description?: string; status?: "pending" | "done" | "active" }[];
+  isLog?: boolean;
+  logAgent?: string;
+  logStatus?: "running" | "done" | "error";
 }
 
 export default function Builder() {
@@ -235,25 +238,77 @@ export default function Builder() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const prevLogCountRef = React.useRef(0);
+
+  useEffect(() => {
+    if (!activeBuildId || !logs.length) return;
+    const newLogs = logs.slice(prevLogCountRef.current);
+    if (newLogs.length === 0) return;
+    prevLogCountRef.current = logs.length;
+
+    const agentNames: Record<string, { en: string; ar: string }> = {
+      planner: { en: "Planner", ar: "المخطط" },
+      codegen: { en: "Code Generator", ar: "مولّد الكود" },
+      reviewer: { en: "Code Reviewer", ar: "المراجع" },
+      fixer: { en: "Code Fixer", ar: "المصلح" },
+      surgical_edit: { en: "Editor", ar: "المحرر" },
+      package_runner: { en: "Runner", ar: "المشغّل" },
+      qa: { en: "QA", ar: "ضمان الجودة" },
+      filemanager: { en: "File Manager", ar: "مدير الملفات" },
+    };
+
+    const statusIcons: Record<string, string> = {
+      started: "🔄",
+      completed: "✅",
+      failed: "❌",
+      in_progress: "⏳",
+    };
+
+    const logMessages: ChatMessage[] = newLogs.map(log => {
+      const agent = agentNames[log.agentType] || { en: log.agentType, ar: log.agentType };
+      const agentLabel = lang === "ar" ? agent.ar : agent.en;
+      const icon = statusIcons[log.status] || "📋";
+      const action = log.action || "";
+      const logStatus = log.status === "completed" ? "done" as const : log.status === "failed" ? "error" as const : "running" as const;
+
+      return {
+        id: `log-${log.id || crypto.randomUUID()}`,
+        role: "assistant" as const,
+        content: `${icon} **${agentLabel}** — ${action}`,
+        buildId: activeBuildId,
+        timestamp: new Date(log.createdAt || Date.now()),
+        isLog: true,
+        logAgent: log.agentType,
+        logStatus,
+      };
+    });
+
+    if (logMessages.length > 0) {
+      setMessages(prev => [...prev, ...logMessages]);
+    }
+  }, [logs, activeBuildId, lang]);
+
   useEffect(() => {
     if (buildStatus?.status === "completed" && activeBuildId) {
-      const alreadyReplied = messages.some(m => m.buildId === activeBuildId && m.role === "assistant");
+      const alreadyReplied = messages.some(m => m.buildId === activeBuildId && m.content === t.preview_ready);
       if (!alreadyReplied) {
+        prevLogCountRef.current = 0;
         setMessages(prev => [...prev, {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: t.preview_ready,
+          content: `✅ ${t.preview_ready}`,
           buildId: activeBuildId,
           timestamp: new Date(),
         }]);
       }
     } else if (buildStatus?.status === "failed" && activeBuildId) {
-      const alreadyReplied = messages.some(m => m.buildId === activeBuildId && m.role === "assistant");
+      const alreadyReplied = messages.some(m => m.buildId === activeBuildId && m.content?.includes(t.status_failed));
       if (!alreadyReplied) {
+        prevLogCountRef.current = 0;
         setMessages(prev => [...prev, {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: t.status_failed,
+          content: `❌ ${t.status_failed}`,
           buildId: activeBuildId,
           timestamp: new Date(),
         }]);
