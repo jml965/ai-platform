@@ -115,6 +115,8 @@ router.post("/chat/message", async (req, res) => {
         .replace(/```\s*/g, "")
         .trim();
 
+      const buildKeywords = /\b(build|create|make|start|do it|go|execute)\b|اعمل|ابن[يِ]?|نفذ|ابدأ|أبدأ|غير|عدل|صمم|أنشئ|كمل|سو[يّ]|اسو[يِ]|ابني/i;
+
       const jsonMatch = cleaned.match(/\{"reply"\s*:\s*"[^"]*"\s*,\s*"action"\s*:\s*"(?:build|chat)"\s*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
@@ -129,18 +131,21 @@ router.post("/chat/message", async (req, res) => {
             shouldBuild = parsed.action === "build";
           } catch {
             reply = cleaned.replace(/[{}"\n]/g, " ").trim();
-            const buildKeywords = /build|اعمل|ابن|نفذ|ابدأ|غير|عدل|أبدأ|حاضر.*بناء|سأبدأ|سأبني|كمل/i;
             shouldBuild = buildKeywords.test(reply) || buildKeywords.test(message);
           }
         } else {
           reply = cleaned.replace(/[{}"\n]/g, " ").trim() || rawReply;
-          const buildKeywords = /build|create|make|اعمل|ابن|نفذ|ابدأ|غير|عدل|صمم|أنشئ|كمل/i;
           shouldBuild = buildKeywords.test(message);
         }
       }
+
+      if (!shouldBuild && buildKeywords.test(message)) {
+        shouldBuild = true;
+        console.log("[CHAT] Build keyword override: user message contains build intent");
+      }
     } catch {
       reply = rawReply;
-      const buildKeywords = /build|create|make|اعمل|ابن|نفذ|ابدأ|غير|عدل|صمم|أنشئ|كمل/i;
+      const buildKeywords = /\b(build|create|make|start|do it|go|execute)\b|اعمل|ابن[يِ]?|نفذ|ابدأ|أبدأ|غير|عدل|صمم|أنشئ|كمل|سو[يّ]|اسو[يِ]|ابني/i;
       shouldBuild = buildKeywords.test(message);
     }
 

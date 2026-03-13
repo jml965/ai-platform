@@ -30,9 +30,9 @@ const DEFAULT_CODE_QUALITY_RULES: CodeQualityRules = {
 };
 
 const DEFAULT_CONSTITUTION: AgentConstitution = {
-  maxTokensPerCall: 16384,
+  maxTokensPerCall: 32000,
   maxRetriesPerTask: 3,
-  maxTotalTokensPerBuild: 200000,
+  maxTotalTokensPerBuild: 500000,
   allowedFileExtensions: [
     ".html", ".css", ".js", ".ts", ".tsx", ".jsx",
     ".json", ".svg", ".md", ".txt",

@@ -201,6 +201,75 @@ IMPORTANT:
     return Array.from(fileMap.values());
   }
 
+  private repairTruncatedJson(jsonStr: string): string {
+    let s = jsonStr;
+    let inString = false;
+    let escaped = false;
+    const stack: string[] = [];
+    let lastValidPos = 0;
+
+    for (let i = 0; i < s.length; i++) {
+      const ch = s[i];
+      if (inString) {
+        if (escaped) { escaped = false; continue; }
+        if (ch === "\\") { escaped = true; continue; }
+        if (ch === '"') { inString = false; lastValidPos = i; }
+      } else {
+        if (ch === '"') { inString = true; continue; }
+        if (ch === "{" || ch === "[") { stack.push(ch); lastValidPos = i; }
+        else if (ch === "}" || ch === "]") { stack.pop(); lastValidPos = i; }
+      }
+    }
+
+    if (inString) {
+      s = s.substring(0, lastValidPos + 1);
+      inString = false;
+    }
+
+    s = s.replace(/,\s*$/, "");
+
+    const remaining: string[] = [];
+    let stillInString = false;
+    let esc = false;
+    const st2: string[] = [];
+    for (let i = 0; i < s.length; i++) {
+      const ch = s[i];
+      if (stillInString) {
+        if (esc) { esc = false; continue; }
+        if (ch === "\\") { esc = true; continue; }
+        if (ch === '"') { stillInString = false; }
+      } else {
+        if (ch === '"') { stillInString = true; continue; }
+        if (ch === "{" || ch === "[") st2.push(ch);
+        else if (ch === "}" || ch === "]") st2.pop();
+      }
+    }
+
+    for (let i = st2.length - 1; i >= 0; i--) {
+      remaining.push(st2[i] === "{" ? "}" : "]");
+    }
+
+    return s + remaining.join("");
+  }
+
+  private extractCompleteFiles(content: string): GeneratedFile[] {
+    const files: GeneratedFile[] = [];
+    const filePattern = /\{\s*"filePath"\s*:\s*"([^"]+)"\s*,\s*"content"\s*:\s*"((?:[^"\\]|\\.)*)"\s*(?:,\s*"fileType"\s*:\s*"([^"]*)")?\s*\}/g;
+    let match;
+    while ((match = filePattern.exec(content)) !== null) {
+      try {
+        const filePath = JSON.parse(`"${match[1]}"`);
+        const fileContent = JSON.parse(`"${match[2]}"`);
+        files.push({
+          filePath,
+          content: fileContent,
+          fileType: match[3] || filePath.split(".").pop() || "txt",
+        });
+      } catch {}
+    }
+    return files;
+  }
+
   private parseResponse(content: string): {
     framework?: ProjectFramework;
     files: GeneratedFile[];
@@ -214,35 +283,38 @@ IMPORTANT:
     cleaned = cleaned.trim();
 
     let parsed: any;
+
     try {
       parsed = JSON.parse(cleaned);
     } catch {
-      const jsonMatch = cleaned.match(/\{[\s\S]*"files"\s*:\s*\[[\s\S]*\]/);
-      if (!jsonMatch) {
-        throw new Error("Agent did not return valid JSON with files array");
-      }
-      let jsonStr = jsonMatch[0];
-      let braceCount = 0;
-      let endPos = -1;
-      for (let i = 0; i < jsonStr.length; i++) {
-        if (jsonStr[i] === "{") braceCount++;
-        else if (jsonStr[i] === "}") {
-          braceCount--;
-          if (braceCount === 0) { endPos = i; break; }
-        }
-      }
-      if (endPos > 0) {
-        jsonStr = jsonStr.substring(0, endPos + 1);
-      } else {
-        jsonStr += "}";
-      }
       try {
-        parsed = JSON.parse(jsonStr);
-      } catch (e2) {
-        jsonStr = jsonStr
-          .replace(/,\s*([}\]])/g, "$1")
-          .replace(/[\x00-\x1f]/g, (c) => c === "\n" || c === "\r" || c === "\t" ? c : "");
-        parsed = JSON.parse(jsonStr);
+        const repaired = this.repairTruncatedJson(cleaned);
+        parsed = JSON.parse(repaired);
+      } catch {
+        const jsonStart = cleaned.indexOf("{");
+        if (jsonStart >= 0) {
+          try {
+            const repaired = this.repairTruncatedJson(cleaned.substring(jsonStart));
+            parsed = JSON.parse(repaired);
+          } catch {
+            const files = this.extractCompleteFiles(cleaned);
+            if (files.length > 0) {
+              console.log(`[CODEGEN] Recovered ${files.length} files via regex extraction from truncated response`);
+              const frameworkMatch = cleaned.match(/"framework"\s*:\s*"([^"]+)"/);
+              return {
+                framework: frameworkMatch?.[1] as ProjectFramework | undefined,
+                files,
+                directories: [],
+                dependencies: {},
+                devDependencies: {},
+                scripts: {},
+              };
+            }
+            throw new Error("Agent did not return valid JSON with files array");
+          }
+        } else {
+          throw new Error("Agent did not return valid JSON with files array");
+        }
       }
     }
 
