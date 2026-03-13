@@ -384,7 +384,7 @@ export default function Builder() {
           }]);
         } catch (err: any) {
           console.error("[BUILD] Build failed:", err);
-          const errorMsg = err?.response?.data?.error?.message || err?.message || t.unknown_error;
+          const errorMsg = err?.data?.error?.message || err?.data?.error?.message_ar || err?.message || t.unknown_error;
           setMessages(prev => [...prev, {
             id: crypto.randomUUID(),
             role: "assistant",
