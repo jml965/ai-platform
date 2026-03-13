@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./addDomainRequest";
+export * from "./addPluginRequest";
+export * from "./addPluginResponse";
 export * from "./agentsStatusResponse";
 export * from "./agentsStatusResponseAgentsItem";
 export * from "./agentsStatusResponseAgentsItemAgentType";
@@ -28,6 +31,15 @@ export * from "./deploymentListResponse";
 export * from "./deploymentResponse";
 export * from "./deploymentResponseStatus";
 export * from "./deployProjectRequest";
+export * from "./domainListResponse";
+export * from "./domainResponse";
+export * from "./domainResponseStatus";
+export * from "./domainVerifyResponse";
+export * from "./domainVerifyResponseDnsInstructions";
+export * from "./domainVerifyResponseDnsInstructionsARecord";
+export * from "./domainVerifyResponseDnsInstructionsCnameRecord";
+export * from "./domainVerifyResponseDnsInstructionsTxtRecord";
+export * from "./domainVerifyResponseDnsRecordsItem";
 export * from "./errorResponse";
 export * from "./errorResponseError";
 export * from "./executionLog";
@@ -53,6 +65,10 @@ export * from "./paginationMeta";
 export * from "./plan";
 export * from "./planFeatures";
 export * from "./planListResponse";
+export * from "./pluginCategory";
+export * from "./pluginDetail";
+export * from "./pluginListResponse";
+export * from "./pluginSummary";
 export * from "./previewResponse";
 export * from "./previewResponseStatus";
 export * from "./project";
@@ -63,6 +79,7 @@ export * from "./projectStatus";
 export * from "./pwaSettings";
 export * from "./pwaSettingsDisplay";
 export * from "./pwaSettingsOrientation";
+export * from "./removeDomain200";
 export * from "./snapshot";
 export * from "./snapshotCompareResponse";
 export * from "./snapshotFile";

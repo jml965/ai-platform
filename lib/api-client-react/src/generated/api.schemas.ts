@@ -532,6 +532,71 @@ export interface DeploymentListResponse {
   data: DeploymentResponse[];
 }
 
+export type DomainResponseStatus =
+  (typeof DomainResponseStatus)[keyof typeof DomainResponseStatus];
+
+export const DomainResponseStatus = {
+  pending: "pending",
+  dns_pending: "dns_pending",
+  active: "active",
+  ssl_error: "ssl_error",
+} as const;
+
+export interface DomainResponse {
+  id: string;
+  projectId: string;
+  domain: string;
+  status: DomainResponseStatus;
+  dnsVerified: boolean;
+  sslIssued: boolean;
+  sslExpiresAt?: string | null;
+  verificationToken?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface DomainListResponse {
+  data: DomainResponse[];
+}
+
+export interface AddDomainRequest {
+  domain: string;
+}
+
+export type DomainVerifyResponseDnsRecordsItem = {
+  type?: string;
+  value?: string;
+};
+
+export type DomainVerifyResponseDnsInstructionsARecord = {
+  type?: string;
+  host?: string;
+  value?: string;
+};
+
+export type DomainVerifyResponseDnsInstructionsCnameRecord = {
+  type?: string;
+  host?: string;
+  value?: string;
+};
+
+export type DomainVerifyResponseDnsInstructionsTxtRecord = {
+  type?: string;
+  host?: string;
+  value?: string;
+};
+
+export type DomainVerifyResponseDnsInstructions = {
+  aRecord?: DomainVerifyResponseDnsInstructionsARecord;
+  cnameRecord?: DomainVerifyResponseDnsInstructionsCnameRecord;
+  txtRecord?: DomainVerifyResponseDnsInstructionsTxtRecord;
+};
+
+export type DomainVerifyResponse = DomainResponse & {
+  dnsRecords?: DomainVerifyResponseDnsRecordsItem[];
+  dnsInstructions?: DomainVerifyResponseDnsInstructions;
+};
+
 export type PwaSettingsDisplay =
   (typeof PwaSettingsDisplay)[keyof typeof PwaSettingsDisplay];
 
@@ -601,6 +666,45 @@ export interface UpdatePwaSettingsRequest {
   offlineEnabled?: boolean;
 }
 
+export interface PluginSummary {
+  id: string;
+  nameEn: string;
+  nameAr: string;
+  descriptionEn: string;
+  descriptionAr: string;
+  category: string;
+  icon: string;
+  previewHtml: string;
+}
+
+export interface PluginCategory {
+  id: string;
+  nameEn: string;
+  nameAr: string;
+}
+
+export interface PluginListResponse {
+  data: PluginSummary[];
+  categories: PluginCategory[];
+}
+
+export type PluginDetail = PluginSummary & {
+  codeHtml?: string;
+  codeCss?: string;
+  codeJs?: string;
+};
+
+export interface AddPluginRequest {
+  pluginId: string;
+}
+
+export interface AddPluginResponse {
+  success: boolean;
+  pluginId: string;
+  pluginName: string;
+  message: string;
+}
+
 export type GetAuthProvider200Provider =
   (typeof GetAuthProvider200Provider)[keyof typeof GetAuthProvider200Provider];
 
@@ -663,3 +767,8 @@ export type ListInvoicesParams = {
 };
 
 export type GetPwaManifest200 = { [key: string]: unknown };
+
+export type RemoveDomain200 = {
+  success?: boolean;
+  message?: string;
+};

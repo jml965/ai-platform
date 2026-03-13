@@ -1089,3 +1089,186 @@ export const GetPreviewResponse = zod.object({
   previewUrl: zod.string().url().optional(),
   status: zod.enum(["ready", "building", "not_available"]),
 });
+
+/**
+ * Returns all custom domains linked to a project
+ * @summary List project domains
+ */
+export const ListDomainsParams = zod.object({
+  projectId: zod.coerce.string().uuid(),
+});
+
+export const ListDomainsResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.string().uuid(),
+      projectId: zod.string().uuid(),
+      domain: zod.string(),
+      status: zod.enum(["pending", "dns_pending", "active", "ssl_error"]),
+      dnsVerified: zod.boolean(),
+      sslIssued: zod.boolean(),
+      sslExpiresAt: zod.date().nullish(),
+      verificationToken: zod.string().nullish(),
+      createdAt: zod.date().optional(),
+      updatedAt: zod.date().optional(),
+    }),
+  ),
+});
+
+/**
+ * Links a custom domain to the project
+ * @summary Add custom domain
+ */
+export const AddDomainParams = zod.object({
+  projectId: zod.coerce.string().uuid(),
+});
+
+export const AddDomainBody = zod.object({
+  domain: zod.string(),
+});
+
+/**
+ * Checks DNS records and issues SSL certificate if verified
+ * @summary Verify domain DNS
+ */
+export const VerifyDomainParams = zod.object({
+  projectId: zod.coerce.string().uuid(),
+  domainId: zod.coerce.string().uuid(),
+});
+
+export const VerifyDomainResponse = zod
+  .object({
+    id: zod.string().uuid(),
+    projectId: zod.string().uuid(),
+    domain: zod.string(),
+    status: zod.enum(["pending", "dns_pending", "active", "ssl_error"]),
+    dnsVerified: zod.boolean(),
+    sslIssued: zod.boolean(),
+    sslExpiresAt: zod.date().nullish(),
+    verificationToken: zod.string().nullish(),
+    createdAt: zod.date().optional(),
+    updatedAt: zod.date().optional(),
+  })
+  .and(
+    zod.object({
+      dnsRecords: zod
+        .array(
+          zod.object({
+            type: zod.string().optional(),
+            value: zod.string().optional(),
+          }),
+        )
+        .optional(),
+      dnsInstructions: zod
+        .object({
+          aRecord: zod
+            .object({
+              type: zod.string().optional(),
+              host: zod.string().optional(),
+              value: zod.string().optional(),
+            })
+            .optional(),
+          cnameRecord: zod
+            .object({
+              type: zod.string().optional(),
+              host: zod.string().optional(),
+              value: zod.string().optional(),
+            })
+            .optional(),
+          txtRecord: zod
+            .object({
+              type: zod.string().optional(),
+              host: zod.string().optional(),
+              value: zod.string().optional(),
+            })
+            .optional(),
+        })
+        .optional(),
+    }),
+  );
+
+/**
+ * Removes a custom domain from the project
+ * @summary Remove custom domain
+ */
+export const RemoveDomainParams = zod.object({
+  projectId: zod.coerce.string().uuid(),
+  domainId: zod.coerce.string().uuid(),
+});
+
+export const RemoveDomainResponse = zod.object({
+  success: zod.boolean().optional(),
+  message: zod.string().optional(),
+});
+
+/**
+ * Returns all available plugins for the plugin store
+ * @summary List available plugins
+ */
+export const ListPluginsResponse = zod.object({
+  data: zod.array(
+    zod.object({
+      id: zod.string(),
+      nameEn: zod.string(),
+      nameAr: zod.string(),
+      descriptionEn: zod.string(),
+      descriptionAr: zod.string(),
+      category: zod.string(),
+      icon: zod.string(),
+      previewHtml: zod.string(),
+    }),
+  ),
+  categories: zod.array(
+    zod.object({
+      id: zod.string(),
+      nameEn: zod.string(),
+      nameAr: zod.string(),
+    }),
+  ),
+});
+
+/**
+ * Returns full details and code for a specific plugin
+ * @summary Get plugin details
+ */
+export const GetPluginParams = zod.object({
+  pluginId: zod.coerce.string(),
+});
+
+export const GetPluginResponse = zod
+  .object({
+    id: zod.string(),
+    nameEn: zod.string(),
+    nameAr: zod.string(),
+    descriptionEn: zod.string(),
+    descriptionAr: zod.string(),
+    category: zod.string(),
+    icon: zod.string(),
+    previewHtml: zod.string(),
+  })
+  .and(
+    zod.object({
+      codeHtml: zod.string().optional(),
+      codeCss: zod.string().optional(),
+      codeJs: zod.string().optional(),
+    }),
+  );
+
+/**
+ * Injects plugin code into the project files
+ * @summary Add plugin to project
+ */
+export const AddPluginToProjectParams = zod.object({
+  projectId: zod.coerce.string().uuid(),
+});
+
+export const AddPluginToProjectBody = zod.object({
+  pluginId: zod.string(),
+});
+
+export const AddPluginToProjectResponse = zod.object({
+  success: zod.boolean(),
+  pluginId: zod.string(),
+  pluginName: zod.string(),
+  message: zod.string(),
+});

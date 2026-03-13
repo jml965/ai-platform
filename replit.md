@@ -382,3 +382,18 @@ Anthropic AI integration via Replit AI Integrations proxy. Provides pre-configur
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+
+## Plugin Store
+
+The platform includes a Plugin Store that allows users to add pre-built components to their websites with one click.
+
+**Architecture:**
+- Plugin definitions are stored in `artifacts/api-server/src/lib/plugins/plugin-definitions.ts` as static data (12 plugins across 6 categories: forms, media, social, marketing, content, utility).
+- API routes: `GET /api/plugins` (list), `GET /api/plugins/:id` (detail), `POST /api/projects/:projectId/plugins` (add plugin to project).
+- Frontend: `PluginStore` component in `artifacts/website-builder/src/components/builder/PluginStore.tsx`, integrated as a tab in the Builder page's right panel.
+- OpenAPI spec updated in `lib/api-spec/openapi.yaml` with plugin schemas and endpoints.
+- i18n translations added for both English and Arabic.
+
+**Available Plugins:** Contact Form, Google Map, Image Gallery, Live Chat Widget, Social Share Buttons, Countdown Timer, Announcement Bar, FAQ Accordion, Testimonials, Newsletter Signup, Pricing Table, Back to Top Button, Cookie Consent Banner.
+
+**Plugin Injection:** When a user adds a plugin, the API injects the plugin's HTML/CSS/JS code directly into the project's HTML file. If no HTML file exists, it creates a standalone plugin HTML file or appends to existing CSS/JS files.

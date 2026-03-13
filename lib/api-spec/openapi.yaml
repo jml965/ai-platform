@@ -34,6 +34,8 @@ tags:
     description: Live preview of generated websites
   - name: domains
     description: Custom domain management
+  - name: plugins
+    description: Plugin store and management
 
 paths:
   /healthz:
@@ -1359,6 +1361,80 @@ paths:
                   message:
                     type: string
 
+  /plugins:
+    get:
+      operationId: listPlugins
+      tags: [plugins]
+      summary: List available plugins
+      description: Returns all available plugins for the plugin store
+      responses:
+        "200":
+          description: List of plugins
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PluginListResponse"
+
+  /plugins/{pluginId}:
+    get:
+      operationId: getPlugin
+      tags: [plugins]
+      summary: Get plugin details
+      description: Returns full details and code for a specific plugin
+      parameters:
+        - name: pluginId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Plugin details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PluginDetail"
+        "404":
+          description: Plugin not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /projects/{projectId}/plugins:
+    post:
+      operationId: addPluginToProject
+      tags: [plugins]
+      summary: Add plugin to project
+      description: Injects plugin code into the project files
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddPluginRequest"
+      responses:
+        "200":
+          description: Plugin added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AddPluginResponse"
+        "404":
+          description: Plugin not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Plugin already added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   parameters:
     ProjectId:
@@ -2509,3 +2585,98 @@ components:
           type: string
         offlineEnabled:
           type: boolean
+
+    PluginSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        nameEn:
+          type: string
+        nameAr:
+          type: string
+        descriptionEn:
+          type: string
+        descriptionAr:
+          type: string
+        category:
+          type: string
+        icon:
+          type: string
+        previewHtml:
+          type: string
+      required:
+        - id
+        - nameEn
+        - nameAr
+        - descriptionEn
+        - descriptionAr
+        - category
+        - icon
+        - previewHtml
+
+    PluginCategory:
+      type: object
+      properties:
+        id:
+          type: string
+        nameEn:
+          type: string
+        nameAr:
+          type: string
+      required:
+        - id
+        - nameEn
+        - nameAr
+
+    PluginListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/PluginSummary"
+        categories:
+          type: array
+          items:
+            $ref: "#/components/schemas/PluginCategory"
+      required:
+        - data
+        - categories
+
+    PluginDetail:
+      allOf:
+        - $ref: "#/components/schemas/PluginSummary"
+        - type: object
+          properties:
+            codeHtml:
+              type: string
+            codeCss:
+              type: string
+            codeJs:
+              type: string
+
+    AddPluginRequest:
+      type: object
+      properties:
+        pluginId:
+          type: string
+      required:
+        - pluginId
+
+    AddPluginResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        pluginId:
+          type: string
+        pluginName:
+          type: string
+        message:
+          type: string
+      required:
+        - success
+        - pluginId
+        - pluginName
+        - message

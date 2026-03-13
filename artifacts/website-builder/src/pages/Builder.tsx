@@ -8,7 +8,7 @@ import {
   FileText, FileJson, FileImage, File, Folder, ArrowLeft, Clock,
   RotateCw, Monitor, Smartphone, Tablet, Laptop, ChevronLeft,
   Terminal as TerminalIcon, Rocket, ExternalLink, Square, RefreshCw, Globe, Archive, BarChart3,
-  Smartphone as SmartphoneIcon, Users, Lock, Unlock, Paintbrush
+  Smartphone as SmartphoneIcon, Users, Lock, Unlock, Paintbrush, Puzzle
 } from "lucide-react";
 import { format } from "date-fns";
 import { useI18n } from "@/lib/i18n";
@@ -38,6 +38,7 @@ import SnapshotsPanel from "@/components/builder/SnapshotsPanel";
 import PwaSettingsPanel from "@/components/builder/PwaSettings";
 import CollaborationPanel, { CollaboratorAvatars, FileLockIndicator } from "@/components/builder/CollaborationPanel";
 import { useCollaboration } from "@/hooks/useCollaboration";
+import PluginStore from "@/components/builder/PluginStore";
 import { useUpdateFile } from "@/hooks/useUpdateFile";
 import { useCSSEditor } from "@/hooks/useCSSEditor";
 import CSSEditorPanel from "@/components/builder/CSSEditorPanel";
@@ -78,7 +79,7 @@ export default function Builder() {
   const [showDeviceMenu, setShowDeviceMenu] = useState(false);
   const [showTerminal, setShowTerminal] = useState(true);
   const [planApproved, setPlanApproved] = useState(false);
-  const [rightTab, setRightTab] = useState<"library" | "snapshots" | "collab">("library");
+  const [rightTab, setRightTab] = useState<"library" | "snapshots" | "plugins" | "collab">("library");
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const [showDeployPanel, setShowDeployPanel] = useState(false);
@@ -1100,6 +1101,18 @@ export default function Builder() {
               {t.library}
             </button>
             <button
+              onClick={() => setRightTab("plugins")}
+              className={cn(
+                "px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1",
+                rightTab === "plugins"
+                  ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
+                  : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
+              )}
+            >
+              <Puzzle className="w-3 h-3" />
+              {t.plugin_store}
+            </button>
+            <button
               onClick={() => setRightTab("snapshots")}
               className={cn(
                 "px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1",
@@ -1132,6 +1145,8 @@ export default function Builder() {
 
           {rightTab === "library" ? (
             <FileLibrary files={files} onFileSelect={(idx) => { setSelectedFileIndex(idx); setCenterTab("code"); }} />
+          ) : rightTab === "plugins" ? (
+            id ? <PluginStore projectId={id} /> : null
           ) : rightTab === "snapshots" ? (
             id ? <SnapshotsPanel projectId={id} /> : null
           ) : (

@@ -17,6 +17,9 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AddDomainRequest,
+  AddPluginRequest,
+  AddPluginResponse,
   AgentsStatusResponse,
   AuthCallbackParams,
   AuthLoginBody,
@@ -33,6 +36,9 @@ import type {
   DeployProjectRequest,
   DeploymentListResponse,
   DeploymentResponse,
+  DomainListResponse,
+  DomainResponse,
+  DomainVerifyResponse,
   ErrorResponse,
   ExecutionLogListResponse,
   GetAuthProvider200,
@@ -46,12 +52,15 @@ import type {
   NotificationListResponse,
   NotificationPreferences,
   PlanListResponse,
+  PluginDetail,
+  PluginListResponse,
   PreviewResponse,
   Project,
   ProjectFile,
   ProjectFileListResponse,
   ProjectListResponse,
   PwaSettings,
+  RemoveDomain200,
   Snapshot,
   SnapshotCompareResponse,
   SnapshotListResponse,
@@ -5555,3 +5564,604 @@ export function useGetPreview<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * Returns all custom domains linked to a project
+ * @summary List project domains
+ */
+export const getListDomainsUrl = (projectId: string) => {
+  return `/api/projects/${projectId}/domains`;
+};
+
+export const listDomains = async (
+  projectId: string,
+  options?: RequestInit,
+): Promise<DomainListResponse> => {
+  return customFetch<DomainListResponse>(getListDomainsUrl(projectId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListDomainsQueryKey = (projectId: string) => {
+  return [`/api/projects/${projectId}/domains`] as const;
+};
+
+export const getListDomainsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listDomains>>,
+  TError = ErrorType<unknown>,
+>(
+  projectId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listDomains>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListDomainsQueryKey(projectId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listDomains>>> = ({
+    signal,
+  }) => listDomains(projectId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!projectId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listDomains>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListDomainsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listDomains>>
+>;
+export type ListDomainsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List project domains
+ */
+
+export function useListDomains<
+  TData = Awaited<ReturnType<typeof listDomains>>,
+  TError = ErrorType<unknown>,
+>(
+  projectId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listDomains>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListDomainsQueryOptions(projectId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Links a custom domain to the project
+ * @summary Add custom domain
+ */
+export const getAddDomainUrl = (projectId: string) => {
+  return `/api/projects/${projectId}/domains`;
+};
+
+export const addDomain = async (
+  projectId: string,
+  addDomainRequest: AddDomainRequest,
+  options?: RequestInit,
+): Promise<DomainResponse> => {
+  return customFetch<DomainResponse>(getAddDomainUrl(projectId), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(addDomainRequest),
+  });
+};
+
+export const getAddDomainMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addDomain>>,
+    TError,
+    { projectId: string; data: BodyType<AddDomainRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof addDomain>>,
+  TError,
+  { projectId: string; data: BodyType<AddDomainRequest> },
+  TContext
+> => {
+  const mutationKey = ["addDomain"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof addDomain>>,
+    { projectId: string; data: BodyType<AddDomainRequest> }
+  > = (props) => {
+    const { projectId, data } = props ?? {};
+
+    return addDomain(projectId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AddDomainMutationResult = NonNullable<
+  Awaited<ReturnType<typeof addDomain>>
+>;
+export type AddDomainMutationBody = BodyType<AddDomainRequest>;
+export type AddDomainMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Add custom domain
+ */
+export const useAddDomain = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addDomain>>,
+    TError,
+    { projectId: string; data: BodyType<AddDomainRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof addDomain>>,
+  TError,
+  { projectId: string; data: BodyType<AddDomainRequest> },
+  TContext
+> => {
+  return useMutation(getAddDomainMutationOptions(options));
+};
+
+/**
+ * Checks DNS records and issues SSL certificate if verified
+ * @summary Verify domain DNS
+ */
+export const getVerifyDomainUrl = (projectId: string, domainId: string) => {
+  return `/api/projects/${projectId}/domains/${domainId}/verify`;
+};
+
+export const verifyDomain = async (
+  projectId: string,
+  domainId: string,
+  options?: RequestInit,
+): Promise<DomainVerifyResponse> => {
+  return customFetch<DomainVerifyResponse>(
+    getVerifyDomainUrl(projectId, domainId),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getVerifyDomainMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof verifyDomain>>,
+    TError,
+    { projectId: string; domainId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof verifyDomain>>,
+  TError,
+  { projectId: string; domainId: string },
+  TContext
+> => {
+  const mutationKey = ["verifyDomain"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof verifyDomain>>,
+    { projectId: string; domainId: string }
+  > = (props) => {
+    const { projectId, domainId } = props ?? {};
+
+    return verifyDomain(projectId, domainId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type VerifyDomainMutationResult = NonNullable<
+  Awaited<ReturnType<typeof verifyDomain>>
+>;
+
+export type VerifyDomainMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Verify domain DNS
+ */
+export const useVerifyDomain = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof verifyDomain>>,
+    TError,
+    { projectId: string; domainId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof verifyDomain>>,
+  TError,
+  { projectId: string; domainId: string },
+  TContext
+> => {
+  return useMutation(getVerifyDomainMutationOptions(options));
+};
+
+/**
+ * Removes a custom domain from the project
+ * @summary Remove custom domain
+ */
+export const getRemoveDomainUrl = (projectId: string, domainId: string) => {
+  return `/api/projects/${projectId}/domains/${domainId}`;
+};
+
+export const removeDomain = async (
+  projectId: string,
+  domainId: string,
+  options?: RequestInit,
+): Promise<RemoveDomain200> => {
+  return customFetch<RemoveDomain200>(getRemoveDomainUrl(projectId, domainId), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getRemoveDomainMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof removeDomain>>,
+    TError,
+    { projectId: string; domainId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof removeDomain>>,
+  TError,
+  { projectId: string; domainId: string },
+  TContext
+> => {
+  const mutationKey = ["removeDomain"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof removeDomain>>,
+    { projectId: string; domainId: string }
+  > = (props) => {
+    const { projectId, domainId } = props ?? {};
+
+    return removeDomain(projectId, domainId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RemoveDomainMutationResult = NonNullable<
+  Awaited<ReturnType<typeof removeDomain>>
+>;
+
+export type RemoveDomainMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Remove custom domain
+ */
+export const useRemoveDomain = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof removeDomain>>,
+    TError,
+    { projectId: string; domainId: string },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof removeDomain>>,
+  TError,
+  { projectId: string; domainId: string },
+  TContext
+> => {
+  return useMutation(getRemoveDomainMutationOptions(options));
+};
+
+/**
+ * Returns all available plugins for the plugin store
+ * @summary List available plugins
+ */
+export const getListPluginsUrl = () => {
+  return `/api/plugins`;
+};
+
+export const listPlugins = async (
+  options?: RequestInit,
+): Promise<PluginListResponse> => {
+  return customFetch<PluginListResponse>(getListPluginsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListPluginsQueryKey = () => {
+  return [`/api/plugins`] as const;
+};
+
+export const getListPluginsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listPlugins>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listPlugins>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListPluginsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listPlugins>>> = ({
+    signal,
+  }) => listPlugins({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listPlugins>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListPluginsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listPlugins>>
+>;
+export type ListPluginsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List available plugins
+ */
+
+export function useListPlugins<
+  TData = Awaited<ReturnType<typeof listPlugins>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listPlugins>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListPluginsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns full details and code for a specific plugin
+ * @summary Get plugin details
+ */
+export const getGetPluginUrl = (pluginId: string) => {
+  return `/api/plugins/${pluginId}`;
+};
+
+export const getPlugin = async (
+  pluginId: string,
+  options?: RequestInit,
+): Promise<PluginDetail> => {
+  return customFetch<PluginDetail>(getGetPluginUrl(pluginId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetPluginQueryKey = (pluginId: string) => {
+  return [`/api/plugins/${pluginId}`] as const;
+};
+
+export const getGetPluginQueryOptions = <
+  TData = Awaited<ReturnType<typeof getPlugin>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  pluginId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPlugin>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetPluginQueryKey(pluginId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getPlugin>>> = ({
+    signal,
+  }) => getPlugin(pluginId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!pluginId,
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getPlugin>>, TError, TData> & {
+    queryKey: QueryKey;
+  };
+};
+
+export type GetPluginQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getPlugin>>
+>;
+export type GetPluginQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get plugin details
+ */
+
+export function useGetPlugin<
+  TData = Awaited<ReturnType<typeof getPlugin>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  pluginId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getPlugin>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetPluginQueryOptions(pluginId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Injects plugin code into the project files
+ * @summary Add plugin to project
+ */
+export const getAddPluginToProjectUrl = (projectId: string) => {
+  return `/api/projects/${projectId}/plugins`;
+};
+
+export const addPluginToProject = async (
+  projectId: string,
+  addPluginRequest: AddPluginRequest,
+  options?: RequestInit,
+): Promise<AddPluginResponse> => {
+  return customFetch<AddPluginResponse>(getAddPluginToProjectUrl(projectId), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(addPluginRequest),
+  });
+};
+
+export const getAddPluginToProjectMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addPluginToProject>>,
+    TError,
+    { projectId: string; data: BodyType<AddPluginRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof addPluginToProject>>,
+  TError,
+  { projectId: string; data: BodyType<AddPluginRequest> },
+  TContext
+> => {
+  const mutationKey = ["addPluginToProject"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof addPluginToProject>>,
+    { projectId: string; data: BodyType<AddPluginRequest> }
+  > = (props) => {
+    const { projectId, data } = props ?? {};
+
+    return addPluginToProject(projectId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AddPluginToProjectMutationResult = NonNullable<
+  Awaited<ReturnType<typeof addPluginToProject>>
+>;
+export type AddPluginToProjectMutationBody = BodyType<AddPluginRequest>;
+export type AddPluginToProjectMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Add plugin to project
+ */
+export const useAddPluginToProject = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addPluginToProject>>,
+    TError,
+    { projectId: string; data: BodyType<AddPluginRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof addPluginToProject>>,
+  TError,
+  { projectId: string; data: BodyType<AddPluginRequest> },
+  TContext
+> => {
+  return useMutation(getAddPluginToProjectMutationOptions(options));
+};
