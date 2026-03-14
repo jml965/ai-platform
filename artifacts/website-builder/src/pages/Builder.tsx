@@ -2541,9 +2541,10 @@ function FileLibrary({ files, projectId, onFileSelect }: { files: ProjectFile[];
             <span className="truncate flex-1">{node.name}</span>
             <button
               onClick={e => handleDotsClick(e, node)}
-              className="file-dots p-0.5 rounded hover:bg-[#30363d] transition-all flex-shrink-0"
+              className="file-dots"
+              style={{ opacity: 1, flexShrink: 0, padding: '2px', borderRadius: '4px', fontSize: '14px', lineHeight: 1, color: '#8b949e', background: 'transparent', border: 'none', cursor: 'pointer', minWidth: '18px', textAlign: 'center' }}
             >
-              <MoreVertical className="w-3.5 h-3.5 text-[#8b949e]" />
+              ⋮
             </button>
           </div>
           {isExpanded && node.children.map(child => renderNode(child, depth + 1))}
@@ -2563,9 +2564,10 @@ function FileLibrary({ files, projectId, onFileSelect }: { files: ProjectFile[];
         <span className="truncate flex-1">{node.name}</span>
         <button
           onClick={e => handleDotsClick(e, node)}
-          className="file-dots p-0.5 rounded hover:bg-[#30363d] transition-all flex-shrink-0"
+          className="file-dots"
+          style={{ opacity: 1, flexShrink: 0, padding: '2px', borderRadius: '4px', fontSize: '14px', lineHeight: 1, color: '#8b949e', background: 'transparent', border: 'none', cursor: 'pointer', minWidth: '18px', textAlign: 'center' }}
         >
-          <MoreVertical className="w-3.5 h-3.5 text-[#8b949e]" />
+          ⋮
         </button>
       </div>
     );
@@ -2677,9 +2679,10 @@ function InlineFileTree({ files, projectId, selectedIndex, onFileSelect }: { fil
             <span className="truncate flex-1">{node.name}</span>
             <button
               onClick={e => handleDotsClick(e, node)}
-              className="file-dots p-0.5 rounded hover:bg-[#30363d] transition-all flex-shrink-0"
+              className="file-dots"
+              style={{ opacity: 1, flexShrink: 0, padding: '2px', borderRadius: '4px', fontSize: '14px', lineHeight: 1, color: '#8b949e', background: 'transparent', border: 'none', cursor: 'pointer', minWidth: '18px', textAlign: 'center' }}
             >
-              <MoreVertical className="w-3.5 h-3.5 text-[#8b949e]" />
+              ⋮
             </button>
           </div>
           {isExpanded && node.children.map(child => renderNode(child, depth + 1))}
@@ -2705,9 +2708,10 @@ function InlineFileTree({ files, projectId, selectedIndex, onFileSelect }: { fil
         <span className="truncate flex-1">{node.name}</span>
         <button
           onClick={e => handleDotsClick(e, node)}
-          className="file-dots p-0.5 rounded hover:bg-[#30363d] transition-all flex-shrink-0"
+          className="file-dots"
+          style={{ opacity: 1, flexShrink: 0, padding: '2px', borderRadius: '4px', fontSize: '14px', lineHeight: 1, color: '#8b949e', background: 'transparent', border: 'none', cursor: 'pointer', minWidth: '18px', textAlign: 'center' }}
         >
-          <MoreVertical className="w-3.5 h-3.5 text-[#8b949e]" />
+          ⋮
         </button>
       </div>
     );
