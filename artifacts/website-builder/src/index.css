@@ -112,8 +112,5 @@
 }
 
 .file-row .file-dots {
-  opacity: 0.5;
-}
-.file-row:hover .file-dots {
   opacity: 1;
 }
