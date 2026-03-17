@@ -127,7 +127,8 @@ export default function Builder() {
         ? leftDragRef.current.startX - ev.clientX
         : ev.clientX - leftDragRef.current.startX;
       const newLeft = Math.max(220, Math.min(480, leftDragRef.current.startW + delta));
-      const centerRemaining = window.innerWidth - newLeft - rightWidth - 10;
+      const effectiveRight = rightPanelOpen ? rightWidth : 0;
+      const centerRemaining = window.innerWidth - newLeft - effectiveRight - 10;
       if (centerRemaining >= MIN_CENTER_WIDTH) {
         setLeftWidth(newLeft);
       }
@@ -139,7 +140,7 @@ export default function Builder() {
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-  }, [leftWidth, rightWidth, lang]);
+  }, [leftWidth, rightWidth, rightPanelOpen, lang]);
 
   const handleRightDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -151,7 +152,8 @@ export default function Builder() {
         ? ev.clientX - rightDragRef.current.startX
         : rightDragRef.current.startX - ev.clientX;
       const newRight = Math.max(260, Math.min(600, rightDragRef.current.startW + delta));
-      const centerRemaining = window.innerWidth - leftWidth - newRight - 10;
+      const effectiveLeft = leftPanelOpen ? leftWidth : 0;
+      const centerRemaining = window.innerWidth - effectiveLeft - newRight - 10;
       if (centerRemaining >= MIN_CENTER_WIDTH) {
         setRightWidth(newRight);
       }
@@ -163,7 +165,7 @@ export default function Builder() {
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-  }, [rightWidth, leftWidth, lang]);
+  }, [rightWidth, leftWidth, leftPanelOpen, lang]);
 
   const { data: project } = useGetProject(id || "");
   const { data: me } = useGetMe({ query: { queryKey: ["getMe"], retry: false } });
@@ -653,6 +655,7 @@ export default function Builder() {
     }
     let cancelled = false;
     let attempt = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
     const maxAttempts = 6;
     const baseDelay = 1000;
     const verify = () => {
@@ -665,7 +668,7 @@ export default function Builder() {
             setProxyVerified(true);
             setProxyFailed(false);
           } else if (attempt < maxAttempts) {
-            setTimeout(verify, baseDelay * Math.min(attempt, 4));
+            retryTimer = setTimeout(verify, baseDelay * Math.min(attempt, 4));
           } else {
             setProxyVerified(false);
             setProxyFailed(true);
@@ -674,7 +677,7 @@ export default function Builder() {
         .catch(() => {
           if (cancelled) return;
           if (attempt < maxAttempts) {
-            setTimeout(verify, baseDelay * Math.min(attempt, 4));
+            retryTimer = setTimeout(verify, baseDelay * Math.min(attempt, 4));
           } else {
             setProxyVerified(false);
             setProxyFailed(true);
@@ -682,7 +685,10 @@ export default function Builder() {
         });
     };
     verify();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
   }, [sandboxProxyUrl, previewKey]);
 
   const previewUrl = (sandboxProxyUrl && proxyVerified && !proxyFailed) ? sandboxProxyUrl : null;
