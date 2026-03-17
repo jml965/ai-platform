@@ -1,9 +1,16 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { db } from "@workspace/db";
 import { buildTasksTable, agentConfigsTable, tokenUsageTable } from "@workspace/db/schema";
 import { eq, sql, desc } from "drizzle-orm";
 
 const router: IRouter = Router();
+
+function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.user || (req.user as any).role !== "admin") {
+    return res.status(403).json({ error: "Admin access required", errorAr: "يجب أن تكون مديراً للوصول" });
+  }
+  next();
+}
 
 const DEFAULT_AGENTS = [
   {
@@ -286,7 +293,7 @@ router.get("/agents/configs/:agentKey", async (req, res) => {
   }
 });
 
-router.put("/agents/configs/:agentKey", async (req, res) => {
+router.put("/agents/configs/:agentKey", requireAdmin, async (req, res) => {
   try {
     const { agentKey } = req.params;
     const updates = req.body;
@@ -311,7 +318,7 @@ router.put("/agents/configs/:agentKey", async (req, res) => {
   }
 });
 
-router.post("/agents/configs", async (req, res) => {
+router.post("/agents/configs", requireAdmin, async (req, res) => {
   try {
     const body = req.body;
     const [created] = await db.insert(agentConfigsTable).values({
@@ -349,7 +356,7 @@ router.post("/agents/configs", async (req, res) => {
   }
 });
 
-router.delete("/agents/configs/:agentKey", async (req, res) => {
+router.delete("/agents/configs/:agentKey", requireAdmin, async (req, res) => {
   try {
     const [deleted] = await db.delete(agentConfigsTable)
       .where(eq(agentConfigsTable.agentKey, req.params.agentKey))
@@ -365,7 +372,7 @@ router.delete("/agents/configs/:agentKey", async (req, res) => {
   }
 });
 
-router.put("/agents/reorder", async (req, res) => {
+router.put("/agents/reorder", requireAdmin, async (req, res) => {
   try {
     const { order } = req.body;
     if (!Array.isArray(order)) {

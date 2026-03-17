@@ -1,9 +1,16 @@
-import { Router } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
 import { db } from "@workspace/db";
-import { aiProvidersTable, providerUsageLogsTable, agentConfigsTable } from "@workspace/db/schema";
+import { aiProvidersTable, providerUsageLogsTable, agentConfigsTable, mediaProvidersTable } from "@workspace/db/schema";
 import { eq, desc, sql, gte } from "drizzle-orm";
 
 const router = Router();
+
+function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.user || (req.user as any).role !== "admin") {
+    return res.status(403).json({ error: "Admin access required", errorAr: "يجب أن تكون مديراً للوصول" });
+  }
+  next();
+}
 
 const DEFAULT_PROVIDERS = [
   {
@@ -292,6 +299,139 @@ function maskProvider(p: any) {
   return { ...p, apiKey: maskApiKey(p.apiKey) };
 }
 
+const syncState = {
+  lastSyncAt: null as Date | null,
+  nextSyncAt: null as Date | null,
+  syncInProgress: false,
+  syncIntervalMinutes: 30,
+  results: [] as { providerKey: string; status: string; checkedAt: string }[],
+};
+
+let syncTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function runUsageSync() {
+  if (syncState.syncInProgress) return;
+  syncState.syncInProgress = true;
+  const results: typeof syncState.results = [];
+
+  try {
+    const allProviders = await db.select().from(aiProvidersTable);
+    for (const p of allProviders) {
+      if (!p.apiKey) {
+        results.push({ providerKey: p.providerKey, status: "skipped_no_key", checkedAt: new Date().toISOString() });
+        continue;
+      }
+
+      let status = "verified";
+      try {
+        if (p.providerKey === "openai") {
+          const resp = await fetch("https://api.openai.com/v1/models", {
+            headers: { Authorization: `Bearer ${p.apiKey}` },
+            signal: AbortSignal.timeout(10000),
+          });
+          status = resp.ok ? "verified" : "key_invalid";
+        } else if (p.providerKey === "anthropic") {
+          const resp = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: { "x-api-key": p.apiKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
+            body: JSON.stringify({ model: "claude-haiku-3-5", max_tokens: 1, messages: [{ role: "user", content: "ping" }] }),
+            signal: AbortSignal.timeout(10000),
+          });
+          status = resp.status === 401 ? "key_invalid" : "verified";
+        } else if (p.providerKey === "google") {
+          const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${p.apiKey}`, {
+            signal: AbortSignal.timeout(10000),
+          });
+          status = resp.ok ? "verified" : "key_invalid";
+        } else {
+          status = "assumed_valid";
+        }
+      } catch {
+        status = "unreachable";
+      }
+
+      const newKeyStatus = status === "key_invalid" ? "error" : status === "verified" ? "active" : p.keyStatus;
+      if (newKeyStatus !== p.keyStatus) {
+        await db.update(aiProvidersTable).set({ keyStatus: newKeyStatus, updatedAt: new Date() }).where(eq(aiProvidersTable.providerKey, p.providerKey));
+
+        const allMedia = await db.select().from(mediaProvidersTable);
+        const children = allMedia.filter((m: any) => m.parentProvider === p.providerKey);
+        for (const child of children) {
+          await db.update(mediaProvidersTable).set({ keyStatus: newKeyStatus, updatedAt: new Date() }).where(eq(mediaProvidersTable.providerKey, child.providerKey));
+        }
+      }
+      results.push({ providerKey: p.providerKey, status, checkedAt: new Date().toISOString() });
+
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  } catch {
+  } finally {
+    syncState.syncInProgress = false;
+    syncState.lastSyncAt = new Date();
+    syncState.nextSyncAt = new Date(Date.now() + syncState.syncIntervalMinutes * 60 * 1000);
+    syncState.results = results;
+    scheduleSyncTimer();
+  }
+}
+
+function scheduleSyncTimer() {
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => { runUsageSync(); }, syncState.syncIntervalMinutes * 60 * 1000);
+}
+
+scheduleSyncTimer();
+
+router.get("/providers/sync/status", async (_req, res) => {
+  res.json({
+    lastSyncAt: syncState.lastSyncAt?.toISOString() || null,
+    nextSyncAt: syncState.nextSyncAt?.toISOString() || null,
+    syncInProgress: syncState.syncInProgress,
+    syncIntervalMinutes: syncState.syncIntervalMinutes,
+    results: syncState.results,
+  });
+});
+
+router.post("/providers/sync/trigger", requireAdmin, async (_req, res) => {
+  if (syncState.syncInProgress) {
+    return res.json({ message: "Sync already in progress", inProgress: true });
+  }
+  runUsageSync();
+  res.json({ message: "Sync started", inProgress: true });
+});
+
+router.put("/providers/sync/interval", requireAdmin, async (req, res) => {
+  const { intervalMinutes } = req.body;
+  if (typeof intervalMinutes === "number" && intervalMinutes >= 5 && intervalMinutes <= 1440) {
+    syncState.syncIntervalMinutes = intervalMinutes;
+    scheduleSyncTimer();
+    res.json({ syncIntervalMinutes: syncState.syncIntervalMinutes });
+  } else {
+    res.status(400).json({ error: "Interval must be 5-1440 minutes" });
+  }
+});
+
+router.get("/providers/shared-keys", async (_req, res) => {
+  try {
+    const allMedia = await db.select().from(mediaProvidersTable);
+    const allAi = await db.select().from(aiProvidersTable);
+    const groups: Record<string, { parent: string; parentName: string; children: { providerKey: string; displayName: string; type: string }[] }> = {};
+
+    for (const m of allMedia) {
+      const parent = (m as any).parentProvider;
+      if (!parent) continue;
+      if (!groups[parent]) {
+        const parentAi = allAi.find(a => a.providerKey === parent);
+        groups[parent] = { parent, parentName: parentAi?.displayName || parent, children: [] };
+      }
+      groups[parent].children.push({ providerKey: m.providerKey, displayName: m.displayName, type: m.type });
+    }
+
+    res.json(Object.values(groups));
+  } catch {
+    res.json([]);
+  }
+});
+
 router.get("/providers", async (_req, res) => {
   try {
     let providers = await db.select().from(aiProvidersTable).orderBy(aiProvidersTable.priority);
@@ -314,22 +454,36 @@ router.get("/providers/:key", async (req, res) => {
   }
 });
 
-router.put("/providers/:key", async (req, res) => {
+router.put("/providers/:key", requireAdmin, async (req, res) => {
   try {
     const updates = req.body;
+    if (updates.apiKey && updates.apiKey.includes("••••")) {
+      delete updates.apiKey;
+    }
     updates.updatedAt = new Date();
     const [updated] = await db.update(aiProvidersTable)
       .set(updates)
       .where(eq(aiProvidersTable.providerKey, req.params.key))
       .returning();
     if (!updated) return res.status(404).json({ error: "Provider not found" });
+
+    if (updates.apiKey !== undefined) {
+      const childMedia = await db.select().from(mediaProvidersTable);
+      const siblings = childMedia.filter((m: any) => m.parentProvider === req.params.key);
+      for (const sibling of siblings) {
+        await db.update(mediaProvidersTable)
+          .set({ apiKey: updates.apiKey, keyStatus: updates.apiKey ? "active" : "inactive", updatedAt: new Date() })
+          .where(eq(mediaProvidersTable.providerKey, sibling.providerKey));
+      }
+    }
+
     res.json(updated);
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
 });
 
-router.post("/providers", async (req, res) => {
+router.post("/providers", requireAdmin, async (req, res) => {
   try {
     const body = req.body;
     const [existing] = await db.select().from(aiProvidersTable).where(eq(aiProvidersTable.providerKey, body.providerKey));
@@ -345,7 +499,7 @@ router.post("/providers", async (req, res) => {
   }
 });
 
-router.delete("/providers/:key", async (req, res) => {
+router.delete("/providers/:key", requireAdmin, async (req, res) => {
   try {
     const [provider] = await db.select().from(aiProvidersTable).where(eq(aiProvidersTable.providerKey, req.params.key));
     if (!provider) return res.status(404).json({ error: "Provider not found" });
@@ -415,7 +569,7 @@ router.get("/providers/:key/agents", async (req, res) => {
   }
 });
 
-router.post("/providers/:key/swap-model", async (req, res) => {
+router.post("/providers/:key/swap-model", requireAdmin, async (req, res) => {
   try {
     const { oldModelId, newModelId } = req.body;
     const providerKey = req.params.key;
@@ -458,7 +612,7 @@ router.post("/providers/:key/swap-model", async (req, res) => {
   }
 });
 
-router.post("/providers/:key/validate-key", async (req, res) => {
+router.post("/providers/:key/validate-key", requireAdmin, async (req, res) => {
   try {
     const [provider] = await db.select().from(aiProvidersTable).where(eq(aiProvidersTable.providerKey, req.params.key));
     if (!provider) return res.status(404).json({ error: "Provider not found" });

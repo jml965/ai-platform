@@ -4,7 +4,7 @@ import {
   ArrowLeft, ExternalLink, ShieldCheck, ShieldAlert, ShieldX,
   Bot, Activity, AlertTriangle, Plus, Trash2, Save,
   Eye, EyeOff, RefreshCw, ChevronDown, ChevronUp, BarChart2,
-  Globe, Settings, Search, Cpu, Image, Film
+  Globe, Settings, Search, Cpu, Image, Film, Link2, Clock, Zap
 } from "lucide-react";
 
 const API = "/api";
@@ -43,6 +43,8 @@ interface MediaModel {
   name: string;
   maxResolution: string;
   costPerRequest: number;
+  costPerToken: number;
+  maxFileSizeMb: number;
   description: string;
 }
 
@@ -50,6 +52,7 @@ interface MediaProvider {
   id: string;
   providerKey: string;
   type: string;
+  parentProvider: string;
   displayName: string;
   displayNameAr: string;
   logo: string;
@@ -60,11 +63,20 @@ interface MediaProvider {
   isCustom: boolean;
   enabled: boolean;
   priority: number;
+  maxFileSizeMb: number;
   models: MediaModel[];
   budgetMonthlyUsd: string;
   alertThreshold: number;
   totalRequests: number;
   totalCostUsd: string;
+}
+
+interface SyncStatus {
+  lastSyncAt: string | null;
+  nextSyncAt: string | null;
+  syncInProgress: boolean;
+  syncIntervalMinutes: number;
+  results: { providerKey: string; status: string; checkedAt: string }[];
 }
 
 interface LinkedAgent {
@@ -341,6 +353,13 @@ function AiProviderDetail({
   );
 }
 
+interface MediaUsageData {
+  daily: { cost: number; tokens: number; requests: number; totalSizeMb: number };
+  weekly: { cost: number; tokens: number; requests: number; totalSizeMb: number };
+  monthly: { cost: number; tokens: number; requests: number; totalSizeMb: number };
+  recentLogs: any[];
+}
+
 function MediaProviderDetail({
   provider,
   onUpdate,
@@ -352,42 +371,81 @@ function MediaProviderDetail({
 }) {
   const [showKey, setShowKey] = useState(false);
   const [localKey, setLocalKey] = useState(provider.apiKey || "");
+  const [usage, setUsage] = useState<MediaUsageData | null>(null);
+  const [linkedAgents, setLinkedAgents] = useState<LinkedAgent[]>([]);
+  const [localMaxSize, setLocalMaxSize] = useState(provider.maxFileSizeMb || 10);
 
   useEffect(() => {
     setLocalKey(provider.apiKey || "");
+    setLocalMaxSize(provider.maxFileSizeMb || 10);
+    Promise.all([
+      fetch(`${API}/media-providers/${provider.providerKey}/usage`, { credentials: "include" }).then(r => r.ok ? r.json() : null),
+      fetch(`${API}/media-providers/${provider.providerKey}/agents`, { credentials: "include" }).then(r => r.ok ? r.json() : []),
+    ]).then(([u, a]) => {
+      setUsage(u);
+      setLinkedAgents(a);
+    }).catch(() => {});
   }, [provider.providerKey]);
 
   const isImage = provider.type === "image";
-  const typeIcon = isImage ? <Image className="w-4 h-4 text-pink-400" /> : <Film className="w-4 h-4 text-cyan-400" />;
   const typeColor = isImage ? "text-pink-400" : "text-cyan-400";
+  const typeBg = isImage ? "bg-pink-500/10" : "bg-cyan-500/10";
+  const budget = parseFloat(provider.budgetMonthlyUsd) || 0;
+  const monthCost = usage?.monthly?.cost || 0;
+  const budgetPercent = budget > 0 ? (monthCost / budget) * 100 : 0;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 mb-4">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isImage ? "bg-pink-500/10" : "bg-cyan-500/10"}`}>
-          {typeIcon}
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${typeBg}`}>
+          {isImage ? <Image className="w-4 h-4 text-pink-400" /> : <Film className="w-4 h-4 text-cyan-400" />}
         </div>
         <div className="flex-1">
           <h2 className="text-[15px] font-bold">{provider.displayNameAr} <span className="text-[#58a6ff]">({provider.displayName})</span></h2>
           <div className="flex items-center gap-2 mt-0.5">
             <StatusBadge status={provider.keyStatus} />
             <span className="text-[10px] text-[#8b949e]">{provider.models.length} {isImage ? "نموذج صور" : "نموذج فيديو"}</span>
+            {provider.parentProvider && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-medium border bg-amber-500/10 text-amber-400 border-amber-500/25">
+                <Link2 className="w-2.5 h-2.5" />
+                مفتاح مشترك (Shared Key)
+              </span>
+            )}
           </div>
         </div>
       </div>
 
+      {provider.parentProvider && (
+        <div className="bg-amber-500/5 border border-amber-500/15 rounded-xl p-3">
+          <div className="flex items-center gap-2 mb-1.5">
+            <Link2 className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-[11px] font-medium text-amber-400"><BLabel ar="مفتاح API مشترك" en="Shared API Key" /></span>
+          </div>
+          <p className="text-[10px] text-[#8b949e] leading-relaxed">
+            هذا المزود يشارك نفس مفتاح API مع المزود الرئيسي <span className="text-amber-400 font-medium">{provider.parentProvider}</span>.
+            عند تغيير المفتاح هنا سيتم تحديثه تلقائياً في المزود الرئيسي وجميع المزودين المرتبطين.
+          </p>
+          <p className="text-[9px] text-[#8b949e]/60 mt-1">
+            This provider shares an API key with the parent provider "{provider.parentProvider}". Changing the key here auto-syncs to the parent and all siblings.
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
           <label className="text-[10px] text-[#8b949e] mb-1 block"><BLabel ar="مفتاح API" en="API Key" /></label>
-          <FieldHint text="المفتاح السري للاتصال بخدمة المزود" />
+          <FieldHint text={provider.parentProvider ? "المفتاح مشترك — سيتم مزامنته تلقائياً" : "المفتاح السري للاتصال بخدمة المزود"} />
           <div className="flex gap-1.5 mt-1">
             <div className="relative flex-1">
-              <input type={showKey ? "text" : "password"} value={localKey} onChange={e => setLocalKey(e.target.value)} placeholder="أدخل مفتاح API..." className="w-full bg-[#0d1117] border border-white/10 rounded-lg px-3 py-2 text-[11px] text-[#e2e8f0] font-mono pr-8" />
+              <input type={showKey ? "text" : "password"} value={localKey} onChange={e => setLocalKey(e.target.value)} placeholder="أدخل مفتاح API..." className={`w-full bg-[#0d1117] border rounded-lg px-3 py-2 text-[11px] text-[#e2e8f0] font-mono pr-8 ${provider.parentProvider ? "border-amber-500/20" : "border-white/10"}`} />
               <button onClick={() => setShowKey(!showKey)} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#8b949e] hover:text-white">
                 {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
               </button>
             </div>
-            <button onClick={() => onUpdate(provider.providerKey, { apiKey: localKey })} title="حفظ" className="px-2.5 py-2 bg-[#7c3aed]/20 text-[#7c3aed] rounded-lg text-[10px] hover:bg-[#7c3aed]/30"><Save className="w-3.5 h-3.5" /></button>
+            <button onClick={() => onUpdate(provider.providerKey, { apiKey: localKey })} title={provider.parentProvider ? "حفظ ومزامنة" : "حفظ"} className="px-2.5 py-2 bg-[#7c3aed]/20 text-[#7c3aed] rounded-lg text-[10px] hover:bg-[#7c3aed]/30 flex items-center gap-1">
+              <Save className="w-3.5 h-3.5" />
+              {provider.parentProvider && <Link2 className="w-3 h-3" />}
+            </button>
           </div>
         </div>
         <div>
@@ -400,7 +458,7 @@ function MediaProviderDetail({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <div>
           <label className="text-[10px] text-[#8b949e] mb-1 block"><BLabel ar="الأولوية" en="Priority" /></label>
           <FieldHint text="رقم أقل = أولوية أعلى" />
@@ -416,6 +474,28 @@ function MediaProviderDetail({
           <FieldHint text="نسبة الميزانية للتنبيه" />
           <input type="number" min="50" max="100" value={provider.alertThreshold} onChange={e => onUpdate(provider.providerKey, { alertThreshold: parseInt(e.target.value) || 80 })} className="w-full bg-[#0d1117] border border-white/10 rounded-lg px-3 py-1.5 text-[11px] text-[#e2e8f0] mt-0.5" />
         </div>
+        <div>
+          <label className="text-[10px] text-[#8b949e] mb-1 block"><BLabel ar="الحد الأقصى للملف" en="Max File Size" /></label>
+          <FieldHint text={isImage ? "أقصى حجم للصورة بالميجابايت" : "أقصى حجم للفيديو بالميجابايت"} />
+          <div className="mt-0.5">
+            <input
+              type="range"
+              min="1"
+              max={isImage ? 50 : 2000}
+              step={isImage ? 1 : 10}
+              value={localMaxSize}
+              onChange={e => setLocalMaxSize(parseInt(e.target.value))}
+              onMouseUp={() => onUpdate(provider.providerKey, { maxFileSizeMb: localMaxSize })}
+              onTouchEnd={() => onUpdate(provider.providerKey, { maxFileSizeMb: localMaxSize })}
+              className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer accent-[#7c3aed]"
+            />
+            <div className="flex justify-between text-[9px] text-[#8b949e] mt-0.5">
+              <span>1 MB</span>
+              <span className="text-[#7c3aed] font-bold">{localMaxSize} MB</span>
+              <span>{isImage ? 50 : 2000} MB</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div>
@@ -423,23 +503,133 @@ function MediaProviderDetail({
           {isImage ? <Image className="w-3.5 h-3.5 text-pink-400" /> : <Film className="w-3.5 h-3.5 text-cyan-400" />}
           <span className="text-[11px] font-medium"><BLabel ar={isImage ? "نماذج الصور المتوفرة" : "نماذج الفيديو المتوفرة"} en={isImage ? "Available Image Models" : "Available Video Models"} /></span>
         </div>
-        <FieldHint text={isImage ? "النماذج المتاحة لتوليد الصور مع الدقة والتكلفة" : "النماذج المتاحة لتوليد الفيديو مع الدقة والتكلفة"} />
+        <FieldHint text={isImage ? "النماذج المتاحة لتوليد الصور مع الدقة والحجم والتكلفة" : "النماذج المتاحة لتوليد الفيديو مع الدقة والحجم والتكلفة"} />
         <div className="grid gap-1.5 mt-1.5">
           {provider.models.map(m => (
-            <div key={m.id} className="bg-[#0d1117] border border-white/5 rounded-lg px-3 py-2">
+            <div key={m.id} className="bg-[#0d1117] border border-white/5 rounded-lg px-3 py-2.5">
               <div className="flex items-center justify-between">
                 <div>
                   <span className="text-[11px] font-medium">{m.name}</span>
                   <span className="text-[9px] text-[#8b949e] ml-2">{m.id}</span>
                 </div>
-                <div className="flex items-center gap-3 text-[9px] text-[#8b949e]">
-                  <span className={typeColor}>{m.maxResolution}</span>
-                  <span className="text-orange-400">${m.costPerRequest}/طلب</span>
+                <div className="flex items-center gap-2 text-[9px]">
+                  <span className={typeColor} title="أقصى دقة">{m.maxResolution}</span>
+                  <span className="text-blue-400" title="أقصى حجم ملف">{m.maxFileSizeMb} MB</span>
                 </div>
               </div>
-              <p className="text-[9px] text-[#8b949e]/70 mt-1">{m.description}</p>
+              <div className="flex items-center gap-3 mt-1.5 text-[9px]">
+                <span className="px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400" title="تكلفة لكل طلب">${m.costPerRequest}/طلب (per request)</span>
+                <span className="px-1.5 py-0.5 rounded bg-green-500/10 text-green-400" title="تكلفة لكل توكن">${m.costPerToken}/توكن (per token)</span>
+              </div>
+              <p className="text-[9px] text-[#8b949e]/70 mt-1.5">{m.description}</p>
             </div>
           ))}
+        </div>
+      </div>
+
+      {usage && (
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <BarChart2 className="w-3.5 h-3.5 text-blue-400" />
+            <span className="text-[11px] font-medium"><BLabel ar="الاستهلاك" en="Usage Statistics" /></span>
+          </div>
+          <FieldHint text={isImage ? "إحصائيات استخدام مزود الصور: التكلفة والطلبات والحجم" : "إحصائيات استخدام مزود الفيديو: التكلفة والطلبات والحجم"} />
+          <div className="grid grid-cols-3 gap-2 mt-1.5">
+            {[
+              { label: "اليوم (Today)", data: usage.daily },
+              { label: "الأسبوع (Week)", data: usage.weekly },
+              { label: "الشهر (Month)", data: usage.monthly },
+            ].map(period => (
+              <div key={period.label} className="bg-[#0d1117] border border-white/5 rounded-lg p-2.5">
+                <span className="text-[9px] text-[#8b949e] block mb-1">{period.label}</span>
+                <div className="text-[13px] font-bold text-green-400">${(period.data.cost || 0).toFixed(4)}</div>
+                <div className="text-[9px] text-[#8b949e] mt-0.5">
+                  {period.data.requests || 0} طلب · {(period.data.tokens / 1000).toFixed(1)}K توكن
+                </div>
+                <div className="text-[9px] text-blue-400 mt-0.5">
+                  {(period.data.totalSizeMb || 0).toFixed(1)} MB حجم الملفات
+                </div>
+              </div>
+            ))}
+          </div>
+          {budget > 0 && budgetPercent >= (provider.alertThreshold || 80) && (
+            <div className={`mt-2 flex items-center gap-2 p-2 rounded-lg text-[11px] ${budgetPercent >= 100 ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"}`}>
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              {budgetPercent >= 100 ? "تجاوزت الميزانية الشهرية!" : `وصلت ${budgetPercent.toFixed(0)}% من الميزانية`}
+            </div>
+          )}
+        </div>
+      )}
+
+      {linkedAgents.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Bot className="w-3.5 h-3.5 text-yellow-400" />
+            <span className="text-[11px] font-medium"><BLabel ar="الوكلاء المرتبطون" en="Linked Agents" /></span>
+          </div>
+          <FieldHint text="الوكلاء الذين يستخدمون نماذج من هذا المزود" />
+          <div className="grid gap-1.5 mt-1.5">
+            {linkedAgents.map(a => (
+              <div key={a.agentKey} className="flex items-center justify-between bg-[#0d1117] border border-white/5 rounded-lg px-3 py-2">
+                <div>
+                  <span className="text-[11px] font-medium">{a.displayNameAr} <span className="text-[#58a6ff]">({a.displayNameEn})</span></span>
+                  <div className="flex gap-1 mt-0.5">
+                    {a.slots.map((s: any) => (
+                      <span key={s.slot} className={`text-[9px] px-1.5 py-0.5 rounded ${isImage ? "bg-pink-500/10 text-pink-400" : "bg-cyan-500/10 text-cyan-400"}`}>{s.slot}: {s.model}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {usage && usage.recentLogs && usage.recentLogs.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Activity className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="text-[11px] font-medium"><BLabel ar="آخر الطلبات" en="Recent Requests" /></span>
+          </div>
+          <FieldHint text="سجل آخر الطلبات المرسلة لهذا المزود" />
+          <div className="max-h-40 overflow-y-auto space-y-1 mt-1.5">
+            {usage.recentLogs.slice(0, 20).map((log: any, i: number) => (
+              <div key={i} className="flex items-center justify-between bg-[#0d1117] border border-white/5 rounded px-2.5 py-1.5 text-[10px]">
+                <div className="flex items-center gap-2">
+                  <span className={log.success ? "text-green-400" : "text-red-400"}>{log.success ? "✓" : "✗"}</span>
+                  <span className="text-[#8b949e]">{log.modelId}</span>
+                  {log.agentKey && <span className="text-[#7c3aed]">{log.agentKey}</span>}
+                </div>
+                <div className="flex items-center gap-2 text-[#8b949e]">
+                  <span>{parseFloat(log.fileSizeMb || 0).toFixed(1)} MB</span>
+                  <span className="text-green-400">${parseFloat(log.costUsd).toFixed(5)}</span>
+                  <span>{new Date(log.createdAt).toLocaleTimeString()}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="bg-[#161b22] border border-white/7 rounded-xl p-3">
+        <div className="text-[10px] font-medium mb-2"><BLabel ar="ملخص سريع" en="Quick Summary" /></div>
+        <div className="grid grid-cols-4 gap-2">
+          <div className="text-center">
+            <div className={`text-[14px] font-bold ${typeColor}`}>{provider.models.length}</div>
+            <div className="text-[8px] text-[#8b949e]">نماذج متوفرة</div>
+          </div>
+          <div className="text-center">
+            <div className="text-[14px] font-bold text-orange-400">${Math.min(...provider.models.map(m => m.costPerRequest)).toFixed(3)}</div>
+            <div className="text-[8px] text-[#8b949e]">أقل تكلفة/طلب</div>
+          </div>
+          <div className="text-center">
+            <div className="text-[14px] font-bold text-blue-400">{Math.max(...provider.models.map(m => m.maxFileSizeMb))} MB</div>
+            <div className="text-[8px] text-[#8b949e]">أقصى حجم ملف</div>
+          </div>
+          <div className="text-center">
+            <div className="text-[14px] font-bold text-green-400">{provider.models.map(m => m.maxResolution).sort().pop()}</div>
+            <div className="text-[8px] text-[#8b949e]">أعلى دقة</div>
+          </div>
         </div>
       </div>
 
@@ -466,21 +656,43 @@ export default function AIControlCenter() {
   const [search, setSearch] = useState("");
   const [activeSection, setActiveSection] = useState<SidebarSection>("ai");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const [showSyncPanel, setShowSyncPanel] = useState(false);
+
+  const loadSyncStatus = () => {
+    fetch(`${API}/providers/sync/status`, { credentials: "include" }).then(r => r.ok ? r.json() : null).then(s => setSyncStatus(s)).catch(() => {});
+  };
 
   useEffect(() => {
     Promise.all([
       fetch(`${API}/providers`, { credentials: "include" }).then(r => r.json()).catch(() => []),
       fetch(`${API}/media-providers`, { credentials: "include" }).then(r => r.json()).catch(() => []),
     ]).then(([aiP, mediaP]) => {
-      setProviders(aiP);
-      setMediaProviders(mediaP);
-      if (aiP.length > 0) setSelectedKey(aiP[0].providerKey);
+      setProviders(Array.isArray(aiP) ? aiP : []);
+      setMediaProviders(Array.isArray(mediaP) ? mediaP : []);
+      if (Array.isArray(aiP) && aiP.length > 0) setSelectedKey(aiP[0].providerKey);
     }).finally(() => setLoading(false));
+    loadSyncStatus();
+    const interval = setInterval(loadSyncStatus, 60000);
+    return () => clearInterval(interval);
   }, []);
+
+  const triggerSync = () => {
+    fetch(`${API}/providers/sync/trigger`, { method: "POST", credentials: "include" })
+      .then(() => { setTimeout(loadSyncStatus, 2000); });
+  };
+
+  const updateSyncInterval = (mins: number) => {
+    fetch(`${API}/providers/sync/interval`, { method: "PUT", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ intervalMinutes: mins }) })
+      .then(r => r.ok ? r.json() : null).then(() => loadSyncStatus());
+  };
 
   const updateProvider = (key: string, data: Partial<AiProvider>) => {
     fetch(`${API}/providers/${key}`, { method: "PUT", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(data) })
-      .then(r => r.json()).then(updated => { setProviders(prev => prev.map(p => p.providerKey === key ? { ...p, ...updated } : p)); });
+      .then(r => r.json()).then(updated => {
+        setProviders(prev => prev.map(p => p.providerKey === key ? { ...p, ...updated } : p));
+        fetch(`${API}/media-providers`, { credentials: "include" }).then(r => r.json()).then(mp => { if (Array.isArray(mp)) setMediaProviders(mp); }).catch(() => {});
+      });
   };
 
   const deleteProvider = (key: string) => {
@@ -496,7 +708,18 @@ export default function AIControlCenter() {
 
   const updateMediaProvider = (key: string, data: any) => {
     fetch(`${API}/media-providers/${key}`, { method: "PUT", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(data) })
-      .then(r => r.json()).then(updated => { setMediaProviders(prev => prev.map(p => p.providerKey === key ? { ...p, ...updated } : p)); });
+      .then(r => r.json()).then(updated => {
+        setMediaProviders(prev => prev.map(p => p.providerKey === key ? { ...p, ...updated } : p));
+        if (data.apiKey !== undefined) {
+          Promise.all([
+            fetch(`${API}/providers`, { credentials: "include" }).then(r => r.json()).catch(() => []),
+            fetch(`${API}/media-providers`, { credentials: "include" }).then(r => r.json()).catch(() => []),
+          ]).then(([aiP, mediaP]) => {
+            if (Array.isArray(aiP)) setProviders(aiP);
+            if (Array.isArray(mediaP)) setMediaProviders(mediaP);
+          });
+        }
+      });
   };
 
   const deleteMediaProvider = (key: string) => {
@@ -543,8 +766,104 @@ export default function AIControlCenter() {
           <span>{providers.length} مزود نصي</span>
           <span>{imageProviders.length} مزود صور</span>
           <span>{videoProviders.length} مزود فيديو</span>
+          <button
+            onClick={() => setShowSyncPanel(!showSyncPanel)}
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg border transition-colors ${syncStatus?.syncInProgress ? "bg-blue-500/10 text-blue-400 border-blue-500/20 animate-pulse" : "bg-white/5 text-[#8b949e] border-white/10 hover:text-white"}`}
+          >
+            <RefreshCw className={`w-3 h-3 ${syncStatus?.syncInProgress ? "animate-spin" : ""}`} />
+            <span>{syncStatus?.syncInProgress ? "جاري المزامنة..." : "المزامنة"}</span>
+          </button>
         </div>
       </div>
+
+      {showSyncPanel && syncStatus && (
+        <div className="px-4 py-3 border-b border-white/7 bg-[#0d1117]">
+          <div className="bg-[#161b22] border border-white/7 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-[#7c3aed]" />
+                <span className="text-[12px] font-medium"><BLabel ar="مزامنة التحقق من المزودين" en="Provider Verification Sync" /></span>
+              </div>
+              <button
+                onClick={triggerSync}
+                disabled={syncStatus.syncInProgress}
+                className="flex items-center gap-1 px-3 py-1.5 bg-[#7c3aed]/20 text-[#7c3aed] rounded-lg text-[10px] hover:bg-[#7c3aed]/30 disabled:opacity-50"
+              >
+                <Zap className="w-3 h-3" />
+                {syncStatus.syncInProgress ? "جاري المزامنة..." : "مزامنة الآن (Sync Now)"}
+              </button>
+            </div>
+
+            <p className="text-[9px] text-[#8b949e]/70 mb-3 leading-relaxed">
+              يتم التحقق من صلاحية مفاتيح API وحالة المزودين بشكل دوري بفترات معقولة بدون ضغط على السيرفر.
+              كل مزود يتم فحصه مع تأخير 2 ثانية بين كل فحص لتجنب الضغط.
+            </p>
+
+            <div className="grid grid-cols-4 gap-3 mb-3">
+              <div className="bg-[#0d1117] border border-white/5 rounded-lg p-2.5">
+                <div className="text-[9px] text-[#8b949e] mb-0.5">آخر مزامنة (Last Sync)</div>
+                <div className="text-[11px] font-medium">{syncStatus.lastSyncAt ? new Date(syncStatus.lastSyncAt).toLocaleTimeString("ar") : "لم يتم بعد"}</div>
+              </div>
+              <div className="bg-[#0d1117] border border-white/5 rounded-lg p-2.5">
+                <div className="text-[9px] text-[#8b949e] mb-0.5">المزامنة التالية (Next)</div>
+                <div className="text-[11px] font-medium">{syncStatus.nextSyncAt ? new Date(syncStatus.nextSyncAt).toLocaleTimeString("ar") : "—"}</div>
+              </div>
+              <div className="bg-[#0d1117] border border-white/5 rounded-lg p-2.5">
+                <div className="text-[9px] text-[#8b949e] mb-0.5">الحالة (Status)</div>
+                <div className={`text-[11px] font-medium ${syncStatus.syncInProgress ? "text-blue-400" : "text-green-400"}`}>
+                  {syncStatus.syncInProgress ? "جاري التشغيل..." : "مكتمل"}
+                </div>
+              </div>
+              <div className="bg-[#0d1117] border border-white/5 rounded-lg p-2.5">
+                <div className="text-[9px] text-[#8b949e] mb-0.5">الفترة (Interval)</div>
+                <select
+                  value={syncStatus.syncIntervalMinutes}
+                  onChange={e => updateSyncInterval(parseInt(e.target.value))}
+                  className="bg-transparent text-[11px] font-medium text-[#7c3aed] border-none outline-none cursor-pointer"
+                >
+                  <option value="5">5 دقائق</option>
+                  <option value="15">15 دقيقة</option>
+                  <option value="30">30 دقيقة</option>
+                  <option value="60">ساعة</option>
+                  <option value="360">6 ساعات</option>
+                  <option value="720">12 ساعة</option>
+                  <option value="1440">24 ساعة</option>
+                </select>
+              </div>
+            </div>
+
+            {syncStatus.results.length > 0 && (
+              <div>
+                <div className="text-[10px] text-[#8b949e] mb-1.5">نتائج آخر فحص (Last Check Results)</div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5">
+                  {syncStatus.results.map(r => {
+                    const statusColors: Record<string, string> = {
+                      verified: "text-green-400 bg-green-500/10",
+                      assumed_valid: "text-blue-400 bg-blue-500/10",
+                      key_invalid: "text-red-400 bg-red-500/10",
+                      unreachable: "text-orange-400 bg-orange-500/10",
+                      skipped_no_key: "text-[#8b949e] bg-white/5",
+                    };
+                    const statusLabels: Record<string, string> = {
+                      verified: "تم التحقق ✓",
+                      assumed_valid: "صالح (افتراضي)",
+                      key_invalid: "مفتاح غير صالح ✗",
+                      unreachable: "غير متاح",
+                      skipped_no_key: "بدون مفتاح",
+                    };
+                    return (
+                      <div key={r.providerKey} className={`rounded-lg px-2 py-1.5 text-[9px] ${statusColors[r.status] || "bg-white/5 text-[#8b949e]"}`}>
+                        <div className="font-medium">{r.providerKey}</div>
+                        <div className="opacity-80">{statusLabels[r.status] || r.status}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-4 gap-3 px-4 py-3 border-b border-white/7">
         <div className="bg-[#161b22] border border-white/7 rounded-xl p-2.5">
@@ -610,7 +929,10 @@ export default function AIControlCenter() {
               >
                 <StatusDot status={p.keyStatus} />
                 <div className="flex-1 min-w-0">
-                  <div className="text-[11px] font-medium truncate">{p.displayNameAr}</div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[11px] font-medium truncate">{p.displayNameAr}</span>
+                    {p.parentProvider && <Link2 className="w-2.5 h-2.5 text-amber-400 shrink-0" />}
+                  </div>
                   <div className="text-[9px] text-[#8b949e] truncate">{p.displayName}</div>
                 </div>
                 <span className="text-[9px] text-[#8b949e] shrink-0">{p.models?.length || 0}</span>
