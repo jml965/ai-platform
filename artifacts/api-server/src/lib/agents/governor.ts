@@ -11,6 +11,7 @@ interface ModelSlot {
   enabled: boolean;
   creativity?: number;
   timeoutSeconds?: number;
+  maxTokens?: number;
 }
 
 interface GovernorModelSlot {
@@ -18,6 +19,7 @@ interface GovernorModelSlot {
   model: string;
   creativity?: number;
   timeoutSeconds?: number;
+  maxTokens?: number;
 }
 
 interface GovernorResult {
@@ -108,7 +110,8 @@ export async function runGovernor(
   }
 
   if (!agentConfig.governorEnabled || slots.length === 1) {
-    const result = await callModel(slots[0], systemPrompt, userMessage, maxTokens);
+    const slotTokens = slots[0].maxTokens ?? maxTokens;
+    const result = await callModel(slots[0], systemPrompt, userMessage, slotTokens);
     if (!result) throw new Error(`Primary model failed for ${agentConfig.agentKey}`);
     return {
       content: result.content,
@@ -121,7 +124,7 @@ export async function runGovernor(
   console.log(`[Governor] Running ${slots.length} models in parallel for ${agentConfig.agentKey}`);
 
   const results = await Promise.allSettled(
-    slots.map(slot => callModel(slot, systemPrompt, userMessage, maxTokens))
+    slots.map(slot => callModel(slot, systemPrompt, userMessage, slot.maxTokens ?? maxTokens))
   );
 
   const successResults: { content: string; tokensUsed: number; model: string }[] = [];
@@ -160,16 +163,17 @@ Now produce the BEST unified solution:`;
 
   const govModel = agentConfig.governorModel as GovernorModelSlot | null;
   const mergerSlot: ModelSlot | GovernorModelSlot = govModel
-    ? { provider: govModel.provider, model: govModel.model, creativity: govModel.creativity, timeoutSeconds: govModel.timeoutSeconds }
+    ? { provider: govModel.provider, model: govModel.model, creativity: govModel.creativity, timeoutSeconds: govModel.timeoutSeconds, maxTokens: govModel.maxTokens }
     : slots[0];
 
-  console.log(`[Governor] Merger model: ${mergerSlot.model} (${govModel ? "custom governor" : "fallback to primary"})`);
+  const governorMaxTokens = govModel?.maxTokens ?? maxTokens;
+  console.log(`[Governor] Merger model: ${mergerSlot.model} (${govModel ? "custom governor" : "fallback to primary"}) | maxTokens: ${governorMaxTokens} | creativity: ${mergerSlot.creativity ?? 0.7} | timeout: ${(mergerSlot as any).timeoutSeconds ?? 240}s`);
 
   const mergeResult = await callModel(
     mergerSlot,
     "You merge multiple AI proposals into a single optimal solution. Output ONLY the merged result.",
     mergePrompt,
-    maxTokens
+    governorMaxTokens
   );
 
   if (!mergeResult) {

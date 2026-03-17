@@ -12,10 +12,10 @@ export const agentConfigsTable = pgTable("agent_configs", {
   isCustom: boolean("is_custom").notNull().default(false),
 
   governorEnabled: boolean("governor_enabled").notNull().default(false),
-  governorModel: jsonb("governor_model").$type<{ provider: string; model: string; creativity: number; timeoutSeconds: number }>(),
-  primaryModel: jsonb("primary_model").$type<{ provider: string; model: string; enabled: boolean; creativity: number; timeoutSeconds: number }>().notNull(),
-  secondaryModel: jsonb("secondary_model").$type<{ provider: string; model: string; enabled: boolean; creativity: number; timeoutSeconds: number }>(),
-  tertiaryModel: jsonb("tertiary_model").$type<{ provider: string; model: string; enabled: boolean; creativity: number; timeoutSeconds: number }>(),
+  governorModel: jsonb("governor_model").$type<{ provider: string; model: string; creativity: number; timeoutSeconds: number; maxTokens: number }>(),
+  primaryModel: jsonb("primary_model").$type<{ provider: string; model: string; enabled: boolean; creativity: number; timeoutSeconds: number; maxTokens: number }>().notNull(),
+  secondaryModel: jsonb("secondary_model").$type<{ provider: string; model: string; enabled: boolean; creativity: number; timeoutSeconds: number; maxTokens: number }>(),
+  tertiaryModel: jsonb("tertiary_model").$type<{ provider: string; model: string; enabled: boolean; creativity: number; timeoutSeconds: number; maxTokens: number }>(),
 
   systemPrompt: text("system_prompt").notNull().default(""),
   instructions: text("instructions").default(""),

@@ -17,6 +17,7 @@ interface ModelSlot {
   enabled: boolean;
   creativity?: number;
   timeoutSeconds?: number;
+  maxTokens?: number;
 }
 
 interface AgentConfig {
@@ -28,7 +29,7 @@ interface AgentConfig {
   enabled: boolean;
   isCustom: boolean;
   governorEnabled: boolean;
-  governorModel: { provider: string; model: string; creativity: number; timeoutSeconds: number } | null;
+  governorModel: { provider: string; model: string; creativity: number; timeoutSeconds: number; maxTokens: number } | null;
   primaryModel: ModelSlot;
   secondaryModel: ModelSlot | null;
   tertiaryModel: ModelSlot | null;
@@ -421,9 +422,10 @@ function AgentListItem({ agent, selected, onClick, isRTL }: { agent: AgentConfig
 
 function ModelSlotEditor({ slot, index, onChange, isRTL }: { slot: ModelSlot | null; index: number; onChange: (s: ModelSlot) => void; isRTL: boolean }) {
   const labels = [isRTL ? "النموذج الأساسي" : "Primary Model", isRTL ? "النموذج الثانوي" : "Secondary Model", isRTL ? "النموذج الثالث" : "Tertiary Model"];
-  const current = slot || { provider: "anthropic", model: "claude-sonnet-4-20250514", enabled: false, creativity: 0.7, timeoutSeconds: 240 };
+  const current = slot || { provider: "anthropic", model: "claude-sonnet-4-20250514", enabled: false, creativity: 0.7, timeoutSeconds: 240, maxTokens: 16000 };
   const creativity = current.creativity ?? 0.7;
   const timeoutSeconds = current.timeoutSeconds ?? 240;
+  const maxTokens = current.maxTokens ?? 16000;
 
   return (
     <div className="bg-[#0d1117] border border-white/10 rounded-lg p-3">
@@ -449,7 +451,7 @@ function ModelSlotEditor({ slot, index, onChange, isRTL }: { slot: ModelSlot | n
         ))}
       </select>
 
-      <div className="grid grid-cols-2 gap-2 mt-1">
+      <div className="grid grid-cols-3 gap-2 mt-1">
         <div>
           <label className="text-[10px] text-[#8b949e] mb-1 block">{isRTL ? "الإبداع" : "Creativity"}</label>
           <div className="flex items-center gap-1.5">
@@ -474,6 +476,18 @@ function ModelSlotEditor({ slot, index, onChange, isRTL }: { slot: ModelSlot | n
             step="10"
             value={timeoutSeconds}
             onChange={e => onChange({ ...current, timeoutSeconds: parseInt(e.target.value) || 240 })}
+            className="w-full bg-[#161b22] border border-white/10 rounded px-2 py-1 text-[11px] text-[#e2e8f0]"
+          />
+        </div>
+        <div>
+          <label className="text-[10px] text-[#8b949e] mb-1 block">{isRTL ? "التوكن" : "Max Tokens"}</label>
+          <input
+            type="number"
+            min="1000"
+            max="200000"
+            step="1000"
+            value={maxTokens}
+            onChange={e => onChange({ ...current, maxTokens: parseInt(e.target.value) || 16000 })}
             className="w-full bg-[#161b22] border border-white/10 rounded px-2 py-1 text-[11px] text-[#e2e8f0]"
           />
         </div>
@@ -509,7 +523,7 @@ function ModelsTab({ agent, onUpdate, isRTL }: { agent: AgentConfig; onUpdate: (
         </p>
 
         {agent.governorEnabled && (() => {
-          const gov = agent.governorModel || { provider: "", model: "", creativity: 0.5, timeoutSeconds: 300 };
+          const gov = agent.governorModel || { provider: "", model: "", creativity: 0.5, timeoutSeconds: 300, maxTokens: 16000 };
           return (
           <div className="bg-[#0d1117] border border-yellow-500/20 rounded-lg p-3 mt-2">
             <div className="flex items-center gap-2 mb-2">
@@ -529,7 +543,7 @@ function ModelsTab({ agent, onUpdate, isRTL }: { agent: AgentConfig; onUpdate: (
                   onUpdate({ governorModel: null } as any);
                 } else {
                   const [provider, model] = e.target.value.split("::");
-                  onUpdate({ governorModel: { provider, model, creativity: gov.creativity ?? 0.5, timeoutSeconds: gov.timeoutSeconds ?? 300 } } as any);
+                  onUpdate({ governorModel: { provider, model, creativity: gov.creativity ?? 0.5, timeoutSeconds: gov.timeoutSeconds ?? 300, maxTokens: gov.maxTokens ?? 16000 } } as any);
                 }
               }}
               className="w-full bg-[#161b22] border border-yellow-500/20 rounded-lg px-3 py-2 text-[12px] text-[#e2e8f0]"
@@ -541,7 +555,7 @@ function ModelsTab({ agent, onUpdate, isRTL }: { agent: AgentConfig; onUpdate: (
             </select>
 
             {gov.provider && gov.model && (
-              <div className="grid grid-cols-2 gap-2 mt-2">
+              <div className="grid grid-cols-3 gap-2 mt-2">
                 <div>
                   <label className="text-[10px] text-yellow-400/70 mb-1 block">{isRTL ? "إبداع الحاكم" : "Governor Creativity"}</label>
                   <div className="flex items-center gap-1.5">
@@ -558,7 +572,7 @@ function ModelsTab({ agent, onUpdate, isRTL }: { agent: AgentConfig; onUpdate: (
                   </div>
                 </div>
                 <div>
-                  <label className="text-[10px] text-yellow-400/70 mb-1 block">{isRTL ? "مهلة الحاكم (ثانية)" : "Governor Timeout (s)"}</label>
+                  <label className="text-[10px] text-yellow-400/70 mb-1 block">{isRTL ? "مهلة الحاكم (ثانية)" : "Timeout (s)"}</label>
                   <input
                     type="number"
                     min="30"
@@ -566,6 +580,18 @@ function ModelsTab({ agent, onUpdate, isRTL }: { agent: AgentConfig; onUpdate: (
                     step="10"
                     value={gov.timeoutSeconds ?? 300}
                     onChange={e => onUpdate({ governorModel: { ...gov, timeoutSeconds: parseInt(e.target.value) || 300 } } as any)}
+                    className="w-full bg-[#161b22] border border-yellow-500/20 rounded px-2 py-1 text-[11px] text-yellow-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-yellow-400/70 mb-1 block">{isRTL ? "توكن الحاكم" : "Governor Tokens"}</label>
+                  <input
+                    type="number"
+                    min="1000"
+                    max="200000"
+                    step="1000"
+                    value={gov.maxTokens ?? 16000}
+                    onChange={e => onUpdate({ governorModel: { ...gov, maxTokens: parseInt(e.target.value) || 16000 } } as any)}
                     className="w-full bg-[#161b22] border border-yellow-500/20 rounded px-2 py-1 text-[11px] text-yellow-400"
                   />
                 </div>
