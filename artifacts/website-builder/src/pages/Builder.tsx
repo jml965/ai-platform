@@ -565,7 +565,9 @@ export default function Builder() {
   useEffect(() => {
     if (!id) return;
     const baseUrl = import.meta.env.VITE_API_URL || "";
+    let stopped = false;
     const check = () => {
+      if (stopped) return;
       fetch(`${baseUrl}/api/sandbox/project/${id}`)
         .then(r => r.ok ? r.json() : null)
         .then(d => {
@@ -575,9 +577,18 @@ export default function Builder() {
         })
         .catch(() => {});
     };
+    const triggerRecovery = () => {
+      if (stopped) return;
+      fetch(`${baseUrl}/api/sandbox/proxy/${id}/`, { method: "HEAD" })
+        .then(() => {
+          setTimeout(check, 3000);
+        })
+        .catch(() => {});
+    };
     check();
+    triggerRecovery();
     const iv = setInterval(check, 5000);
-    return () => clearInterval(iv);
+    return () => { stopped = true; clearInterval(iv); };
   }, [id]);
 
   const sandboxProxyUrl = useMemo(() => {

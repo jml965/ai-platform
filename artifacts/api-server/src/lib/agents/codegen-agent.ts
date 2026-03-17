@@ -113,6 +113,26 @@ FASTAPI (Python) PROJECTS:
 
 === END CRITICAL RULES ===
 
+=== ABSOLUTELY FORBIDDEN — NEVER DO THIS ===
+- NEVER generate a website builder, code editor, IDE, dashboard builder, or any "platform to create other things"
+- NEVER generate a website that has "create project", "build", "deploy", "workspace", "agents", "AI assistant" features
+- NEVER mimic or copy the tool/platform that is generating this code
+- If the user asks for a "company website" → generate the ACTUAL company website with real sections (hero, about, services, contact), NOT a platform to build websites
+- If the user asks for an "e-commerce store" → generate the ACTUAL store with products, cart, checkout, NOT a store builder
+- Always generate the END-USER PRODUCT, never a meta-tool
+=== END FORBIDDEN ===
+
+VISUAL DESIGN RULES:
+- Use beautiful, modern UI with gradients, shadows, rounded corners, and spacing
+- Use professional color palettes — not just gray/blue. Pick colors matching the website's industry
+- For hero sections: use gradient backgrounds (e.g., from-blue-600 to-purple-700) or solid vibrant colors
+- Use placeholder images from https://images.unsplash.com/photo-{id}?w=800&h=600&fit=crop for realistic visuals
+- Include proper typography hierarchy: large hero text, medium headings, readable body text
+- Add hover effects and smooth transitions on buttons and cards
+- For Arabic websites: use proper RTL layout, Arabic fonts, and culturally appropriate design
+- Add visual icons using lucide-react to enhance sections (e.g., services cards, feature lists)
+- Use Tailwind's spacing scale consistently (p-4, p-6, p-8 for sections)
+
 Project Generation Rules:
 - Generate a COMPLETE, working project — not placeholder or demo code
 - Include all necessary files: components, routes, utilities, styles, configuration

@@ -342,16 +342,36 @@ router.use("/sandbox/proxy", async (req: Request, res: Response) => {
           proxyRes.on("data", (chunk: Buffer) => chunks.push(chunk));
           proxyRes.on("end", () => {
             let html = Buffer.concat(chunks).toString("utf8");
+            html = html.replace(/(src|href)="\/(?!\/)/g, `$1="${proxyPrefix}/`);
+            html = html.replace(/from\s+"\/(?!\/)/g, `from "${proxyPrefix}/`);
             const routerFixScript = `<script>
 (function(){
   var prefix = "${proxyPrefix}";
+  var origPushState = history.pushState;
+  var origReplaceState = history.replaceState;
+  function fixPath(url) {
+    if (typeof url === "string" && url.startsWith("/") && !url.startsWith(prefix)) {
+      return prefix + url;
+    }
+    return url;
+  }
+  history.pushState = function(state, title, url) {
+    return origPushState.call(this, state, title, fixPath(url));
+  };
+  history.replaceState = function(state, title, url) {
+    return origReplaceState.call(this, state, title, fixPath(url));
+  };
+  window.__SANDBOX_PREFIX__ = prefix;
   if(window.location.pathname.startsWith(prefix)){
     var real = window.location.pathname.slice(prefix.length) || "/";
-    window.history.replaceState(null, "", real);
+    origReplaceState.call(history, null, "", real);
   }
 })();
 </script>`;
-            html = html.replace("<head>", "<head>" + routerFixScript);
+            html = html.replace("<!DOCTYPE html>", "<!DOCTYPE html>" + routerFixScript);
+            if (!html.includes("<!DOCTYPE html>")) {
+              html = html.replace("<html", routerFixScript + "<html");
+            }
             const headers = { ...proxyRes.headers };
             delete headers["content-length"];
             delete headers["content-encoding"];
@@ -360,8 +380,32 @@ router.use("/sandbox/proxy", async (req: Request, res: Response) => {
             res.end(html);
           });
         } else {
-          res.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
-          proxyRes.pipe(res, { end: true });
+          const contentType = proxyRes.headers["content-type"] || "";
+          const isJsModule = contentType.includes("javascript") ||
+                            contentType.includes("typescript") ||
+                            cleanPath.endsWith(".js") || cleanPath.endsWith(".ts") ||
+                            cleanPath.endsWith(".tsx") || cleanPath.endsWith(".jsx") ||
+                            cleanPath.endsWith(".mjs") ||
+                            cleanPath.startsWith("/@") || cleanPath.startsWith("/node_modules/");
+
+          if (isJsModule) {
+            const chunks: Buffer[] = [];
+            proxyRes.on("data", (chunk: Buffer) => chunks.push(chunk));
+            proxyRes.on("end", () => {
+              let js = Buffer.concat(chunks).toString("utf8");
+              js = js.replace(/from\s+"\/(?!\/)/g, `from "${proxyPrefix}/`);
+              js = js.replace(/import\s*\(\s*"\/(?!\/)/g, `import("${proxyPrefix}/`);
+              js = js.replace(/import\s+"\/(?!\/)/g, `import "${proxyPrefix}/`);
+              const headers = { ...proxyRes.headers };
+              delete headers["content-length"];
+              delete headers["content-encoding"];
+              res.writeHead(proxyRes.statusCode || 200, headers);
+              res.end(js);
+            });
+          } else {
+            res.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
+            proxyRes.pipe(res, { end: true });
+          }
         }
       }
     );
