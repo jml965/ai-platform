@@ -600,7 +600,7 @@ export default function Builder() {
       l.details &&
       typeof l.details === "object" &&
       "serverStarted" in l.details &&
-      (l.details as any).serverStarted === true
+      (l.details as Record<string, unknown>).serverStarted === true
     );
     if (runnerLog || sandboxRunning) {
       const baseUrl = import.meta.env.VITE_API_URL || "";
