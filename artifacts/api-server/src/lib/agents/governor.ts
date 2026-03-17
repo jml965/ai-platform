@@ -9,6 +9,15 @@ interface ModelSlot {
   provider: string;
   model: string;
   enabled: boolean;
+  creativity?: number;
+  timeoutSeconds?: number;
+}
+
+interface GovernorModelSlot {
+  provider: string;
+  model: string;
+  creativity?: number;
+  timeoutSeconds?: number;
 }
 
 interface GovernorResult {
@@ -19,27 +28,31 @@ interface GovernorResult {
 }
 
 async function callModel(
-  slot: ModelSlot,
+  slot: ModelSlot | GovernorModelSlot,
   systemPrompt: string,
   userMessage: string,
-  maxTokens: number
+  maxTokens: number,
+  fallbackCreativity?: number
 ): Promise<{ content: string; tokensUsed: number; model: string } | null> {
+  const temperature = slot.creativity ?? fallbackCreativity ?? 0.7;
+  const timeoutMs = (slot.timeoutSeconds ?? 240) * 1000;
+
   try {
     if (slot.provider === "anthropic") {
       const stream = anthropic.messages.stream({
         model: slot.model,
         max_tokens: maxTokens,
+        temperature,
         system: systemPrompt,
         messages: [{ role: "user", content: userMessage }],
       });
 
-      const timeoutMs = 4 * 60 * 1000;
       const response = await Promise.race([
         stream.finalMessage(),
         new Promise<never>((_, reject) =>
           setTimeout(() => {
             stream.abort();
-            reject(new Error("Governor model call timed out"));
+            reject(new Error(`Model ${slot.model} timed out after ${slot.timeoutSeconds ?? 240}s`));
           }, timeoutMs)
         ),
       ]);
@@ -54,6 +67,7 @@ async function callModel(
       const response = await openai.chat.completions.create({
         model: slot.model,
         max_completion_tokens: maxTokens,
+        temperature,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userMessage },
@@ -144,7 +158,13 @@ ${successResults.map((r, i) => `=== PROPOSAL ${i + 1} (from ${r.model}) ===\n${r
 
 Now produce the BEST unified solution:`;
 
-  const mergerSlot = slots[0];
+  const govModel = agentConfig.governorModel as GovernorModelSlot | null;
+  const mergerSlot: ModelSlot | GovernorModelSlot = govModel
+    ? { provider: govModel.provider, model: govModel.model, creativity: govModel.creativity, timeoutSeconds: govModel.timeoutSeconds }
+    : slots[0];
+
+  console.log(`[Governor] Merger model: ${mergerSlot.model} (${govModel ? "custom governor" : "fallback to primary"})`);
+
   const mergeResult = await callModel(
     mergerSlot,
     "You merge multiple AI proposals into a single optimal solution. Output ONLY the merged result.",
@@ -166,7 +186,7 @@ Now produce the BEST unified solution:`;
   return {
     content: mergeResult.content,
     tokensUsed: totalTokens,
-    modelsUsed: [...successResults.map(r => r.model), `${mergerSlot.model}(merger)`],
+    modelsUsed: [...successResults.map(r => r.model), `${mergerSlot.model}(governor)`],
     mergedFrom: successResults.length,
   };
 }

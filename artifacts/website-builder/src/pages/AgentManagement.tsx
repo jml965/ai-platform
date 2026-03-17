@@ -15,6 +15,8 @@ interface ModelSlot {
   provider: string;
   model: string;
   enabled: boolean;
+  creativity?: number;
+  timeoutSeconds?: number;
 }
 
 interface AgentConfig {
@@ -26,6 +28,7 @@ interface AgentConfig {
   enabled: boolean;
   isCustom: boolean;
   governorEnabled: boolean;
+  governorModel: { provider: string; model: string; creativity: number; timeoutSeconds: number } | null;
   primaryModel: ModelSlot;
   secondaryModel: ModelSlot | null;
   tertiaryModel: ModelSlot | null;
@@ -418,7 +421,9 @@ function AgentListItem({ agent, selected, onClick, isRTL }: { agent: AgentConfig
 
 function ModelSlotEditor({ slot, index, onChange, isRTL }: { slot: ModelSlot | null; index: number; onChange: (s: ModelSlot) => void; isRTL: boolean }) {
   const labels = [isRTL ? "النموذج الأساسي" : "Primary Model", isRTL ? "النموذج الثانوي" : "Secondary Model", isRTL ? "النموذج الثالث" : "Tertiary Model"];
-  const current = slot || { provider: "anthropic", model: "claude-sonnet-4-20250514", enabled: false };
+  const current = slot || { provider: "anthropic", model: "claude-sonnet-4-20250514", enabled: false, creativity: 0.7, timeoutSeconds: 240 };
+  const creativity = current.creativity ?? 0.7;
+  const timeoutSeconds = current.timeoutSeconds ?? 240;
 
   return (
     <div className="bg-[#0d1117] border border-white/10 rounded-lg p-3">
@@ -437,12 +442,42 @@ function ModelSlotEditor({ slot, index, onChange, isRTL }: { slot: ModelSlot | n
           const [provider, model] = e.target.value.split("::");
           onChange({ ...current, provider, model });
         }}
-        className="w-full bg-[#161b22] border border-white/10 rounded-lg px-3 py-2 text-[12px] text-[#e2e8f0]"
+        className="w-full bg-[#161b22] border border-white/10 rounded-lg px-3 py-2 text-[12px] text-[#e2e8f0] mb-2"
       >
         {MODEL_OPTIONS.map(m => (
           <option key={`${m.provider}::${m.model}`} value={`${m.provider}::${m.model}`}>{m.label}</option>
         ))}
       </select>
+
+      <div className="grid grid-cols-2 gap-2 mt-1">
+        <div>
+          <label className="text-[10px] text-[#8b949e] mb-1 block">{isRTL ? "الإبداع" : "Creativity"}</label>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={creativity}
+              onChange={e => onChange({ ...current, creativity: parseFloat(e.target.value) })}
+              className="flex-1 accent-[#7c3aed] h-1.5"
+            />
+            <span className="text-[10px] font-mono bg-[#161b22] px-1.5 py-0.5 rounded border border-white/10 w-10 text-center">{creativity.toFixed(2)}</span>
+          </div>
+        </div>
+        <div>
+          <label className="text-[10px] text-[#8b949e] mb-1 block">{isRTL ? "المهلة (ثانية)" : "Timeout (s)"}</label>
+          <input
+            type="number"
+            min="10"
+            max="600"
+            step="10"
+            value={timeoutSeconds}
+            onChange={e => onChange({ ...current, timeoutSeconds: parseInt(e.target.value) || 240 })}
+            className="w-full bg-[#161b22] border border-white/10 rounded px-2 py-1 text-[11px] text-[#e2e8f0]"
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -466,12 +501,79 @@ function ModelsTab({ agent, onUpdate, isRTL }: { agent: AgentConfig; onUpdate: (
             {agent.governorEnabled ? (isRTL ? "دمج مفعّل" : "Merge Active") : (isRTL ? "بدون دمج" : "No Merge")}
           </button>
         </div>
-        <p className="text-[11px] text-[#8b949e] leading-relaxed">
+        <p className="text-[11px] text-[#8b949e] leading-relaxed mb-3">
           {isRTL
             ? "عند تفعيل الحاكم: النماذج الثلاثة تفكّر بنفس المشكلة بشكل مستقل، ثم الحاكم يأخذ أفضل الأفكار من كل نموذج ويدمجها في حل نهائي متفوّق. عند التعطيل: يعمل النموذج الأساسي فقط."
             : "When enabled: All 3 models think independently about the same problem, then the Governor extracts the best ideas from each and merges them into a superior final solution. When disabled: Only the primary model is used."
           }
         </p>
+
+        {agent.governorEnabled && (() => {
+          const gov = agent.governorModel || { provider: "", model: "", creativity: 0.5, timeoutSeconds: 300 };
+          return (
+          <div className="bg-[#0d1117] border border-yellow-500/20 rounded-lg p-3 mt-2">
+            <div className="flex items-center gap-2 mb-2">
+              <Zap className="w-3.5 h-3.5 text-yellow-400" />
+              <span className="text-[12px] font-medium text-yellow-400">{isRTL ? "نموذج الحاكم (من يدمج النتائج)" : "Governor Model (who merges results)"}</span>
+            </div>
+            <p className="text-[10px] text-[#8b949e] mb-2">
+              {isRTL
+                ? "أنت تعيّن أي نموذج يكون الحاكم — هو الذي يستلم اقتراحات النماذج الثلاثة ويستخرج أفضل حل نهائي."
+                : "You choose which model serves as the Governor — it receives all proposals and produces the final merged solution."
+              }
+            </p>
+            <select
+              value={gov.provider && gov.model ? `${gov.provider}::${gov.model}` : ""}
+              onChange={e => {
+                if (e.target.value === "") {
+                  onUpdate({ governorModel: null } as any);
+                } else {
+                  const [provider, model] = e.target.value.split("::");
+                  onUpdate({ governorModel: { provider, model, creativity: gov.creativity ?? 0.5, timeoutSeconds: gov.timeoutSeconds ?? 300 } } as any);
+                }
+              }}
+              className="w-full bg-[#161b22] border border-yellow-500/20 rounded-lg px-3 py-2 text-[12px] text-[#e2e8f0]"
+            >
+              <option value="">{isRTL ? "تلقائي (يستخدم النموذج الأساسي)" : "Auto (uses primary model)"}</option>
+              {MODEL_OPTIONS.filter(m => m.provider !== "local").map(m => (
+                <option key={`${m.provider}::${m.model}`} value={`${m.provider}::${m.model}`}>{m.label}</option>
+              ))}
+            </select>
+
+            {gov.provider && gov.model && (
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <div>
+                  <label className="text-[10px] text-yellow-400/70 mb-1 block">{isRTL ? "إبداع الحاكم" : "Governor Creativity"}</label>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={gov.creativity ?? 0.5}
+                      onChange={e => onUpdate({ governorModel: { ...gov, creativity: parseFloat(e.target.value) } } as any)}
+                      className="flex-1 accent-yellow-400 h-1.5"
+                    />
+                    <span className="text-[10px] font-mono bg-[#161b22] px-1.5 py-0.5 rounded border border-yellow-500/20 w-10 text-center text-yellow-400">{(gov.creativity ?? 0.5).toFixed(2)}</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] text-yellow-400/70 mb-1 block">{isRTL ? "مهلة الحاكم (ثانية)" : "Governor Timeout (s)"}</label>
+                  <input
+                    type="number"
+                    min="30"
+                    max="600"
+                    step="10"
+                    value={gov.timeoutSeconds ?? 300}
+                    onChange={e => onUpdate({ governorModel: { ...gov, timeoutSeconds: parseInt(e.target.value) || 300 } } as any)}
+                    className="w-full bg-[#161b22] border border-yellow-500/20 rounded px-2 py-1 text-[11px] text-yellow-400"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+          );
+        })()}
       </div>
 
       <div className="grid gap-3">
@@ -481,24 +583,15 @@ function ModelsTab({ agent, onUpdate, isRTL }: { agent: AgentConfig; onUpdate: (
       </div>
 
       <div className="bg-[#161b22] border border-white/7 rounded-xl p-4">
-        <label className="text-[12px] text-[#8b949e] mb-2 block">{isRTL ? "درجة الإبداع (Temperature)" : "Creativity (Temperature)"}</label>
-        <div className="flex items-center gap-3">
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.05"
-            value={parseFloat(agent.creativity)}
-            onChange={e => onUpdate({ creativity: e.target.value })}
-            className="flex-1 accent-[#7c3aed]"
-          />
-          <span className="text-sm font-mono bg-[#0d1117] px-3 py-1 rounded-lg border border-white/10 w-16 text-center">{parseFloat(agent.creativity).toFixed(2)}</span>
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-[12px] text-[#8b949e]">{isRTL ? "درجة الإبداع والمهلة لكل نموذج أعلاه" : "Creativity & timeout set per-model above"}</span>
         </div>
-        <div className="flex justify-between text-[10px] text-[#8b949e] mt-1">
-          <span>{isRTL ? "دقيق" : "Precise"}</span>
-          <span>{isRTL ? "متوازن" : "Balanced"}</span>
-          <span>{isRTL ? "إبداعي" : "Creative"}</span>
-        </div>
+        <p className="text-[10px] text-[#8b949e]/60">
+          {isRTL
+            ? "كل نموذج يمكن ضبط إبداعه ومهلته بشكل مستقل — غيّر القيم مباشرة في كل خانة نموذج."
+            : "Each model can have its own creativity and timeout — adjust values directly in each model slot."
+          }
+        </p>
       </div>
     </div>
   );
