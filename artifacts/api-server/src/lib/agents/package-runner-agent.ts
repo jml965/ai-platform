@@ -229,6 +229,11 @@ export class PackageRunnerAgent extends BaseAgent {
   private setupFileWatcher(): void {
     if (!this.sandboxId) return;
 
+    if (this.status.projectType === "nodejs" && this.isViteProject(this.lastFiles)) {
+      this.emitOutput("info", "Vite project detected — relying on Vite HMR for live updates (no restart watcher).");
+      return;
+    }
+
     const workDir = getSandboxWorkDir(this.sandboxId);
     if (!workDir) return;
 
@@ -389,6 +394,7 @@ export class PackageRunnerAgent extends BaseAgent {
   ): Promise<AgentResult> {
     const startTime = Date.now();
     this.lastProjectId = projectId;
+    const previousFiles = this.lastFiles;
     this.lastFiles = files;
 
     if (this.sandboxId && this.status.phase === "running") {
@@ -399,7 +405,7 @@ export class PackageRunnerAgent extends BaseAgent {
         this.emitOutput("info", `Final sync: ${written} files updated in running sandbox`);
 
         const pkgFile = files.find(f => f.filePath === "package.json");
-        const earlyPkg = this.lastFiles.find(f => f.filePath === "package.json");
+        const earlyPkg = previousFiles.find(f => f.filePath === "package.json");
         if (pkgFile && earlyPkg && pkgFile.content !== earlyPkg.content) {
           this.emitOutput("info", "package.json changed — reinstalling dependencies...");
           try {

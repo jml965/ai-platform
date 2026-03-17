@@ -1,5 +1,8 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import http from "http";
+import type { IncomingMessage } from "http";
+import type { Duplex } from "stream";
+import net from "net";
 import {
   createSandbox,
   stopSandbox,
@@ -16,6 +19,7 @@ import {
   recoverSandboxForProject,
 } from "../lib/sandbox/sandbox-manager";
 import { getUserId } from "../middlewares/permissions";
+import { verifySessionToken } from "../lib/session";
 import { db } from "@workspace/db";
 import { projectsTable, teamMembersTable } from "@workspace/db/schema";
 import { eq, or, inArray } from "drizzle-orm";
@@ -423,5 +427,85 @@ router.use("/sandbox/proxy", async (req: Request, res: Response) => {
     }
   }
 });
+
+function parseWsCookies(header: string | undefined): Record<string, string> {
+  if (!header) return {};
+  const cookies: Record<string, string> = {};
+  for (const pair of header.split(";")) {
+    const idx = pair.indexOf("=");
+    if (idx < 0) continue;
+    const key = pair.slice(0, idx).trim();
+    let val = pair.slice(idx + 1).trim();
+    if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+    try { val = decodeURIComponent(val); } catch {}
+    cookies[key] = val;
+  }
+  return cookies;
+}
+
+export async function handleSandboxWebSocketUpgrade(req: IncomingMessage & { _sandboxHandled?: boolean }, socket: Duplex, head: Buffer) {
+  const url = req.url || "";
+  const proxyMatch = url.match(/^\/api\/sandbox\/proxy\/([a-f0-9-]+)\/(.*)?/);
+  if (!proxyMatch) return false;
+  req._sandboxHandled = true;
+
+  const cookies = parseWsCookies(req.headers.cookie);
+  const sessionToken = cookies["session_token"];
+  const userId = sessionToken ? verifySessionToken(sessionToken) : null;
+  if (!userId) {
+    socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+    socket.destroy();
+    return true;
+  }
+
+  const projectId = proxyMatch[1];
+
+  const projectIds = await getUserProjectIds(userId);
+  if (!projectIds.includes(projectId)) {
+    socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
+    socket.destroy();
+    return true;
+  }
+
+  const sandboxId = getProjectSandbox(projectId);
+  if (!sandboxId) {
+    socket.destroy();
+    return true;
+  }
+
+  const status = getSandboxStatus(sandboxId);
+  if (!status || status.status !== "running") {
+    socket.destroy();
+    return true;
+  }
+
+  const WS_SAFE_HEADERS = new Set([
+    "upgrade", "connection", "sec-websocket-key", "sec-websocket-version",
+    "sec-websocket-extensions", "sec-websocket-protocol",
+    "origin", "user-agent",
+  ]);
+
+  const targetPath = proxyMatch[2] ? "/" + proxyMatch[2] : "/";
+  const proxySocket = net.connect(status.port, "127.0.0.1", () => {
+    const reqLine = `GET ${targetPath} HTTP/1.1\r\n`;
+    const headers: string[] = [`Host: 127.0.0.1:${status.port}`];
+    for (const [key, val] of Object.entries(req.headers)) {
+      if (key.toLowerCase() === "host") continue;
+      if (!WS_SAFE_HEADERS.has(key.toLowerCase())) continue;
+      if (val) {
+        headers.push(`${key}: ${Array.isArray(val) ? val.join(", ") : val}`);
+      }
+    }
+    proxySocket.write(reqLine + headers.join("\r\n") + "\r\n\r\n");
+    if (head.length > 0) proxySocket.write(head);
+    proxySocket.pipe(socket);
+    socket.pipe(proxySocket);
+  });
+
+  proxySocket.on("error", () => socket.destroy());
+  socket.on("error", () => proxySocket.destroy());
+
+  return true;
+}
 
 export default router;

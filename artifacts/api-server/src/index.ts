@@ -2,6 +2,7 @@ import { createServer } from "http";
 import app from "./app";
 import { seedRolesAndPermissions } from "./lib/seedRoles";
 import { setupCollaborationWebSocket } from "./lib/collaboration";
+import { handleSandboxWebSocketUpgrade } from "./routes/sandbox";
 
 const rawPort = process.env["PORT"];
 
@@ -22,6 +23,16 @@ seedRolesAndPermissions().catch((err) =>
 );
 
 const server = createServer(app);
+
+server.on("upgrade", (req, socket, head) => {
+  const url = req.url || "";
+  if (url.startsWith("/api/sandbox/proxy/")) {
+    handleSandboxWebSocketUpgrade(req, socket, head).catch(() => {
+      socket.destroy();
+    });
+    return;
+  }
+});
 
 setupCollaborationWebSocket(server);
 

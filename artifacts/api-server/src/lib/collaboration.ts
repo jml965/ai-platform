@@ -200,7 +200,8 @@ async function checkProjectAccess(userId: string, projectId: string): Promise<bo
 export function setupCollaborationWebSocket(server: HTTPServer) {
   const wss = new WebSocketServer({ noServer: true });
 
-  server.on("upgrade", async (req, socket, head) => {
+  server.on("upgrade", async (req: any, socket, head) => {
+    if ((req as any)._sandboxHandled) return;
     if (req.url !== "/ws/collaborate") {
       socket.destroy();
       return;

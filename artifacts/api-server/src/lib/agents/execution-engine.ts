@@ -989,6 +989,8 @@ async function executeBatchedBuildPipeline(
           : `🚀 Launching ${remainingModules.length} parallel developer agents: ${remainingModules.map(m => m.name).join(", ")}`,
       });
 
+      let earlySandboxInitiated = !!getRunner(buildId);
+
       const modulePromises = remainingModules.map(async (mod, idx) => {
         const moduleTaskId = await createTask(buildId, projectId, "codegen", `Module: ${mod.name}`);
 
@@ -1032,12 +1034,50 @@ async function executeBatchedBuildPipeline(
             console.error(`Build ${buildId}: module ${mod.name} save failed:`, e)
           );
 
-          try {
-            const runner = getRunner(buildId);
-            if (runner && runner.isRunning()) {
-              runner.updateSandboxFiles(moduleFiles);
+          if (!earlySandboxInitiated) {
+            earlySandboxInitiated = true;
+            try {
+              const template = getProjectTemplate(framework) || { dependencies: {}, devDependencies: {}, scripts: {}, baseFiles: [], directories: [] };
+              const initFiles: GeneratedFile[] = [...allGeneratedFiles];
+              const initDeps = { ...(template.dependencies || {}), ...allDeps };
+              const initDevDeps = { ...(template.devDependencies || {}), ...allDevDeps };
+              const initScripts = { ...(template.scripts || {}), ...allScripts };
+              if (framework !== "fastapi") {
+                const initPkg: GeneratedFile = {
+                  filePath: "package.json",
+                  content: JSON.stringify({ name: "generated-project", version: "1.0.0", private: true, scripts: initScripts, dependencies: initDeps, devDependencies: initDevDeps }, null, 2),
+                  fileType: "json",
+                };
+                const pkgIdx = initFiles.findIndex(f => f.filePath === "package.json");
+                if (pkgIdx >= 0) initFiles[pkgIdx] = initPkg;
+                else initFiles.push(initPkg);
+              }
+              for (const tf of (template.baseFiles || [])) {
+                if (!initFiles.some(f => f.filePath === tf.filePath)) initFiles.push(tf);
+              }
+
+              const firstRunner = new PackageRunnerAgent(constitution);
+              setRunner(buildId, firstRunner);
+              const initResult = await firstRunner.initSandboxEarly(projectId, initFiles);
+              if (initResult) {
+                logExecution(buildId, projectId, null, "package_runner", "early_sandbox", "completed", {
+                  sandboxId: initResult.sandboxId, port: initResult.port, serverStarted: true,
+                  message: lang === "ar"
+                    ? `🖥️ المعاينة الحية جاهزة — الموقع يتبنى أمامك الآن`
+                    : `🖥️ Live preview ready — site building in real-time`,
+                });
+              }
+            } catch (earlyErr) {
+              console.error(`Build ${buildId}: early sandbox init failed:`, earlyErr);
             }
-          } catch {}
+          } else {
+            try {
+              const runner = getRunner(buildId);
+              if (runner && runner.isRunning()) {
+                runner.updateSandboxFiles(moduleFiles);
+              }
+            } catch {}
+          }
 
           logExecution(buildId, projectId, moduleTaskId, "codegen", "generate_module", "completed", {
             moduleName: mod.name, fileCount: moduleFiles.length,
