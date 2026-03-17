@@ -568,7 +568,7 @@ export default function Builder() {
     let stopped = false;
     const check = () => {
       if (stopped) return;
-      fetch(`${baseUrl}/api/sandbox/project/${id}`)
+      fetch(`${baseUrl}/api/sandbox/project/${id}`, { credentials: "include" })
         .then(r => r.ok ? r.json() : null)
         .then(d => {
           if (d && d.status === "running") {
@@ -579,7 +579,7 @@ export default function Builder() {
     };
     const triggerRecovery = () => {
       if (stopped) return;
-      fetch(`${baseUrl}/api/sandbox/proxy/${id}/`, { method: "HEAD" })
+      fetch(`${baseUrl}/api/sandbox/proxy/${id}/`, { method: "HEAD", credentials: "include" })
         .then(() => {
           setTimeout(check, 2000);
         })
@@ -599,7 +599,9 @@ export default function Builder() {
     es.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.type === "info" && typeof data.message === "string" && data.message.includes("Early server running")) {
+        if (data.type === "sandbox_started") {
+          setSandboxRunning(true);
+        } else if (data.type === "info" && typeof data.message === "string" && data.message.includes("Early server running")) {
           setSandboxRunning(true);
         }
       } catch {}

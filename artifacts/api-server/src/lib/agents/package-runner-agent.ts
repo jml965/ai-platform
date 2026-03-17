@@ -17,7 +17,7 @@ import type { AgentResult, AgentType, BuildContext, GeneratedFile } from "./type
 export type ProjectType = "nodejs" | "python" | "static" | "unknown";
 
 export interface RunnerOutput {
-  type: "stdout" | "stderr" | "info" | "error";
+  type: "stdout" | "stderr" | "info" | "error" | "sandbox_started";
   message: string;
   timestamp: string;
 }
@@ -345,6 +345,7 @@ export class PackageRunnerAgent extends BaseAgent {
           this.status.serverPort = sandbox.port;
           serverStarted = true;
           this.emitOutput("info", `Early server running on port ${sandbox.port} (pid: ${server.pid})`);
+          this.emitOutput("sandbox_started", JSON.stringify({ sandboxId: sandbox.id, port: sandbox.port }));
           this.setupFileWatcher();
         } catch (err) {
           this.emitOutput("error", `Early server start failed: ${err instanceof Error ? err.message : String(err)}`);
