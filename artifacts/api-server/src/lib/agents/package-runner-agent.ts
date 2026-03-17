@@ -303,6 +303,9 @@ export class PackageRunnerAgent extends BaseAgent {
       this.status.sandboxId = sandbox.id;
       this.emitOutput("info", `Early sandbox created (id: ${sandbox.id}, port: ${sandbox.port})`);
 
+      const written = writeFilesToSandboxDirect(sandbox.id, files);
+      this.emitOutput("info", `Wrote ${written} files directly to early sandbox`);
+
       const installCmd = this.getInstallCommand(projectType, files);
       if (installCmd) {
         this.status.phase = "installing";

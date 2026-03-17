@@ -942,9 +942,7 @@ async function executeBatchedBuildPipeline(
           }
         }
 
-        fileManager.saveFiles(projectId, [...earlyFiles]).catch(e =>
-          console.error(`Build ${buildId}: core module save failed:`, e)
-        );
+        await fileManager.saveFiles(projectId, [...earlyFiles]);
 
         logExecution(buildId, projectId, coreTaskId, "codegen", "generate_module", "completed", {
           moduleName: coreModule.name, fileCount: coreFiles.length,
@@ -1030,11 +1028,12 @@ async function executeBatchedBuildPipeline(
           if (result.data?.devDependencies) Object.assign(allDevDeps, result.data.devDependencies as Record<string, string>);
           if (result.data?.scripts) Object.assign(allScripts, result.data.scripts as Record<string, string>);
 
-          fileManager.saveFiles(projectId, [...allGeneratedFiles]).catch(e =>
+          const savePromise = fileManager.saveFiles(projectId, [...allGeneratedFiles]).catch(e =>
             console.error(`Build ${buildId}: module ${mod.name} save failed:`, e)
           );
 
           if (!earlySandboxInitiated) {
+            await savePromise;
             earlySandboxInitiated = true;
             try {
               const template = getProjectTemplate(framework) || { dependencies: {}, devDependencies: {}, scripts: {}, baseFiles: [], directories: [] };
