@@ -158,10 +158,27 @@ const DEFAULT_VIDEO_PROVIDERS = [
 
 async function seedMediaProviders() {
   const existing = await db.select().from(mediaProvidersTable);
-  if (existing.length > 0) return;
-  const allDefaults = [...DEFAULT_IMAGE_PROVIDERS, ...DEFAULT_VIDEO_PROVIDERS];
-  for (const p of allDefaults) {
-    await db.insert(mediaProvidersTable).values(p as any).onConflictDoNothing();
+  if (existing.length === 0) {
+    const allDefaults = [...DEFAULT_IMAGE_PROVIDERS, ...DEFAULT_VIDEO_PROVIDERS];
+    for (const p of allDefaults) {
+      await db.insert(mediaProvidersTable).values(p as any).onConflictDoNothing();
+    }
+    return;
+  }
+
+  const parentMappings: Record<string, string> = {
+    openai_dalle: "openai",
+    openai_sora: "openai",
+    stability_ai: "stability",
+    google_imagen: "google",
+  };
+  for (const row of existing) {
+    const expected = parentMappings[row.providerKey] || "";
+    if ((row as any).parentProvider !== expected && expected) {
+      await db.update(mediaProvidersTable)
+        .set({ parentProvider: expected })
+        .where(eq(mediaProvidersTable.providerKey, row.providerKey));
+    }
   }
 }
 
