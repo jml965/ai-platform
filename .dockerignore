@@ -1,0 +1,10 @@
+node_modules
+.git
+.github
+.local
+.replit
+replit.nix
+*.md
+.env*
+dist
+artifacts/mockup-sandbox

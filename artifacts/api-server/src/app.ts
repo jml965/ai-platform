@@ -1,4 +1,6 @@
 import express, { type Express } from "express";
+import path from "path";
+import { fileURLToPath } from "url";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import router from "./routes";
@@ -6,6 +8,8 @@ import { processStripeWebhook } from "./lib/stripeWebhookHandler";
 import { authSession } from "./middlewares/authSession";
 
 const app: Express = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 app.post(
   "/api/billing/webhook",
@@ -58,5 +62,13 @@ if (process.env.NODE_ENV === "development") {
 app.use(authSession);
 
 app.use("/api", router);
+
+if (process.env.NODE_ENV === "production") {
+  const frontendDist = path.resolve(__dirname, "../../website-builder/dist");
+  app.use(express.static(frontendDist));
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(frontendDist, "index.html"));
+  });
+}
 
 export default app;
