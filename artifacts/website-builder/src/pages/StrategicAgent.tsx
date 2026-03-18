@@ -200,29 +200,30 @@ function MessageContent({ content, fontSize, lineSpacing, fontWeight }: { conten
           };
           return (
             <div key={i} className="my-3 rounded-lg overflow-hidden border border-[#30363d]">
-              <div className="flex items-center justify-between px-3 py-1.5 bg-[#1c2333]">
+              <div className="px-3 py-1.5 bg-[#1c2333]">
                 <span className="text-[10px] text-[#8b949e] uppercase tracking-wide">{langLabel}</span>
-                {code.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleDownload}
-                      className="flex items-center gap-1 text-[10px] text-[#8b949e] hover:text-[#e1e4e8] transition-colors"
-                    >
-                      <Download className="w-3 h-3" />
-                    </button>
-                    <button
-                      onClick={() => handleCopy(code, i)}
-                      className="flex items-center gap-1 text-[10px] text-[#8b949e] hover:text-[#e1e4e8] transition-colors"
-                    >
-                      {copiedIdx === i ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                      <span>{copiedIdx === i ? "Copied" : "Copy"}</span>
-                    </button>
-                  </div>
-                )}
               </div>
               <pre className="p-3 bg-[#0d1117] text-[13px] leading-relaxed text-[#e1e4e8] overflow-x-auto" dir="ltr">
                 <code>{code}</code>
               </pre>
+              {code.length > 0 && (
+                <div className="flex items-center justify-end gap-2 px-3 py-1.5 bg-[#1c2333] border-t border-[#30363d]">
+                  <button
+                    onClick={() => handleCopy(code, i)}
+                    className="flex items-center gap-1 text-[10px] text-[#8b949e] hover:text-[#e1e4e8] transition-colors"
+                  >
+                    {copiedIdx === i ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedIdx === i ? "Copied" : "Copy"}</span>
+                  </button>
+                  <button
+                    onClick={handleDownload}
+                    className="flex items-center gap-1 text-[10px] text-[#8b949e] hover:text-[#e1e4e8] transition-colors"
+                  >
+                    <Download className="w-3 h-3" />
+                    <span>Download</span>
+                  </button>
+                </div>
+              )}
             </div>
           );
         }
