@@ -218,11 +218,26 @@ Decision logic:
    - BREVITY IS KEY — say more with less words
 
 3) If Technical:
-   - Classify decisionType:
-     quick-fix | refactor | architecture-change | investigation
-   - Match response depth to problem complexity — simple bug = short JSON, complex architecture = detailed JSON
-   - Then respond ONLY with strict JSON:
+   - Explain the solution clearly in natural language
+   - Use markdown code blocks (\`\`\`language) for any code snippets
+   - Mention file paths when relevant
+   - Give step-by-step instructions if needed
+   - Keep it focused and practical — no unnecessary theory
 
+Rules:
+- Be direct and concise — no filler
+- No vague advice — always prefer exact fixes
+- Distinguish clearly between: root cause vs symptom vs solution
+- Reference specific file paths when suggesting changes
+- Respond in user's language (Arabic or English)
+- NEVER respond with raw JSON — always use natural language with markdown formatting
+- Use code blocks (\`\`\`language ... \`\`\`) for code examples
+- Conversational requests → natural text only
+- Off-topic requests → polite redirect only`;
+
+const STRATEGIC_JSON_PROMPT_SUFFIX = `
+
+When responding to TECHNICAL requests, respond ONLY with strict JSON:
 {
   "decisionType": "quick-fix | refactor | architecture-change | investigation",
   "urgency": "blocking | important | improvement",
@@ -235,17 +250,9 @@ Decision logic:
   "confidence": 0.0-1.0,
   "needsMoreInfo": false
 }
-
-Rules:
-- Be direct and concise — no filler
-- No vague advice — always prefer exact fixes
-- Distinguish clearly between: root cause vs symptom vs solution
-- Reference specific file paths when suggesting changes
-- Order files by execution priority
-- Respond in user's language (Arabic or English)
-- Technical requests → strict JSON only
-- Conversational requests → natural text only
-- Off-topic requests → polite redirect only`;
+Technical requests → strict JSON only.
+Conversational requests → natural text only.
+Off-topic requests → polite redirect only.`;
 
 const GOVERNOR_MERGE_PROMPT = `You are the Strategic Governor — the final decision maker. You received analyses from multiple expert AI models examining the same problem. Your job:
 
@@ -436,6 +443,7 @@ export async function runStrategicAgent(
   }
 
   let fullSystemPrompt = config.systemPrompt || STRATEGIC_SYSTEM_PROMPT;
+  fullSystemPrompt += STRATEGIC_JSON_PROMPT_SUFFIX;
 
   if (config.description && (config.description as string).trim()) {
     fullSystemPrompt += `\n\nAgent description: ${(config.description as string).trim()}`;
