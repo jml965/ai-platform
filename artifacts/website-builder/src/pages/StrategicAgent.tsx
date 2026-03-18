@@ -244,7 +244,6 @@ export default function StrategicAgent() {
     if (!prompt.trim() && attachments.length === 0) return;
     if (loading) return;
     if (agentMode && !selectedAgentKey) return;
-    if (!agentMode && !selectedProjectId) return;
 
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -340,6 +339,7 @@ export default function StrategicAgent() {
       ]);
     } finally {
       setLoading(false);
+      setTimeout(() => textareaRef.current?.focus(), 50);
     }
   };
 
@@ -809,7 +809,7 @@ export default function StrategicAgent() {
               />
               <button
                 onClick={handleSend}
-                disabled={loading || (!prompt.trim() && attachments.length === 0) || (agentMode ? !selectedAgentKey : !selectedProjectId)}
+                disabled={loading || (!prompt.trim() && attachments.length === 0) || (agentMode && !selectedAgentKey)}
                 className={cn(
                   "absolute end-2 bottom-2 p-2 text-black rounded-lg disabled:opacity-40 transition-colors",
                   agentMode ? "bg-purple-500 hover:bg-purple-400 disabled:hover:bg-purple-500" : "bg-amber-500 hover:bg-amber-400 disabled:hover:bg-amber-500"

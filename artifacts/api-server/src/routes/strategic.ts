@@ -123,10 +123,7 @@ router.post("/strategic/chat", async (req, res) => {
       return;
     }
 
-    if (!projectId) {
-      res.status(400).json({ error: { code: "VALIDATION", message: "Project ID is required" } });
-      return;
-    }
+    const effectiveProjectId = projectId || "general";
 
     const [user] = await db.select({ creditBalanceUsd: usersTable.creditBalanceUsd })
       .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
@@ -144,11 +141,11 @@ router.post("/strategic/chat", async (req, res) => {
       return;
     }
 
-    const sKey = sessionId || `${userId}_${projectId}`;
+    const sKey = sessionId || `${userId}_${effectiveProjectId}`;
     const history = strategicSessions.get(sKey) || [];
 
     const result = await runStrategicAgent(
-      projectId,
+      effectiveProjectId,
       message,
       history,
       config.shortTermMemory || [],
@@ -169,16 +166,16 @@ router.post("/strategic/chat", async (req, res) => {
     await addToMemory("strategic", "short", {
       content: `Q: ${message.slice(0, 200)} | A: ${result.reply.slice(0, 300)}`,
       timestamp: new Date().toISOString(),
-      context: projectId,
+      context: effectiveProjectId,
     });
 
     let fixResult: { success: boolean; fixedFiles: string[]; buildId?: string } | undefined;
     if (result.actions?.type === "fix" && result.actions.files.length > 0) {
       try {
-        const limitCheck = await checkBuildLimits(userId, projectId);
+        const limitCheck = await checkBuildLimits(userId, effectiveProjectId);
         if (limitCheck.allowed) {
           console.log("[Strategic] Applying fixes:", result.actions.files);
-          const fix = await startSurgicalFix(projectId, userId, message, result.actions.files);
+          const fix = await startSurgicalFix(effectiveProjectId, userId, message, result.actions.files);
           fixResult = { success: fix.success, fixedFiles: fix.fixedFiles, buildId: fix.buildId };
         }
       } catch (err) {

@@ -176,7 +176,7 @@ export async function runStrategicAgent(
     throw new Error("Strategic agent is not configured or disabled");
   }
 
-  const files = await db.select({
+  const files = projectId === "general" ? [] : await db.select({
     filePath: projectFilesTable.filePath,
     content: projectFilesTable.content,
   }).from(projectFilesTable).where(eq(projectFilesTable.projectId, projectId));
