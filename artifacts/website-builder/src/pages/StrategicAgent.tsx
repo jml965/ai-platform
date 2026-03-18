@@ -207,17 +207,17 @@ function MessageContent({ content, fontSize, lineSpacing, fontWeight }: { conten
                 <code>{code}</code>
               </pre>
               {code.length > 0 && (
-                <div className="sticky bottom-0 z-10 flex items-center justify-end gap-2 px-2 py-1">
+                <div className="sticky bottom-0 z-10 flex items-center justify-end gap-2 px-2 py-1.5">
                   <button
                     onClick={() => handleCopy(code, i)}
-                    className="flex items-center gap-1 text-[10px] text-[#8b949e] hover:text-[#e1e4e8] transition-colors"
+                    className="flex items-center gap-1 px-2 py-1 rounded border border-[#30363d] bg-[#1c2333] text-[10px] text-[#8b949e] hover:text-[#e1e4e8] transition-colors"
                   >
                     {copiedIdx === i ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                     <span>{copiedIdx === i ? "Copied" : "Copy"}</span>
                   </button>
                   <button
                     onClick={handleDownload}
-                    className="flex items-center gap-1 text-[10px] text-[#8b949e] hover:text-[#e1e4e8] transition-colors"
+                    className="flex items-center gap-1 px-2 py-1 rounded border border-[#30363d] bg-[#1c2333] text-[10px] text-[#8b949e] hover:text-[#e1e4e8] transition-colors"
                   >
                     <Download className="w-3 h-3" />
                   </button>
