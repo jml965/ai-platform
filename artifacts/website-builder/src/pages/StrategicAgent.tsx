@@ -562,18 +562,16 @@ export default function StrategicAgent() {
           typewriterRunning = true;
           const tick = () => {
             if (displayedContent.length < streamedContent.length) {
-              const remaining = streamedContent.length - displayedContent.length;
-              const charsToAdd = remaining > 80 ? Math.ceil(remaining / 8) : remaining > 20 ? 3 : 1;
-              displayedContent = streamedContent.slice(0, displayedContent.length + charsToAdd);
+              displayedContent = streamedContent.slice(0, displayedContent.length + 1);
               setMessages(prev => prev.map(m =>
                 m.id === streamMsgId ? { ...m, content: displayedContent } : m
               ));
-              requestAnimationFrame(tick);
+              setTimeout(tick, 18);
             } else {
               typewriterRunning = false;
             }
           };
-          requestAnimationFrame(tick);
+          tick();
         };
 
         setMessages(prev => [...prev, {
