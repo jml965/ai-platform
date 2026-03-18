@@ -221,16 +221,14 @@ export default function StrategicAgent() {
     }
   }, [projects, selectedProjectId]);
 
-  useEffect(() => {
-    if (!userScrolledUpRef.current) {
-      const el = chatContainerRef.current;
-      if (el) {
-        programmaticScrollRef.current = true;
-        el.scrollTop = el.scrollHeight;
-        setTimeout(() => { programmaticScrollRef.current = false; }, 50);
-      }
-    }
-  }, [messages]);
+  const scrollToBottomIfNeeded = useCallback(() => {
+    if (userScrolledUpRef.current) return;
+    const el = chatContainerRef.current;
+    if (!el) return;
+    programmaticScrollRef.current = true;
+    el.scrollTop = el.scrollHeight;
+    requestAnimationFrame(() => { programmaticScrollRef.current = false; });
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -580,6 +578,7 @@ export default function StrategicAgent() {
               setMessages(prev => prev.map(m =>
                 m.id === streamMsgId ? { ...m, content: displayedContent } : m
               ));
+              scrollToBottomIfNeeded();
               setTimeout(tick, 22);
             } else {
               typewriterRunning = false;
