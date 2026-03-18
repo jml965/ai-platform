@@ -1068,12 +1068,33 @@ export default function StrategicAgent() {
           "flex-1 overflow-y-auto p-4 space-y-4",
           dragOver && "ring-2 ring-amber-500/50 ring-inset bg-amber-500/5"
         )}
+        onWheel={(e) => {
+          if (e.deltaY < 0) {
+            userScrolledUpRef.current = true;
+          } else {
+            const el = chatContainerRef.current;
+            if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 40) {
+              userScrolledUpRef.current = false;
+            }
+          }
+        }}
+        onTouchMove={() => {
+          const el = chatContainerRef.current;
+          if (!el) return;
+          const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+          if (!atBottom) {
+            userScrolledUpRef.current = true;
+          } else {
+            userScrolledUpRef.current = false;
+          }
+        }}
         onScroll={() => {
           if (programmaticScrollRef.current) return;
           const el = chatContainerRef.current;
           if (!el) return;
-          const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-          userScrolledUpRef.current = !atBottom;
+          if (el.scrollHeight - el.scrollTop - el.clientHeight < 40) {
+            userScrolledUpRef.current = false;
+          }
         }}
         onDragOver={e => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
