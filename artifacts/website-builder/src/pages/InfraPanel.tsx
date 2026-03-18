@@ -19,8 +19,61 @@ import {
   Activity,
   Bot,
   Crown,
+  Settings,
+  Save,
+  RotateCcw,
+  Plus,
+  Minus,
+  ChevronDown,
+  ChevronRight,
+  ToggleLeft,
+  ToggleRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+interface ModelSlot {
+  provider: string;
+  model: string;
+  enabled: boolean;
+  creativity: number;
+  timeoutSeconds: number;
+  maxTokens: number;
+}
+
+interface FullAgentConfig {
+  id: string;
+  agentKey: string;
+  displayNameEn: string;
+  displayNameAr: string;
+  description: string;
+  enabled: boolean;
+  agentLayer: string;
+  governorEnabled: boolean;
+  autoGovernor: boolean;
+  governorModel: { provider: string; model: string; creativity: number; timeoutSeconds: number; maxTokens: number } | null;
+  primaryModel: ModelSlot;
+  secondaryModel: ModelSlot | null;
+  tertiaryModel: ModelSlot | null;
+  systemPrompt: string;
+  instructions: string;
+  permissions: string[];
+  creativity: string;
+  tokenLimit: number;
+  batchSize: number;
+  sourceFiles: string[];
+  shortTermMemory: any[];
+  longTermMemory: any[];
+  receivesFrom: string | null;
+  sendsTo: string | null;
+  roleOnReceive: string | null;
+  roleOnSend: string | null;
+  pipelineOrder: number;
+  totalTokensUsed: number;
+  totalTasksCompleted: number;
+  totalErrors: number;
+  avgExecutionMs: number;
+  totalCostUsd: string;
+}
 
 interface InfraAgent {
   id: string;
@@ -161,6 +214,318 @@ function MessageContent({ content }: { content: string }) {
   );
 }
 
+const MODEL_OPTIONS = [
+  { provider: "anthropic", models: ["claude-sonnet-4-6", "claude-opus-4", "claude-haiku-3-5"] },
+  { provider: "google", models: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"] },
+  { provider: "openai", models: ["gpt-4o", "gpt-4o-mini", "o3-mini", "o1-mini"] },
+];
+
+function ModelSlotEditor({ slot, label, onChange, lang }: { slot: ModelSlot | null; label: string; onChange: (s: ModelSlot | null) => void; lang: string }) {
+  if (!slot) return null;
+  return (
+    <div className="border border-[#1c2333] rounded-lg p-3 space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-[#e1e4e8]">{label}</span>
+        <button onClick={() => onChange({ ...slot, enabled: !slot.enabled })} className="flex items-center gap-1">
+          {slot.enabled ? <ToggleRight className="w-5 h-5 text-cyan-400" /> : <ToggleLeft className="w-5 h-5 text-[#484f58]" />}
+        </button>
+      </div>
+      {slot.enabled && (
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-[10px] text-[#484f58]">{lang === "ar" ? "المزوّد" : "Provider"}</label>
+            <select value={slot.provider} onChange={e => {
+              const p = e.target.value;
+              const models = MODEL_OPTIONS.find(m => m.provider === p)?.models || [];
+              onChange({ ...slot, provider: p, model: models[0] || slot.model });
+            }} className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2 py-1.5 text-xs text-[#e1e4e8]">
+              {MODEL_OPTIONS.map(o => <option key={o.provider} value={o.provider}>{o.provider}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] text-[#484f58]">{lang === "ar" ? "النموذج" : "Model"}</label>
+            <select value={slot.model} onChange={e => onChange({ ...slot, model: e.target.value })} className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2 py-1.5 text-xs text-[#e1e4e8]">
+              {(MODEL_OPTIONS.find(m => m.provider === slot.provider)?.models || []).map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] text-[#484f58]">{lang === "ar" ? "الإبداعية" : "Creativity"}</label>
+            <input type="number" step="0.1" min="0" max="2" value={slot.creativity} onChange={e => onChange({ ...slot, creativity: parseFloat(e.target.value) || 0 })} className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2 py-1.5 text-xs text-[#e1e4e8]" />
+          </div>
+          <div>
+            <label className="text-[10px] text-[#484f58]">{lang === "ar" ? "أقصى توكن" : "Max Tokens"}</label>
+            <input type="number" min="1000" max="200000" value={slot.maxTokens} onChange={e => onChange({ ...slot, maxTokens: parseInt(e.target.value) || 8000 })} className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2 py-1.5 text-xs text-[#e1e4e8]" />
+          </div>
+          <div className="col-span-2">
+            <label className="text-[10px] text-[#484f58]">{lang === "ar" ? "المهلة (ثانية)" : "Timeout (sec)"}</label>
+            <input type="number" min="10" max="600" value={slot.timeoutSeconds} onChange={e => onChange({ ...slot, timeoutSeconds: parseInt(e.target.value) || 120 })} className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2 py-1.5 text-xs text-[#e1e4e8]" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AgentSettingsPanel({ config, onClose, onSave, lang }: { config: FullAgentConfig; onClose: () => void; onSave: (updated: FullAgentConfig) => void; lang: string }) {
+  const [data, setData] = useState<FullAgentConfig>(config);
+  const [activeTab, setActiveTab] = useState("models");
+  const [saving, setSaving] = useState(false);
+  const [newPerm, setNewPerm] = useState("");
+  const [newSourceFile, setNewSourceFile] = useState("");
+
+  const tabs = [
+    { key: "models", label: lang === "ar" ? "النماذج" : "Models" },
+    { key: "prompt", label: lang === "ar" ? "البرومبت" : "Prompt" },
+    { key: "instructions", label: lang === "ar" ? "التعليمات" : "Instructions" },
+    { key: "permissions", label: lang === "ar" ? "الصلاحيات" : "Permissions" },
+    { key: "memory", label: lang === "ar" ? "الذاكرة" : "Memory" },
+    { key: "pipeline", label: lang === "ar" ? "الأنبوب" : "Pipeline" },
+    { key: "stats", label: lang === "ar" ? "الإحصائيات" : "Stats" },
+  ];
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/agents/configs/${data.agentKey}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (res.ok) {
+        onSave(data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    setSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="relative ms-auto w-full max-w-2xl h-full bg-[#0d1117] border-s border-[#1c2333] flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[#1c2333] bg-[#161b22]">
+          <div className="flex items-center gap-3">
+            <div className={cn("p-2 rounded-lg bg-[#0d1117]", AGENT_COLORS[data.agentKey] || "text-[#8b949e]")}>
+              {AGENT_ICONS[data.agentKey] || <Bot className="w-5 h-5" />}
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-[#e1e4e8]">{lang === "ar" ? data.displayNameAr : data.displayNameEn}</h2>
+              <p className="text-[10px] text-[#484f58]">{data.agentKey}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setData({ ...data, enabled: !data.enabled })} className={cn("px-2 py-1 rounded text-[10px] font-medium border", data.enabled ? "border-emerald-500/30 text-emerald-400 bg-emerald-500/10" : "border-red-500/30 text-red-400 bg-red-500/10")}>
+              {data.enabled ? (lang === "ar" ? "مفعّل" : "Enabled") : (lang === "ar" ? "معطّل" : "Disabled")}
+            </button>
+            <button onClick={onClose} className="p-1.5 hover:bg-[#1c2333] rounded text-[#8b949e] hover:text-[#e1e4e8]">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex border-b border-[#1c2333] bg-[#161b22] overflow-x-auto">
+          {tabs.map(tab => (
+            <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={cn("px-4 py-2 text-xs font-medium whitespace-nowrap transition-colors border-b-2", activeTab === tab.key ? "text-cyan-400 border-cyan-400" : "text-[#8b949e] border-transparent hover:text-[#e1e4e8]")}>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {activeTab === "models" && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-[#484f58]">{lang === "ar" ? "الاسم (EN)" : "Name (EN)"}</label>
+                  <input value={data.displayNameEn} onChange={e => setData({ ...data, displayNameEn: e.target.value })} className="w-full bg-[#161b22] border border-[#30363d] rounded px-3 py-2 text-sm text-[#e1e4e8]" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#484f58]">{lang === "ar" ? "الاسم (AR)" : "Name (AR)"}</label>
+                  <input value={data.displayNameAr} onChange={e => setData({ ...data, displayNameAr: e.target.value })} className="w-full bg-[#161b22] border border-[#30363d] rounded px-3 py-2 text-sm text-[#e1e4e8]" dir="rtl" />
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] text-[#484f58]">{lang === "ar" ? "الوصف" : "Description"}</label>
+                <textarea value={data.description || ""} onChange={e => setData({ ...data, description: e.target.value })} rows={2} className="w-full bg-[#161b22] border border-[#30363d] rounded px-3 py-2 text-sm text-[#e1e4e8]" />
+              </div>
+              <div className="flex items-center gap-3 p-3 border border-[#1c2333] rounded-lg">
+                <button onClick={() => setData({ ...data, governorEnabled: !data.governorEnabled })} className="flex items-center gap-2">
+                  {data.governorEnabled ? <ToggleRight className="w-5 h-5 text-cyan-400" /> : <ToggleLeft className="w-5 h-5 text-[#484f58]" />}
+                  <span className="text-xs text-[#e1e4e8]">{lang === "ar" ? "نظام الحاكم" : "Governor System"}</span>
+                </button>
+                {data.governorEnabled && (
+                  <button onClick={() => setData({ ...data, autoGovernor: !data.autoGovernor })} className="flex items-center gap-2 ms-auto">
+                    {data.autoGovernor ? <ToggleRight className="w-4 h-4 text-amber-400" /> : <ToggleLeft className="w-4 h-4 text-[#484f58]" />}
+                    <span className="text-[10px] text-[#8b949e]">{lang === "ar" ? "تلقائي" : "Auto"}</span>
+                  </button>
+                )}
+              </div>
+              <ModelSlotEditor slot={data.primaryModel} label={lang === "ar" ? "النموذج الأساسي" : "Primary Model"} onChange={s => s && setData({ ...data, primaryModel: s })} lang={lang} />
+              <ModelSlotEditor slot={data.secondaryModel || { provider: "google", model: "gemini-2.5-flash", enabled: false, creativity: 0.5, maxTokens: 32000, timeoutSeconds: 120 }} label={lang === "ar" ? "النموذج الثانوي" : "Secondary Model"} onChange={s => setData({ ...data, secondaryModel: s })} lang={lang} />
+              <ModelSlotEditor slot={data.tertiaryModel || { provider: "openai", model: "o3-mini", enabled: false, creativity: 0.5, maxTokens: 32000, timeoutSeconds: 180 }} label={lang === "ar" ? "النموذج الثالث" : "Tertiary Model"} onChange={s => setData({ ...data, tertiaryModel: s })} lang={lang} />
+              {data.governorEnabled && (
+                <div className="border border-yellow-500/20 rounded-lg p-3 space-y-3">
+                  <span className="text-xs font-medium text-yellow-400">{lang === "ar" ? "نموذج الحاكم" : "Governor Model"}</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-[#484f58]">{lang === "ar" ? "المزوّد" : "Provider"}</label>
+                      <select value={data.governorModel?.provider || "anthropic"} onChange={e => setData({ ...data, governorModel: { ...(data.governorModel || { model: "claude-sonnet-4-6", creativity: 0.3, timeoutSeconds: 300, maxTokens: 64000 }), provider: e.target.value } })} className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2 py-1.5 text-xs text-[#e1e4e8]">
+                        {MODEL_OPTIONS.map(o => <option key={o.provider} value={o.provider}>{o.provider}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-[#484f58]">{lang === "ar" ? "النموذج" : "Model"}</label>
+                      <select value={data.governorModel?.model || "claude-sonnet-4-6"} onChange={e => setData({ ...data, governorModel: { ...(data.governorModel || { provider: "anthropic", creativity: 0.3, timeoutSeconds: 300, maxTokens: 64000 }), model: e.target.value } })} className="w-full bg-[#0d1117] border border-[#30363d] rounded px-2 py-1.5 text-xs text-[#e1e4e8]">
+                        {(MODEL_OPTIONS.find(m => m.provider === (data.governorModel?.provider || "anthropic"))?.models || []).map(m => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {activeTab === "prompt" && (
+            <div>
+              <label className="text-xs text-[#8b949e] mb-2 block">{lang === "ar" ? "البرومبت الأساسي" : "System Prompt"}</label>
+              <textarea value={data.systemPrompt} onChange={e => setData({ ...data, systemPrompt: e.target.value })} rows={20} className="w-full bg-[#161b22] border border-[#30363d] rounded px-3 py-2 text-xs text-[#e1e4e8] font-mono leading-relaxed" dir="ltr" />
+            </div>
+          )}
+
+          {activeTab === "instructions" && (
+            <div>
+              <label className="text-xs text-[#8b949e] mb-2 block">{lang === "ar" ? "تعليمات إضافية" : "Additional Instructions"}</label>
+              <textarea value={data.instructions || ""} onChange={e => setData({ ...data, instructions: e.target.value })} rows={12} className="w-full bg-[#161b22] border border-[#30363d] rounded px-3 py-2 text-xs text-[#e1e4e8] font-mono leading-relaxed" dir="ltr" />
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-[#484f58]">{lang === "ar" ? "حد التوكن" : "Token Limit"}</label>
+                  <input type="number" value={data.tokenLimit} onChange={e => setData({ ...data, tokenLimit: parseInt(e.target.value) || 100000 })} className="w-full bg-[#161b22] border border-[#30363d] rounded px-3 py-2 text-sm text-[#e1e4e8]" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#484f58]">{lang === "ar" ? "حجم الدفعة" : "Batch Size"}</label>
+                  <input type="number" value={data.batchSize} onChange={e => setData({ ...data, batchSize: parseInt(e.target.value) || 10 })} className="w-full bg-[#161b22] border border-[#30363d] rounded px-3 py-2 text-sm text-[#e1e4e8]" />
+                </div>
+              </div>
+              <div className="mt-4">
+                <label className="text-xs text-[#8b949e] mb-2 block">{lang === "ar" ? "ملفات المصدر" : "Source Files"}</label>
+                <div className="space-y-1">
+                  {(data.sourceFiles || []).map((sf, i) => (
+                    <div key={i} className="flex items-center gap-2 bg-[#161b22] border border-[#30363d] rounded px-2 py-1">
+                      <span className="text-xs text-[#e1e4e8] flex-1 font-mono">{sf}</span>
+                      <button onClick={() => setData({ ...data, sourceFiles: data.sourceFiles.filter((_, j) => j !== i) })} className="text-red-400 hover:text-red-300">
+                        <Minus className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <input value={newSourceFile} onChange={e => setNewSourceFile(e.target.value)} placeholder="src/..." className="flex-1 bg-[#161b22] border border-[#30363d] rounded px-2 py-1 text-xs text-[#e1e4e8]" dir="ltr" />
+                  <button onClick={() => { if (newSourceFile.trim()) { setData({ ...data, sourceFiles: [...(data.sourceFiles || []), newSourceFile.trim()] }); setNewSourceFile(""); } }} className="p-1 bg-cyan-500/20 text-cyan-400 rounded hover:bg-cyan-500/30">
+                    <Plus className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "permissions" && (
+            <div>
+              <label className="text-xs text-[#8b949e] mb-2 block">{lang === "ar" ? "الصلاحيات" : "Permissions"}</label>
+              <div className="space-y-1">
+                {(data.permissions || []).map((perm, i) => (
+                  <div key={i} className="flex items-center gap-2 bg-[#161b22] border border-[#30363d] rounded px-3 py-1.5">
+                    <span className="text-xs text-[#e1e4e8] flex-1">{perm}</span>
+                    <button onClick={() => setData({ ...data, permissions: data.permissions.filter((_, j) => j !== i) })} className="text-red-400 hover:text-red-300">
+                      <Minus className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 mt-2">
+                <input value={newPerm} onChange={e => setNewPerm(e.target.value)} placeholder={lang === "ar" ? "صلاحية جديدة..." : "New permission..."} className="flex-1 bg-[#161b22] border border-[#30363d] rounded px-3 py-1.5 text-xs text-[#e1e4e8]" onKeyDown={e => {
+                  if (e.key === "Enter" && newPerm.trim()) { setData({ ...data, permissions: [...(data.permissions || []), newPerm.trim()] }); setNewPerm(""); }
+                }} />
+                <button onClick={() => { if (newPerm.trim()) { setData({ ...data, permissions: [...(data.permissions || []), newPerm.trim()] }); setNewPerm(""); } }} className="p-1.5 bg-cyan-500/20 text-cyan-400 rounded hover:bg-cyan-500/30">
+                  <Plus className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "memory" && (
+            <>
+              <div>
+                <label className="text-xs text-[#8b949e] mb-2 block">{lang === "ar" ? "ذاكرة قصيرة المدى" : "Short-Term Memory"} ({(data.shortTermMemory || []).length})</label>
+                <textarea value={JSON.stringify(data.shortTermMemory || [], null, 2)} onChange={e => { try { setData({ ...data, shortTermMemory: JSON.parse(e.target.value) }); } catch {} }} rows={6} className="w-full bg-[#161b22] border border-[#30363d] rounded px-3 py-2 text-xs text-[#e1e4e8] font-mono" dir="ltr" />
+              </div>
+              <div>
+                <label className="text-xs text-[#8b949e] mb-2 block">{lang === "ar" ? "ذاكرة طويلة المدى" : "Long-Term Memory"} ({(data.longTermMemory || []).length})</label>
+                <textarea value={JSON.stringify(data.longTermMemory || [], null, 2)} onChange={e => { try { setData({ ...data, longTermMemory: JSON.parse(e.target.value) }); } catch {} }} rows={6} className="w-full bg-[#161b22] border border-[#30363d] rounded px-3 py-2 text-xs text-[#e1e4e8] font-mono" dir="ltr" />
+              </div>
+            </>
+          )}
+
+          {activeTab === "pipeline" && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] text-[#484f58]">{lang === "ar" ? "ترتيب الأنبوب" : "Pipeline Order"}</label>
+                  <input type="number" value={data.pipelineOrder} onChange={e => setData({ ...data, pipelineOrder: parseInt(e.target.value) || 0 })} className="w-full bg-[#161b22] border border-[#30363d] rounded px-3 py-2 text-sm text-[#e1e4e8]" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#484f58]">{lang === "ar" ? "يستقبل من" : "Receives From"}</label>
+                  <input value={data.receivesFrom || ""} onChange={e => setData({ ...data, receivesFrom: e.target.value || null })} className="w-full bg-[#161b22] border border-[#30363d] rounded px-3 py-2 text-sm text-[#e1e4e8]" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-[#484f58]">{lang === "ar" ? "يرسل إلى" : "Sends To"}</label>
+                  <input value={data.sendsTo || ""} onChange={e => setData({ ...data, sendsTo: e.target.value || null })} className="w-full bg-[#161b22] border border-[#30363d] rounded px-3 py-2 text-sm text-[#e1e4e8]" />
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] text-[#484f58]">{lang === "ar" ? "دور عند الاستقبال" : "Role on Receive"}</label>
+                <textarea value={data.roleOnReceive || ""} onChange={e => setData({ ...data, roleOnReceive: e.target.value || null })} rows={2} className="w-full bg-[#161b22] border border-[#30363d] rounded px-3 py-2 text-xs text-[#e1e4e8]" />
+              </div>
+              <div>
+                <label className="text-[10px] text-[#484f58]">{lang === "ar" ? "دور عند الإرسال" : "Role on Send"}</label>
+                <textarea value={data.roleOnSend || ""} onChange={e => setData({ ...data, roleOnSend: e.target.value || null })} rows={2} className="w-full bg-[#161b22] border border-[#30363d] rounded px-3 py-2 text-xs text-[#e1e4e8]" />
+              </div>
+            </div>
+          )}
+
+          {activeTab === "stats" && (
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: lang === "ar" ? "المهام المكتملة" : "Tasks Completed", value: data.totalTasksCompleted.toLocaleString() },
+                { label: lang === "ar" ? "التوكنات المستخدمة" : "Tokens Used", value: data.totalTokensUsed.toLocaleString() },
+                { label: lang === "ar" ? "الأخطاء" : "Errors", value: data.totalErrors.toLocaleString() },
+                { label: lang === "ar" ? "متوسط التنفيذ" : "Avg Execution", value: `${data.avgExecutionMs.toLocaleString()}ms` },
+                { label: lang === "ar" ? "التكلفة الإجمالية" : "Total Cost", value: `$${parseFloat(data.totalCostUsd).toFixed(4)}` },
+              ].map(stat => (
+                <div key={stat.label} className="bg-[#161b22] border border-[#1c2333] rounded-lg p-3">
+                  <div className="text-[10px] text-[#484f58]">{stat.label}</div>
+                  <div className="text-lg font-semibold text-[#e1e4e8] mt-1">{stat.value}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-[#1c2333] bg-[#161b22] px-5 py-3 flex items-center justify-between">
+          <button onClick={onClose} className="px-4 py-2 text-xs text-[#8b949e] hover:text-[#e1e4e8] border border-[#30363d] rounded-lg hover:bg-[#1c2333] transition-colors">
+            {lang === "ar" ? "إلغاء" : "Cancel"}
+          </button>
+          <button onClick={handleSave} disabled={saving} className="px-4 py-2 text-xs font-medium text-black bg-cyan-500 hover:bg-cyan-400 rounded-lg disabled:opacity-50 transition-colors flex items-center gap-2">
+            {saving ? <RotateCcw className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+            {lang === "ar" ? "حفظ التغييرات" : "Save Changes"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function InfraPanel() {
   const { lang } = useI18n();
   const [agents, setAgents] = useState<InfraAgent[]>([]);
@@ -174,6 +539,24 @@ export default function InfraPanel() {
   const programmaticScrollRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const [settingsAgent, setSettingsAgent] = useState<string | null>(null);
+  const [fullConfig, setFullConfig] = useState<FullAgentConfig | null>(null);
+
+  const openSettings = async (agentKey: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const res = await fetch("/api/agents/configs", { credentials: "include" });
+      if (!res.ok) return;
+      const configs: FullAgentConfig[] = await res.json();
+      const cfg = configs.find(c => c.agentKey === agentKey);
+      if (cfg) {
+        setFullConfig(cfg);
+        setSettingsAgent(agentKey);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   useEffect(() => {
     fetch("/api/infra/agents", { credentials: "include" })
@@ -384,7 +767,7 @@ export default function InfraPanel() {
               key={agent.agentKey}
               onClick={() => selectAgent(agent)}
               className={cn(
-                "w-full flex items-center gap-3 px-3 py-3 rounded-lg text-start transition-all mb-2",
+                "group w-full flex items-center gap-3 px-3 py-3 rounded-lg text-start transition-all mb-2",
                 selectedAgent?.agentKey === agent.agentKey
                   ? "bg-gradient-to-r from-yellow-500/20 to-amber-500/10 border border-yellow-500/40"
                   : "bg-gradient-to-r from-yellow-500/10 to-transparent border border-yellow-500/20 hover:border-yellow-500/40"
@@ -393,7 +776,7 @@ export default function InfraPanel() {
               <div className="flex-shrink-0 text-yellow-400">
                 <Crown className="w-6 h-6" />
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="text-sm font-bold text-yellow-300 truncate">
                   {lang === "ar" ? agent.displayNameAr : agent.displayNameEn}
                 </div>
@@ -401,6 +784,9 @@ export default function InfraPanel() {
                   3 models + governor
                 </div>
               </div>
+              <span onClick={(e) => openSettings(agent.agentKey, e)} className="flex-shrink-0 p-1 rounded hover:bg-yellow-500/20 text-yellow-500/50 hover:text-yellow-400 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer" title={lang === "ar" ? "إعدادات الوكيل" : "Agent Settings"}>
+                <Settings className="w-3.5 h-3.5" />
+              </span>
             </button>
           ))}
           <div className="border-t border-[#1c2333] my-2" />
@@ -409,7 +795,7 @@ export default function InfraPanel() {
               key={agent.agentKey}
               onClick={() => selectAgent(agent)}
               className={cn(
-                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-start transition-all",
+                "group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-start transition-all",
                 selectedAgent?.agentKey === agent.agentKey
                   ? "bg-[#1c2333] border border-cyan-500/30"
                   : "hover:bg-[#161b22] border border-transparent"
@@ -418,7 +804,7 @@ export default function InfraPanel() {
               <div className={cn("flex-shrink-0", AGENT_COLORS[agent.agentKey] || "text-[#8b949e]")}>
                 {AGENT_ICONS[agent.agentKey] || <Bot className="w-5 h-5" />}
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium text-[#e1e4e8] truncate">
                   {lang === "ar" ? agent.displayNameAr : agent.displayNameEn}
                 </div>
@@ -426,6 +812,9 @@ export default function InfraPanel() {
                   {agent.primaryModel?.model?.split("-").slice(0, 2).join("-") || ""}
                 </div>
               </div>
+              <span onClick={(e) => openSettings(agent.agentKey, e)} className="flex-shrink-0 p-1 rounded hover:bg-[#1c2333] text-[#484f58] hover:text-cyan-400 transition-colors opacity-0 group-hover:opacity-100" title={lang === "ar" ? "إعدادات الوكيل" : "Agent Settings"}>
+                <Settings className="w-3.5 h-3.5" />
+              </span>
             </button>
           ))}
         </div>
@@ -577,6 +966,18 @@ export default function InfraPanel() {
           </div>
         )}
       </div>
+      {settingsAgent && fullConfig && (
+        <AgentSettingsPanel
+          config={fullConfig}
+          lang={lang}
+          onClose={() => { setSettingsAgent(null); setFullConfig(null); }}
+          onSave={(updated) => {
+            setSettingsAgent(null);
+            setFullConfig(null);
+            setAgents(prev => prev.map(a => a.agentKey === updated.agentKey ? { ...a, displayNameEn: updated.displayNameEn, displayNameAr: updated.displayNameAr, description: updated.description, enabled: updated.enabled } : a));
+          }}
+        />
+      )}
     </div>
   );
 }
