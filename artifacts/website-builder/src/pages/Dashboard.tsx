@@ -78,8 +78,8 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0e1117] text-[#e2e8f0] flex flex-col">
-      <header className="h-14 border-b border-white/10 bg-[#161b22]/80 backdrop-blur-md sticky top-0 z-40 px-4 flex items-center justify-between">
+    <div className="h-screen bg-[#0e1117] text-[#e2e8f0] flex flex-col overflow-hidden">
+      <header className="h-14 flex-shrink-0 border-b border-white/10 bg-[#161b22]/80 backdrop-blur-md z-40 px-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
             <LayoutTemplate className="w-4 h-4 text-primary" />
@@ -126,7 +126,8 @@ export default function Dashboard() {
       <div className="flex flex-1 overflow-hidden">
         <HomeSidebar t={t} lang={lang} userName={userName} isAdmin={isAdmin} onSelectInfraAgent={setInfraChatAgent} />
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 overflow-y-auto">
           <HomeHeroSection t={t} lang={lang} userName={userName} onStart={handleStartProject} isStarting={createProjectMut.isPending} />
 
           <main className="max-w-7xl w-full mx-auto p-6 lg:p-8">
@@ -191,6 +192,15 @@ export default function Dashboard() {
               </div>
             </section>
           )}
+          </div>
+
+          {infraChatAgent && (
+            <InfraInlineChat
+              agent={infraChatAgent}
+              lang={lang}
+              onClose={() => setInfraChatAgent(null)}
+            />
+          )}
         </div>
       </div>
 
@@ -199,14 +209,6 @@ export default function Dashboard() {
         onClose={() => setIsModalOpen(false)} 
         onSuccess={refetch} 
       />
-
-      {infraChatAgent && (
-        <InfraFloatingChat
-          agent={infraChatAgent}
-          lang={lang}
-          onClose={() => setInfraChatAgent(null)}
-        />
-      )}
     </div>
   );
 }
@@ -255,7 +257,7 @@ interface InfraChatMsg {
   models?: string[];
 }
 
-function InfraFloatingChat({ agent, lang, onClose }: { agent: SidebarInfraAgent; lang: string; onClose: () => void }) {
+function InfraInlineChat({ agent, lang, onClose }: { agent: SidebarInfraAgent; lang: string; onClose: () => void }) {
   const [messages, setMessages] = useState<InfraChatMsg[]>([]);
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
@@ -447,34 +449,32 @@ function InfraFloatingChat({ agent, lang, onClose }: { agent: SidebarInfraAgent;
 
   return (
     <div
-      className={`fixed z-50 bg-[#0d1117] border border-[#1c2333] rounded-xl shadow-2xl shadow-black/50 flex flex-col transition-all duration-300 ${
-        expanded
-          ? "bottom-4 end-4 w-[700px] h-[600px]"
-          : "bottom-4 end-4 w-[380px] h-[420px]"
+      className={`bg-[#0d1117] border-s border-[#1c2333] flex flex-col transition-all duration-300 flex-shrink-0 h-full ${
+        expanded ? "w-[500px]" : "w-[340px]"
       }`}
       dir={isRTL ? "rtl" : "ltr"}
     >
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-[#1c2333] bg-[#161b22] rounded-t-xl flex-shrink-0">
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[#1c2333] bg-[#161b22] flex-shrink-0">
         <div className={`p-1.5 rounded-md bg-[#0d1117] ${agentColor}`}>
           {agentIcon}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[12px] font-semibold text-[#e1e4e8] truncate">
+          <div className="text-[13px] font-semibold text-[#e1e4e8] truncate">
             {isRTL ? agent.displayNameAr : agent.displayNameEn}
           </div>
-          <div className="text-[9px] text-[#484f58] truncate">{agent.primaryModel?.model?.split("-").slice(0, 2).join("-")}</div>
+          <div className="text-[10px] text-[#484f58] truncate">{agent.primaryModel?.model?.split("-").slice(0, 2).join("-")}</div>
         </div>
-        <button onClick={() => setExpanded(!expanded)} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] transition-colors rounded">
+        <button onClick={() => setExpanded(!expanded)} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] transition-colors rounded hover:bg-white/5" title={expanded ? (isRTL ? "تضييق" : "Narrow") : (isRTL ? "توسيع" : "Widen")}>
           {expanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
         </button>
         <button
           onClick={() => { setMessages([]); }}
-          className="p-1 text-[#8b949e] hover:text-red-400 transition-colors rounded"
+          className="p-1 text-[#8b949e] hover:text-red-400 transition-colors rounded hover:bg-white/5"
           title={isRTL ? "مسح" : "Clear"}
         >
           <Trash2 className="w-3.5 h-3.5" />
         </button>
-        <button onClick={onClose} className="p-1 text-[#8b949e] hover:text-red-400 transition-colors rounded">
+        <button onClick={onClose} className="p-1 text-[#8b949e] hover:text-red-400 transition-colors rounded hover:bg-white/5" title={isRTL ? "إغلاق" : "Close"}>
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
@@ -537,24 +537,24 @@ function InfraFloatingChat({ agent, lang, onClose }: { agent: SidebarInfraAgent;
         <div ref={chatEndRef} />
       </div>
 
-      <div className="border-t border-[#1c2333] p-2 flex-shrink-0">
+      <div className="border-t border-[#1c2333] px-3 py-2 flex-shrink-0">
         <div className="relative">
           <textarea
             ref={textareaRef}
             value={prompt}
             onChange={e => setPrompt(e.target.value)}
             placeholder={isRTL ? "اكتب أمرك..." : "Type command..."}
-            className="w-full bg-[#161b22] border border-[#30363d] rounded-lg px-3 py-2 pe-10 text-[12px] text-[#e1e4e8] placeholder-[#484f58] resize-none focus:outline-none focus:border-cyan-500/50 transition-colors"
+            className="w-full bg-[#161b22] border border-[#30363d] rounded-xl px-4 py-2.5 pe-12 text-[13px] text-[#e1e4e8] placeholder-[#484f58] resize-none focus:outline-none focus:border-cyan-500/50 transition-colors"
             rows={1}
             onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
           />
           {loading ? (
-            <button onClick={handleStop} className="absolute end-1.5 bottom-1.5 p-1.5 bg-red-500 hover:bg-red-400 text-white rounded-md transition-colors">
-              <X className="w-3 h-3" />
+            <button onClick={handleStop} className="absolute end-2 bottom-2 p-2 bg-red-500 hover:bg-red-400 text-white rounded-lg transition-colors">
+              <X className="w-3.5 h-3.5" />
             </button>
           ) : (
-            <button onClick={handleSend} disabled={!prompt.trim()} className="absolute end-1.5 bottom-1.5 p-1.5 bg-cyan-500 hover:bg-cyan-400 text-black rounded-md disabled:opacity-40 transition-colors">
-              <Send className={`w-3 h-3 ${isRTL ? "rotate-180" : ""}`} />
+            <button onClick={handleSend} disabled={!prompt.trim()} className="absolute end-2 bottom-2 p-2 bg-cyan-500 hover:bg-cyan-400 text-black rounded-lg disabled:opacity-40 transition-colors">
+              <Send className={`w-3.5 h-3.5 ${isRTL ? "rotate-180" : ""}`} />
             </button>
           )}
         </div>
