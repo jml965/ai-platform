@@ -11,7 +11,7 @@ import {
   Trash2,
   Server,
   Shield,
-  Wrench,
+  Crosshair,
   Palette,
   Database,
   Lock,
@@ -43,7 +43,7 @@ interface ChatMessage {
 
 const AGENT_ICONS: Record<string, React.ReactNode> = {
   infra_monitor: <Activity className="w-5 h-5" />,
-  infra_bugfixer: <Wrench className="w-5 h-5" />,
+  infra_bugfixer: <Crosshair className="w-5 h-5" />,
   infra_builder: <Server className="w-5 h-5" />,
   infra_ui: <Palette className="w-5 h-5" />,
   infra_db: <Database className="w-5 h-5" />,
