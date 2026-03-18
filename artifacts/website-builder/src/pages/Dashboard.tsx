@@ -123,7 +123,7 @@ export default function Dashboard() {
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        <HomeSidebar t={t} lang={lang} userName={userName} />
+        <HomeSidebar t={t} lang={lang} userName={userName} isAdmin={isAdmin} />
 
         <div className="flex-1 overflow-y-auto">
           <HomeHeroSection t={t} lang={lang} userName={userName} onStart={handleStartProject} isStarting={createProjectMut.isPending} />
@@ -246,7 +246,7 @@ function AdminPanelSection({ t }: { t: any }) {
   );
 }
 
-function HomeSidebar({ t, lang, userName }: { t: any; lang: string; userName: string }) {
+function HomeSidebar({ t, lang, userName, isAdmin }: { t: any; lang: string; userName: string; isAdmin: boolean }) {
   const navItems = [
     { icon: Home, label: t.home_nav_home, active: true },
     { icon: LayoutTemplate, label: t.home_nav_apps },
@@ -312,7 +312,7 @@ function HomeSidebar({ t, lang, userName }: { t: any; lang: string; userName: st
           </Link>
         </div>
 
-        <AdminPanelSection t={t} />
+        {isAdmin && <AdminPanelSection t={t} />}
       </nav>
 
       <div className="border-t border-white/7 p-2">

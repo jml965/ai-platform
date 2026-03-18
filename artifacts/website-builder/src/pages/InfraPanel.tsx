@@ -28,6 +28,7 @@ import {
   ChevronRight,
   ToggleLeft,
   ToggleRight,
+  FlaskConical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -105,6 +106,7 @@ const AGENT_ICONS: Record<string, React.ReactNode> = {
   infra_db: <Database className="w-5 h-5" />,
   infra_security: <Lock className="w-5 h-5" />,
   infra_deploy: <Rocket className="w-5 h-5" />,
+  infra_qa: <FlaskConical className="w-5 h-5" />,
 };
 
 const AGENT_COLORS: Record<string, string> = {
@@ -116,6 +118,7 @@ const AGENT_COLORS: Record<string, string> = {
   infra_db: "text-amber-400",
   infra_security: "text-emerald-400",
   infra_deploy: "text-cyan-400",
+  infra_qa: "text-pink-400",
 };
 
 function MessageContent({ content }: { content: string }) {

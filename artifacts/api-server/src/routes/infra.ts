@@ -434,6 +434,69 @@ const DEFAULT_INFRA_AGENTS = [
       "artifacts/website-builder/vite.config.ts",
     ],
   },
+  {
+    agentKey: "infra_qa",
+    displayNameEn: "QA & Testing Agent",
+    displayNameAr: "وكيل الاختبار والجودة",
+    description: "يختبر الميزات والصفحات — يكتشف الأخطاء، يتحقق من التجاوب، ويضمن جودة تجربة المستخدم",
+    primaryModel: { provider: "anthropic", model: "claude-sonnet-4-6", enabled: true, creativity: 0.4, timeoutSeconds: 240, maxTokens: 16000 },
+    secondaryModel: { provider: "openai", model: "gpt-4o", enabled: false, creativity: 0.4, timeoutSeconds: 240, maxTokens: 16000 },
+    tertiaryModel: null,
+    governorEnabled: false,
+    autoGovernor: false,
+    governorModel: null,
+    systemPrompt: `أنت وكيل الاختبار وضمان الجودة لمنصة Mr Code AI.
+مهمتك اختبار كل شيء في المنصة والتأكد من أنه يعمل بشكل صحيح.
+
+مسؤولياتك:
+- اختبار الصفحات والمسارات (هل تفتح؟ هل تعرض البيانات؟)
+- اختبار النماذج (forms) والأزرار والتفاعلات
+- التحقق من التجاوب (الجوال والشاشات الكبيرة)
+- اختبار API endpoints (هل ترد بالشكل الصحيح؟)
+- فحص حالات الخطأ (ماذا يحدث عند إدخال بيانات خاطئة؟)
+- التأكد من دعم العربية والإنجليزية (RTL/LTR)
+- اختبار الأداء وسرعة التحميل
+
+قدّم تقاريرك بتصنيف: ✅ نجح / ❌ فشل / ⚠️ تحذير
+مع وصف واضح لخطوات إعادة الإنتاج لكل مشكلة.`,
+    instructions: `## خطة الاختبار
+
+### 1. اختبار الصفحات:
+- الصفحة الرئيسية (/)
+- لوحة التحكم (/dashboard)
+- منشئ المشاريع (/project/:id)
+- إدارة الوكلاء (/agents)
+- البنية التحتية (/infra)
+- الفوترة (/billing)
+- الفرق (/teams)
+
+### 2. اختبار API:
+- GET /api/projects — قائمة المشاريع
+- POST /api/projects — إنشاء مشروع
+- GET /api/agents/configs — إعدادات الوكلاء
+- POST /api/infra/chat-stream — محادثة الوكلاء
+
+### 3. قائمة التحقق:
+- [ ] هل كل الصفحات تفتح بدون أخطاء؟
+- [ ] هل النماذج ترسل البيانات صحيحياً؟
+- [ ] هل RTL يعمل في العربية؟
+- [ ] هل التصميم متجاوب مع الجوال؟
+- [ ] هل رسائل الخطأ واضحة ومفيدة؟`,
+    permissions: ["read_all_files", "test_endpoints", "check_ui", "validate_forms", "test_responsive", "check_accessibility"],
+    pipelineOrder: 9,
+    receivesFrom: "infra_sysadmin",
+    sendsTo: "infra_sysadmin",
+    roleOnReceive: "يستقبل طلبات اختبار ميزات أو صفحات محددة",
+    roleOnSend: "يرسل تقرير الاختبار مع النتائج والمشاكل المكتشفة",
+    tokenLimit: 50000,
+    batchSize: 5,
+    creativity: "0.30",
+    sourceFiles: [
+      "artifacts/website-builder/src/App.tsx",
+      "artifacts/website-builder/src/pages/Dashboard.tsx",
+      "artifacts/api-server/src/routes/index.ts",
+    ],
+  },
 ];
 
 async function seedInfraAgents() {

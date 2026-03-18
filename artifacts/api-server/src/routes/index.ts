@@ -32,18 +32,20 @@ import { requireAuth } from "../middlewares/authSession";
 const router: IRouter = Router();
 
 router.use(healthRouter);
-router.use(authRouter);
-router.use(analyticsRouter);
 
 if (process.env.NODE_ENV === "production") {
+  router.use(authRouter);
+  router.use(analyticsRouter);
   router.use(requireAuth);
 } else {
   router.use((req, _res, next) => {
     if (!req.user) {
-      (req as any).user = { id: "cfc4ba30-2c8a-4a78-8a95-78cc1fc2ec68", role: "admin", email: "jamal@oktamam.com" };
+      (req as any).user = { id: "cfc4ba30-2c8a-4a78-8a95-78cc1fc2ec68", role: "admin", email: "jamal@oktamam.com", name: "Jamal", displayName: "Jamal" };
     }
     next();
   });
+  router.use(authRouter);
+  router.use(analyticsRouter);
 }
 router.use(projectsRouter);
 router.use(buildRouter);
