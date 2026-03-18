@@ -566,7 +566,7 @@ export default function StrategicAgent() {
               setMessages(prev => prev.map(m =>
                 m.id === streamMsgId ? { ...m, content: displayedContent } : m
               ));
-              setTimeout(tick, 20);
+              setTimeout(tick, 22);
             } else {
               typewriterRunning = false;
             }
