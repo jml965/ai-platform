@@ -168,9 +168,18 @@ export default function StrategicAgent() {
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [expandedMsgIds, setExpandedMsgIds] = useState<Set<string>>(new Set());
-  const [fontSize, setFontSize] = useState(16);
-  const [lineSpacing, setLineSpacing] = useState(1.75);
-  const [fontWeight, setFontWeight] = useState(400);
+  const [fontSize, setFontSize] = useState(() => {
+    const saved = localStorage.getItem("strategic_fontSize");
+    return saved ? Number(saved) : 16;
+  });
+  const [lineSpacing, setLineSpacing] = useState(() => {
+    const saved = localStorage.getItem("strategic_lineSpacing");
+    return saved ? Number(saved) : 1.75;
+  });
+  const [fontWeight, setFontWeight] = useState(() => {
+    const saved = localStorage.getItem("strategic_fontWeight");
+    return saved ? Number(saved) : 400;
+  });
   const [showTextSettings, setShowTextSettings] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -933,25 +942,25 @@ export default function StrategicAgent() {
                 <div>
                   <div className="text-[10px] text-[#8b949e] mb-1.5">{lang === "ar" ? "حجم الخط" : "Font Size"}</div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => setFontSize(s => Math.max(12, s - 1))} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Minus className="w-3 h-3" /></button>
+                    <button onClick={() => setFontSize(s => { const v = Math.max(12, s - 1); localStorage.setItem("strategic_fontSize", String(v)); return v; })} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Minus className="w-3 h-3" /></button>
                     <span className="text-xs text-[#c9d1d9] min-w-[28px] text-center">{fontSize}px</span>
-                    <button onClick={() => setFontSize(s => Math.min(24, s + 1))} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Plus className="w-3 h-3" /></button>
+                    <button onClick={() => setFontSize(s => { const v = Math.min(24, s + 1); localStorage.setItem("strategic_fontSize", String(v)); return v; })} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Plus className="w-3 h-3" /></button>
                   </div>
                 </div>
                 <div>
                   <div className="text-[10px] text-[#8b949e] mb-1.5">{lang === "ar" ? "تباعد الأسطر" : "Line Spacing"}</div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => setLineSpacing(s => Math.max(1, +(s - 0.25).toFixed(2)))} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Minus className="w-3 h-3" /></button>
+                    <button onClick={() => setLineSpacing(s => { const v = Math.max(1, +(s - 0.25).toFixed(2)); localStorage.setItem("strategic_lineSpacing", String(v)); return v; })} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Minus className="w-3 h-3" /></button>
                     <span className="text-xs text-[#c9d1d9] min-w-[28px] text-center">{lineSpacing}</span>
-                    <button onClick={() => setLineSpacing(s => Math.min(3, +(s + 0.25).toFixed(2)))} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Plus className="w-3 h-3" /></button>
+                    <button onClick={() => setLineSpacing(s => { const v = Math.min(3, +(s + 0.25).toFixed(2)); localStorage.setItem("strategic_lineSpacing", String(v)); return v; })} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Plus className="w-3 h-3" /></button>
                   </div>
                 </div>
                 <div>
                   <div className="text-[10px] text-[#8b949e] mb-1.5">{lang === "ar" ? "تعريض الخط" : "Font Weight"}</div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => setFontWeight(w => Math.max(100, w - 100))} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Minus className="w-3 h-3" /></button>
+                    <button onClick={() => setFontWeight(w => { const v = Math.max(100, w - 100); localStorage.setItem("strategic_fontWeight", String(v)); return v; })} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Minus className="w-3 h-3" /></button>
                     <span className="text-xs text-[#c9d1d9] min-w-[28px] text-center">{fontWeight}</span>
-                    <button onClick={() => setFontWeight(w => Math.min(900, w + 100))} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Plus className="w-3 h-3" /></button>
+                    <button onClick={() => setFontWeight(w => { const v = Math.min(900, w + 100); localStorage.setItem("strategic_fontWeight", String(v)); return v; })} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Plus className="w-3 h-3" /></button>
                   </div>
                 </div>
               </div>
