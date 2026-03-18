@@ -111,7 +111,6 @@ function ImagePreviewModal({ src, onClose }: { src: string; onClose: () => void 
 
 function MessageContent({ content, fontSize, lineSpacing, fontWeight }: { content: string; fontSize: number; lineSpacing: number; fontWeight: number }) {
   const [copiedIdx, setCopiedIdx] = React.useState<number | null>(null);
-  const parts = content.split(/(```[\s\S]*?```)/g);
 
   const handleCopy = (code: string, idx: number) => {
     navigator.clipboard.writeText(code);
@@ -119,24 +118,83 @@ function MessageContent({ content, fontSize, lineSpacing, fontWeight }: { conten
     setTimeout(() => setCopiedIdx(null), 2000);
   };
 
+  const parseContent = (text: string) => {
+    const segments: Array<{ type: "text" | "code"; lang?: string; value: string }> = [];
+    let remaining = text;
+
+    while (remaining.length > 0) {
+      const openIdx = remaining.indexOf("```");
+      if (openIdx === -1) {
+        segments.push({ type: "text", value: remaining });
+        break;
+      }
+      if (openIdx > 0) {
+        segments.push({ type: "text", value: remaining.slice(0, openIdx) });
+      }
+      const afterOpen = remaining.slice(openIdx + 3);
+      const langMatch = afterOpen.match(/^(\w*)\n?/);
+      const lang = langMatch ? langMatch[1] : "";
+      const codeStart = langMatch ? langMatch[0].length : 0;
+      const closeIdx = afterOpen.indexOf("```", codeStart);
+      if (closeIdx === -1) {
+        segments.push({ type: "code", lang, value: afterOpen.slice(codeStart) });
+        break;
+      }
+      segments.push({ type: "code", lang, value: afterOpen.slice(codeStart, closeIdx) });
+      remaining = afterOpen.slice(closeIdx + 3);
+    }
+    return segments;
+  };
+
+  const renderText = (text: string, keyPrefix: number) => {
+    if (!text.trim()) return null;
+    const lines = text.split("\n");
+    return lines.map((line, li) => {
+      const boldParts = line.split(/(\*\*[^*]+\*\*)/g);
+      const rendered = boldParts.map((seg, si) => {
+        const boldMatch = seg.match(/^\*\*([^*]+)\*\*$/);
+        if (boldMatch) {
+          return <strong key={si} className="font-bold text-[#e1e4e8]">{boldMatch[1]}</strong>;
+        }
+        const inlineParts = seg.split(/(`[^`]+`)/g);
+        return inlineParts.map((ip, ii) => {
+          const inlineMatch = ip.match(/^`([^`]+)`$/);
+          if (inlineMatch) {
+            return <code key={`${si}-${ii}`} className="px-1.5 py-0.5 bg-[#1c2333] rounded text-[13px] text-amber-300 border border-[#30363d]" dir="ltr">{inlineMatch[1]}</code>;
+          }
+          return <React.Fragment key={`${si}-${ii}`}>{ip}</React.Fragment>;
+        });
+      });
+      return (
+        <React.Fragment key={`${keyPrefix}-${li}`}>
+          {li > 0 && <br />}
+          {rendered}
+        </React.Fragment>
+      );
+    });
+  };
+
+  const segments = parseContent(content);
+
   return (
     <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", fontSize: `${fontSize}px`, lineHeight: lineSpacing, fontWeight }}>
-      {parts.map((part, i) => {
-        const codeMatch = part.match(/^```(\w*)\n?([\s\S]*?)```$/);
-        if (codeMatch) {
-          const lang = codeMatch[1] || "";
-          const code = codeMatch[2].trim();
+      {segments.map((seg, i) => {
+        if (seg.type === "code") {
+          const code = seg.value.trim();
+          const langLabel = seg.lang || "code";
           return (
             <div key={i} className="my-3 rounded-lg overflow-hidden border border-[#30363d]">
               <div className="flex items-center justify-between px-3 py-1.5 bg-[#1c2333]">
-                <span className="text-[10px] text-[#8b949e] uppercase tracking-wide">{lang || "code"}</span>
-                <button
-                  onClick={() => handleCopy(code, i)}
-                  className="flex items-center gap-1 text-[10px] text-[#8b949e] hover:text-[#e1e4e8] transition-colors"
-                >
-                  {copiedIdx === i ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                  <span>{copiedIdx === i ? "Copied" : "Copy"}</span>
-                </button>
+                <span className="text-[10px] text-[#8b949e] uppercase tracking-wide">{langLabel}</span>
+                {code.length > 0 && (
+                  <button
+                    onClick={() => handleCopy(code, i)}
+                    className="flex items-center gap-1 text-[10px] text-[#8b949e] hover:text-[#e1e4e8] transition-colors"
+                  >
+                    {copiedIdx === i ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedIdx === i ? "Copied" : "Copy"}</span>
+                  </button>
+                )}
               </div>
               <pre className="p-3 bg-[#0d1117] text-[13px] leading-relaxed text-[#e1e4e8] overflow-x-auto" dir="ltr">
                 <code>{code}</code>
@@ -144,18 +202,10 @@ function MessageContent({ content, fontSize, lineSpacing, fontWeight }: { conten
             </div>
           );
         }
-        if (!part.trim()) return null;
-        const inlineParts = part.split(/(`[^`]+`)/g);
         return (
-          <p key={i} className="whitespace-pre-wrap">
-            {inlineParts.map((seg, j) => {
-              const inlineMatch = seg.match(/^`([^`]+)`$/);
-              if (inlineMatch) {
-                return <code key={j} className="px-1.5 py-0.5 bg-[#1c2333] rounded text-[13px] text-amber-300 border border-[#30363d]" dir="ltr">{inlineMatch[1]}</code>;
-              }
-              return <React.Fragment key={j}>{seg}</React.Fragment>;
-            })}
-          </p>
+          <div key={i} className="whitespace-pre-wrap">
+            {renderText(seg.value, i)}
+          </div>
         );
       })}
     </div>
