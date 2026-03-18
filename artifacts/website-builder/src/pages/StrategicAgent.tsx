@@ -203,6 +203,8 @@ export default function StrategicAgent() {
   const [editingThreadTitle, setEditingThreadTitle] = useState("");
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const userScrolledUpRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -219,7 +221,9 @@ export default function StrategicAgent() {
   }, [projects, selectedProjectId]);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!userScrolledUpRef.current) {
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages]);
 
   useEffect(() => {
@@ -466,6 +470,8 @@ export default function StrategicAgent() {
     if (loading) {
       handleStop();
     }
+
+    userScrolledUpRef.current = false;
 
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -1052,10 +1058,17 @@ export default function StrategicAgent() {
       </header>
 
       <div
+        ref={chatContainerRef}
         className={cn(
           "flex-1 overflow-y-auto p-4 space-y-4",
           dragOver && "ring-2 ring-amber-500/50 ring-inset bg-amber-500/5"
         )}
+        onScroll={() => {
+          const el = chatContainerRef.current;
+          if (!el) return;
+          const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+          userScrolledUpRef.current = !atBottom;
+        }}
         onDragOver={e => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
