@@ -408,6 +408,7 @@ function AgentSettingsPanel({ config, onClose, onSave, lang }: { config: FullAge
   const [data, setData] = useState<FullAgentConfig>(config);
   const [activeTab, setActiveTab] = useState("models");
   const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [newPerm, setNewPerm] = useState("");
   const [newSourceFile, setNewSourceFile] = useState("");
 
@@ -437,6 +438,26 @@ function AgentSettingsPanel({ config, onClose, onSave, lang }: { config: FullAge
       console.error(err);
     }
     setSaving(false);
+  };
+
+  const handleReset = async () => {
+    if (!confirm(lang === "ar" ? "هل أنت متأكد؟ سيتم إعادة جميع إعدادات هذا الوكيل للوضع الافتراضي." : "Are you sure? All settings for this agent will be reset to defaults.")) return;
+    setResetting(true);
+    try {
+      const res = await fetch(`/api/infra/reset/${data.agentKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setData(updated);
+        onSave(updated);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    setResetting(false);
   };
 
   return (
@@ -770,9 +791,15 @@ function AgentSettingsPanel({ config, onClose, onSave, lang }: { config: FullAge
         </div>
 
         <div className="border-t border-[#1c2333] bg-[#161b22] px-5 py-3 flex items-center justify-between">
-          <button onClick={onClose} className="px-4 py-2 text-xs text-[#8b949e] hover:text-[#e1e4e8] border border-[#30363d] rounded-lg hover:bg-[#1c2333] transition-colors">
-            {lang === "ar" ? "إلغاء" : "Cancel"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="px-4 py-2 text-xs text-[#8b949e] hover:text-[#e1e4e8] border border-[#30363d] rounded-lg hover:bg-[#1c2333] transition-colors">
+              {lang === "ar" ? "إلغاء" : "Cancel"}
+            </button>
+            <button onClick={handleReset} disabled={resetting} className="px-4 py-2 text-xs text-orange-400 hover:text-orange-300 border border-orange-500/30 rounded-lg hover:bg-orange-500/10 transition-colors flex items-center gap-2 disabled:opacity-50">
+              {resetting ? <RotateCcw className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
+              {lang === "ar" ? "إعادة للافتراضي" : "Reset to Default"}
+            </button>
+          </div>
           <button onClick={handleSave} disabled={saving} className="px-4 py-2 text-xs font-medium text-black bg-cyan-500 hover:bg-cyan-400 rounded-lg disabled:opacity-50 transition-colors flex items-center gap-2">
             {saving ? <RotateCcw className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
             {lang === "ar" ? "حفظ التغييرات" : "Save Changes"}
@@ -1073,6 +1100,26 @@ export default function InfraPanel() {
               </button>
             </div>
           ))}
+        </div>
+        <div className="p-3 border-t border-[#1c2333]">
+          <button
+            onClick={async () => {
+              if (!confirm(lang === "ar" ? "هل أنت متأكد؟ سيتم إعادة جميع الوكلاء للإعدادات الافتراضية." : "Reset ALL agents to their default settings?")) return;
+              try {
+                const res = await fetch("/api/infra/reset-all", { method: "POST", credentials: "include" });
+                if (res.ok) {
+                  const r2 = await fetch("/api/infra/agents", { credentials: "include" });
+                  if (r2.ok) { const data = await r2.json(); if (Array.isArray(data)) setAgents(data); }
+                  setSettingsAgent(null);
+                  setFullConfig(null);
+                }
+              } catch (err) { console.error(err); }
+            }}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs text-orange-400 hover:text-orange-300 border border-orange-500/20 rounded-lg hover:bg-orange-500/10 transition-colors"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            {lang === "ar" ? "إعادة الكل للافتراضي" : "Reset All to Defaults"}
+          </button>
         </div>
       </div>
 
