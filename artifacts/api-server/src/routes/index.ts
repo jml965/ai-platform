@@ -35,14 +35,16 @@ router.use(healthRouter);
 router.use(authRouter);
 router.use(analyticsRouter);
 
-// AUTH TEMPORARILY DISABLED FOR DEVELOPMENT - RE-ENABLE BEFORE PRODUCTION
-// router.use(requireAuth);
-router.use((req, _res, next) => {
-  if (!req.user) {
-    (req as any).user = { id: "cfc4ba30-2c8a-4a78-8a95-78cc1fc2ec68", role: "admin", email: "jamal@oktamam.com" };
-  }
-  next();
-});
+if (process.env.NODE_ENV === "production") {
+  router.use(requireAuth);
+} else {
+  router.use((req, _res, next) => {
+    if (!req.user) {
+      (req as any).user = { id: "cfc4ba30-2c8a-4a78-8a95-78cc1fc2ec68", role: "admin", email: "jamal@oktamam.com" };
+    }
+    next();
+  });
+}
 router.use(projectsRouter);
 router.use(buildRouter);
 router.use(agentsRouter);

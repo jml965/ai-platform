@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, LayoutTemplate, Trash2, Loader2, Coins, LogOut, CreditCard, Users, ShieldCheck, Activity, Globe, ExternalLink, Square, RefreshCw, Rocket, Bell, Palette, Home, Smartphone, Play, BarChart2, Gamepad2, FileText, Settings, BookOpen, Gift, Search, ChevronDown, Upload, UploadCloud, Download, Cpu, Wand2, Camera, ArrowRight, Check, X, Bot, FolderGit2, Plug, ChevronRight } from "lucide-react";
+import { Plus, LayoutTemplate, Trash2, Loader2, Coins, LogOut, CreditCard, Users, ShieldCheck, Activity, Globe, ExternalLink, Square, RefreshCw, Rocket, Bell, Palette, Home, Smartphone, Play, BarChart2, Gamepad2, FileText, Settings, BookOpen, Gift, Search, ChevronDown, Upload, UploadCloud, Download, Cpu, Wand2, Camera, ArrowRight, Check, X, Bot, FolderGit2, Plug, ChevronRight, Shield, Crown } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import type { Project, ProjectStatus as ProjectStatusType } from "@workspace/api-client-react";
@@ -205,8 +205,10 @@ export default function Dashboard() {
 function AdminPanelSection({ t }: { t: any }) {
   const [expanded, setExpanded] = useState(true);
   const adminItems = [
+    { icon: Crown, label: t.home_nav_infrastructure, href: "/infra", highlight: true },
     { icon: Bot, label: t.home_nav_agents, href: "/agents" },
     { icon: Cpu, label: t.home_nav_control_center, href: "/control-center" },
+    { icon: Shield, label: t.home_nav_admin_dashboard, href: "/admin" },
     { icon: FolderGit2, label: t.home_nav_repository, href: "#" },
     { icon: Plug, label: t.home_nav_integration, href: "#" },
   ];
@@ -224,11 +226,15 @@ function AdminPanelSection({ t }: { t: any }) {
       </button>
       {expanded && (
         <div className="flex flex-col gap-0.5 mt-1">
-          {adminItems.map((item, i) => (
+          {adminItems.map((item: any, i: number) => (
             <Link
               key={i}
               href={item.href}
-              className="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer text-[12.5px] text-[#8b949e] hover:bg-white/5 transition-colors"
+              className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer text-[12.5px] transition-colors ${
+                item.highlight
+                  ? "text-yellow-400 hover:bg-yellow-500/10 font-medium"
+                  : "text-[#8b949e] hover:bg-white/5"
+              }`}
             >
               <item.icon className="w-4 h-4" />
               <span>{item.label}</span>
