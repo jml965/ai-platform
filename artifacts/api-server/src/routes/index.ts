@@ -25,6 +25,7 @@ import translationsRouter from "./translations";
 import chatRouter from "./chat";
 import mediaProvidersRouter from "./media-providers";
 import adminRouter from "./admin";
+import strategicRouter from "./strategic";
 import { requireAuth } from "../middlewares/authSession";
 
 const router: IRouter = Router();
@@ -64,5 +65,6 @@ router.use(translationsRouter);
 router.use(chatRouter);
 router.use(mediaProvidersRouter);
 router.use(adminRouter);
+router.use(strategicRouter);
 
 export default router;

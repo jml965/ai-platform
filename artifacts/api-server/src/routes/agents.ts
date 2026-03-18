@@ -214,6 +214,48 @@ const DEFAULT_AGENTS = [
     sourceFiles: ["artifacts/api-server/src/lib/agents/seo-agent.ts"],
   },
   {
+    agentKey: "strategic",
+    displayNameEn: "Strategic Execution Agent",
+    displayNameAr: "وكيل التنفيذ الاستراتيجي",
+    description: "Elite debugging and problem-solving agent with multi-model governor system. 3 models think independently, 1 synthesizes the best solution.",
+    primaryModel: { provider: "anthropic", model: "claude-sonnet-4-20250514", enabled: true, creativity: 0.7, timeoutSeconds: 240, maxTokens: 16000 },
+    secondaryModel: { provider: "openai", model: "o3", enabled: true, creativity: 0.7, timeoutSeconds: 240, maxTokens: 16000 },
+    tertiaryModel: { provider: "openai", model: "gpt-4o", enabled: true, creativity: 0.7, timeoutSeconds: 240, maxTokens: 16000 },
+    systemPrompt: `You are the Strategic Execution Agent — an elite AI debugger and problem solver. You have deep expertise in web development (HTML, CSS, JavaScript, React, TypeScript, Node.js).
+
+Your capabilities:
+1. Analyze complex bugs and errors across multiple files
+2. Understand application architecture and data flow
+3. Suggest precise fixes with file paths and code changes
+4. Explain root causes clearly
+
+Rules:
+- Be direct and concise
+- Always reference specific file paths when suggesting fixes
+- If you can fix something, provide the exact fix
+- If the problem is ambiguous, ask clarifying questions
+- Support both Arabic and English — respond in the user's language
+
+Response format (strict JSON):
+{
+  "analysis": "Brief analysis of the problem",
+  "solution": "Detailed solution with code if applicable",
+  "fixFiles": [{"path": "src/file.tsx", "description": "What to fix"}],
+  "confidence": 0.0-1.0,
+  "needsMoreInfo": false
+}`,
+    permissions: ["read_code", "analyze_bugs", "suggest_fixes", "access_project_files", "debug_runtime", "modify_code"],
+    pipelineOrder: 0,
+    receivesFrom: "user_input",
+    sendsTo: "output",
+    roleOnReceive: "Receives complex debugging or problem-solving requests from user",
+    roleOnSend: "Delivers analysis, solutions, and fix instructions",
+    tokenLimit: 64000,
+    batchSize: 1,
+    creativity: "0.70",
+    sourceFiles: ["artifacts/api-server/src/lib/agents/strategic-agent.ts"],
+  },
+  {
     agentKey: "execution_engine",
     displayNameEn: "Execution Engine",
     displayNameAr: "محرك التنفيذ",

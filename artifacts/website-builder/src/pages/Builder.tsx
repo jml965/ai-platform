@@ -103,6 +103,11 @@ export default function Builder() {
   const [showPwaPanel, setShowPwaPanel] = useState(false);
   const [showTranslationsPanel, setShowTranslationsPanel] = useState(false);
   const [isChatLoading, setIsChatLoading] = useState(false);
+  const [strategicMode, setStrategicMode] = useState(false);
+  const [strategicMessages, setStrategicMessages] = useState<{ id: string; role: "user" | "assistant"; content: string; thinking?: { model: string; summary: string; durationMs: number }[]; modelsUsed?: string[]; tokensUsed?: number; cost?: number; fixApplied?: boolean; fixedFiles?: string[]; timestamp: Date }[]>([]);
+  const [strategicPrompt, setStrategicPrompt] = useState("");
+  const [strategicLoading, setStrategicLoading] = useState(false);
+  const strategicEndRef = useRef<HTMLDivElement>(null);
   const [cssEditorActive, setCssEditorActive] = useState(false);
   const [cssSaving, setCssSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -473,6 +478,51 @@ export default function Builder() {
       setIsChatLoading(false);
     }
   };
+
+  const handleStrategicSend = async () => {
+    if (!strategicPrompt.trim() || strategicLoading || !id) return;
+    const userMsg = { id: crypto.randomUUID(), role: "user" as const, content: strategicPrompt.trim(), timestamp: new Date() };
+    setStrategicMessages(prev => [...prev, userMsg]);
+    setStrategicPrompt("");
+    setStrategicLoading(true);
+    try {
+      const res = await fetch("/api/strategic/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ projectId: id, message: userMsg.content }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setStrategicMessages(prev => [...prev, { id: crypto.randomUUID(), role: "assistant", content: data.error?.message_ar || data.error?.message || "Error", timestamp: new Date() }]);
+        return;
+      }
+      setStrategicMessages(prev => [...prev, {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: data.reply,
+        thinking: data.thinking,
+        modelsUsed: data.modelsUsed,
+        tokensUsed: data.tokensUsed,
+        cost: data.cost,
+        fixApplied: data.fixApplied,
+        fixedFiles: data.fixedFiles,
+        timestamp: new Date(),
+      }]);
+      if (data.fixApplied) {
+        queryClient.invalidateQueries({ queryKey: ["listProjectFiles", id] });
+        setTimeout(() => setPreviewKey(k => k + 1), 1500);
+      }
+    } catch (err: any) {
+      setStrategicMessages(prev => [...prev, { id: crypto.randomUUID(), role: "assistant", content: err?.message || "Connection error", timestamp: new Date() }]);
+    } finally {
+      setStrategicLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (strategicEndRef.current) strategicEndRef.current.scrollIntoView({ behavior: "smooth" });
+  }, [strategicMessages]);
 
   useEffect(() => {
     if (autoPromptProcessed.current || !id) return;
@@ -1407,6 +1457,18 @@ export default function Builder() {
             </span>
           </div>
           <div className="px-3 pb-2 flex items-center gap-1.5 flex-wrap">
+            <button
+              onClick={() => setStrategicMode(v => !v)}
+              className={cn(
+                "text-[10px] px-2 py-1 rounded-md font-medium flex items-center gap-1 flex-shrink-0 transition-all",
+                strategicMode
+                  ? "bg-amber-500/20 text-amber-400 ring-1 ring-amber-500/30"
+                  : "bg-[#1c2333] text-[#8b949e] hover:bg-[#30363d] hover:text-[#e1e4e8]"
+              )}
+            >
+              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a8 8 0 0 0-8 8c0 3.4 2.1 6.3 5 7.4V20a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-2.6c2.9-1.1 5-4 5-7.4a8 8 0 0 0-8-8z"/><line x1="9" y1="22" x2="15" y2="22"/><line x1="10" y1="2" x2="10" y2="5"/><line x1="14" y1="2" x2="14" y2="5"/></svg>
+              {t.strategic_tab}
+            </button>
             <Link
               href={`/project/${id}/analytics`}
               className="text-[10px] px-2 py-1 rounded-md font-medium flex items-center gap-1 flex-shrink-0 transition-all bg-[#d2a8ff]/10 text-[#d2a8ff] hover:bg-[#d2a8ff]/20"
@@ -1623,6 +1685,99 @@ export default function Builder() {
           )}
         </AnimatePresence>
 
+        {strategicMode ? (
+          <>
+            <div className="px-3 py-2 border-b border-amber-500/20 bg-amber-500/5 flex items-center gap-2">
+              <svg className="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a8 8 0 0 0-8 8c0 3.4 2.1 6.3 5 7.4V20a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-2.6c2.9-1.1 5-4 5-7.4a8 8 0 0 0-8-8z"/><line x1="9" y1="22" x2="15" y2="22"/></svg>
+              <span className="text-xs font-medium text-amber-400 flex-1">{t.strategic_agent}</span>
+              <button onClick={() => setStrategicMode(false)} className="text-[#8b949e] hover:text-[#e1e4e8] p-0.5">
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 space-y-3">
+              {strategicMessages.length === 0 && (
+                <div className="text-center mt-12 text-[#8b949e]">
+                  <div className="w-14 h-14 mx-auto bg-amber-500/10 rounded-full flex items-center justify-center mb-3">
+                    <svg className="w-7 h-7 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a8 8 0 0 0-8 8c0 3.4 2.1 6.3 5 7.4V20a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-2.6c2.9-1.1 5-4 5-7.4a8 8 0 0 0-8-8z"/><line x1="9" y1="22" x2="15" y2="22"/></svg>
+                  </div>
+                  <p className="text-sm font-medium text-[#e1e4e8] mb-1">{t.strategic_agent}</p>
+                  <p className="text-xs text-[#8b949e]">{t.strategic_agent_desc}</p>
+                </div>
+              )}
+              {strategicMessages.map(msg => (
+                <div key={msg.id} className={cn("flex gap-2", msg.role === "user" && "flex-row-reverse")}>
+                  <div className={cn("w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0", msg.role === "user" ? "bg-[#1f6feb]/20 text-[#58a6ff]" : "bg-amber-500/20 text-amber-400")}>
+                    {msg.role === "user" ? <User className="w-3 h-3" /> : <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M12 2a8 8 0 0 0-8 8c0 3.4 2.1 6.3 5 7.4V20a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-2.6c2.9-1.1 5-4 5-7.4a8 8 0 0 0-8-8z"/></svg>}
+                  </div>
+                  <div className={cn("max-w-[85%] rounded-lg px-3 py-2 text-[13px]", msg.role === "user" ? "bg-[#1f6feb]/10 text-[#e1e4e8]" : "bg-[#161b22] border border-[#30363d] text-[#c9d1d9]")}>
+                    <pre className="whitespace-pre-wrap font-sans text-[13px] leading-relaxed">{msg.content}</pre>
+                    {msg.thinking && msg.thinking.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-[#30363d]">
+                        <div className="text-[10px] text-[#8b949e] space-y-1">
+                          {msg.thinking.map((th, i) => (
+                            <div key={i} className="flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                              <span>{th.model}</span>
+                              <span className="text-[#484f58]">•</span>
+                              <span>{(th.durationMs / 1000).toFixed(1)}s</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {msg.fixApplied !== undefined && (
+                      <div className={cn("mt-2 pt-2 border-t border-[#30363d] text-[10px] flex items-center gap-1.5", msg.fixApplied ? "text-emerald-400" : "text-[#8b949e]")}>
+                        {msg.fixApplied ? <Check className="w-3 h-3" /> : null}
+                        <span>{msg.fixApplied ? t.strategic_fix_applied : ""}</span>
+                        {msg.fixedFiles && msg.fixedFiles.length > 0 && (
+                          <span className="text-[#484f58]">{msg.fixedFiles.join(", ")}</span>
+                        )}
+                      </div>
+                    )}
+                    {msg.tokensUsed && (
+                      <div className="mt-1 text-[10px] text-[#484f58] flex items-center gap-2">
+                        <span>{msg.tokensUsed.toLocaleString()} {t.tokens_label}</span>
+                        {msg.cost && <span>${msg.cost.toFixed(4)}</span>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {strategicLoading && (
+                <div className="flex gap-2">
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 bg-amber-500/20 text-amber-400">
+                    <svg className="w-3 h-3 animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M12 2a8 8 0 0 0-8 8c0 3.4 2.1 6.3 5 7.4V20a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-2.6c2.9-1.1 5-4 5-7.4a8 8 0 0 0-8-8z"/></svg>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                    <span className="text-[12px] text-[#c9d1d9]">{t.strategic_thinking}</span>
+                  </div>
+                </div>
+              )}
+              <div ref={strategicEndRef} />
+            </div>
+            <div className="p-3 border-t border-[#1c2333] bg-[#0d1117]">
+              <div className="relative">
+                <textarea
+                  value={strategicPrompt}
+                  onChange={e => setStrategicPrompt(e.target.value)}
+                  placeholder={t.strategic_placeholder}
+                  disabled={strategicLoading}
+                  className={cn("w-full bg-[#161b22] border border-amber-500/20 rounded-lg p-3 pe-10 resize-none h-20 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/30 transition-all text-sm text-[#e1e4e8] placeholder-[#484f58]", strategicLoading && "opacity-50")}
+                  onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleStrategicSend(); } }}
+                />
+                <button
+                  onClick={handleStrategicSend}
+                  disabled={!strategicPrompt.trim() || strategicLoading}
+                  className="absolute end-2 bottom-2 p-1.5 bg-amber-500 text-black rounded-md hover:bg-amber-400 disabled:opacity-40 disabled:hover:bg-amber-500 transition-colors"
+                >
+                  {strategicLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className={cn("w-4 h-4", lang === "ar" && "rotate-180")} />}
+                </button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
         <div className="flex-1 overflow-y-auto p-3 space-y-3">
           {messages.length === 0 && !startBuildMut.isPending && (
             <div className="text-center mt-16 text-[#8b949e]">
@@ -1781,6 +1936,8 @@ export default function Builder() {
             </button>
           </div>
         </div>
+          </>
+        )}
       </div>}
 
       {leftPanelOpen && (

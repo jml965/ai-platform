@@ -654,6 +654,20 @@ const en = {
   preview_sandbox_failed: "Preview connection failed",
   preview_retry: "Retry",
   preview_error_render: "Preview rendering error",
+  strategic_agent: "Strategic Agent",
+  strategic_agent_desc: "Elite debugger with multi-model thinking",
+  strategic_thinking: "Thinking...",
+  strategic_models_thinking: "models analyzing",
+  strategic_governor_merging: "Governor merging solutions",
+  strategic_fix_applied: "Fix applied successfully",
+  strategic_fix_failed: "Fix could not be applied",
+  strategic_confidence: "Confidence",
+  strategic_tokens_used: "Tokens used",
+  strategic_cost: "Cost",
+  strategic_placeholder: "Describe the problem or ask the strategic agent...",
+  strategic_tab: "Strategic",
+  strategic_models_used: "Models used",
+  strategic_close: "Close",
 };
 
 const ar = {
@@ -1310,6 +1324,20 @@ const ar = {
   preview_sandbox_failed: "فشل الاتصال بالمعاينة",
   preview_retry: "إعادة المحاولة",
   preview_error_render: "خطأ في عرض المعاينة",
+  strategic_agent: "الوكيل الاستراتيجي",
+  strategic_agent_desc: "وكيل تصحيح متقدم بتفكير متعدد النماذج",
+  strategic_thinking: "يفكر...",
+  strategic_models_thinking: "نماذج تحلل",
+  strategic_governor_merging: "الحاكم يدمج الحلول",
+  strategic_fix_applied: "تم تطبيق الإصلاح بنجاح",
+  strategic_fix_failed: "لم يتمكن من تطبيق الإصلاح",
+  strategic_confidence: "الثقة",
+  strategic_tokens_used: "التوكنات المستخدمة",
+  strategic_cost: "التكلفة",
+  strategic_placeholder: "صف المشكلة أو اسأل الوكيل الاستراتيجي...",
+  strategic_tab: "استراتيجي",
+  strategic_models_used: "النماذج المستخدمة",
+  strategic_close: "إغلاق",
 };
 
 type Language = "en" | "ar";
