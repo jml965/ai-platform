@@ -34,38 +34,21 @@ interface ConversationMessage {
   content: string;
 }
 
-const STRATEGIC_SYSTEM_PROMPT = `You are the Strategic Execution Agent — an elite AI debugger and problem solver. You have deep expertise in web development (HTML, CSS, JavaScript, React, TypeScript, Node.js).
-
-Your capabilities:
-1. Analyze complex bugs and errors across multiple files
-2. Understand application architecture and data flow
-3. Suggest precise fixes with file paths and code changes
-4. Explain root causes clearly
+const STRATEGIC_SYSTEM_PROMPT = `You are the Strategic Execution Agent — an elite AI assistant, debugger, and problem solver. You have deep expertise in web development (HTML, CSS, JavaScript, React, TypeScript, Node.js) and general knowledge.
 
 Rules:
-- Be direct and concise
-- Always reference specific file paths when suggesting fixes
-- If you can fix something, provide the exact fix
-- If the problem is ambiguous, ask clarifying questions
-- Support both Arabic and English — respond in the user's language
+- Be direct, concise, and fast
+- Respond in the user's language (Arabic or English)
+- When showing code, use markdown code blocks with language tags (e.g. \`\`\`typescript)
+- Reference specific file paths when suggesting fixes
+- For quick questions, give quick answers — no unnecessary structure
+- Only provide detailed analysis when the problem requires it
 
-Response format (strict JSON):
-{
-  "analysis": "Brief analysis of the problem",
-  "solution": "Detailed solution with code if applicable",
-  "fixFiles": [{"path": "src/file.tsx", "description": "What to fix"}],
-  "confidence": 0.0-1.0,
-  "needsMoreInfo": false
-}
-
-If no fix needed (just a question/discussion):
-{
-  "analysis": "Your answer",
-  "solution": "",
-  "fixFiles": [],
-  "confidence": 1.0,
-  "needsMoreInfo": false
-}`;
+When you identify files that need fixing, end your response with a JSON block:
+\`\`\`json
+{"fixFiles": [{"path": "src/file.tsx", "description": "What to fix"}]}
+\`\`\`
+Only include this JSON block when actual file fixes are needed. For general discussion, just respond naturally.`;
 
 const GOVERNOR_MERGE_PROMPT = `You are the Strategic Governor — the final decision maker. You received analyses from multiple expert AI models examining the same problem. Your job:
 
@@ -178,19 +161,12 @@ export async function runStrategicAgent(
 
   const files = projectId === "general" ? [] : await db.select({
     filePath: projectFilesTable.filePath,
-    content: projectFilesTable.content,
   }).from(projectFilesTable).where(eq(projectFilesTable.projectId, projectId));
 
   let contextBlock = "";
   if (files.length > 0) {
-    const filesSummary = files.map(f => {
-      const lines = (f.content || "").split("\n");
-      const preview = lines.length > 100
-        ? lines.slice(0, 100).join("\n") + `\n... (${lines.length - 100} more lines)`
-        : f.content || "";
-      return `--- ${f.filePath} ---\n${preview}`;
-    }).join("\n\n");
-    contextBlock = `\n\nProject files (${files.length} files):\n${filesSummary}`;
+    const fileList = files.map(f => f.filePath).join("\n");
+    contextBlock = `\n\nProject files (${files.length} files):\n${fileList}`;
   }
 
   let memoryBlock = "";
@@ -364,30 +340,34 @@ export async function runStrategicAgent(
 }
 
 function parseResponse(raw: string, _userMessage: string): { reply: string; actions?: { type: "fix"; files: { path: string; description: string }[] } } {
+  const jsonBlockMatch = raw.match(/```json\s*\n?([\s\S]*?)\n?```\s*$/);
+  if (jsonBlockMatch) {
+    try {
+      const parsed = JSON.parse(jsonBlockMatch[1].trim());
+      const reply = raw.slice(0, raw.lastIndexOf("```json")).trim();
+      if (parsed.fixFiles && Array.isArray(parsed.fixFiles) && parsed.fixFiles.length > 0) {
+        return { reply, actions: { type: "fix", files: parsed.fixFiles } };
+      }
+      return { reply };
+    } catch {}
+  }
+
   try {
     const cleaned = raw.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
     let parsed: any = null;
-
-    try {
-      parsed = JSON.parse(cleaned);
-    } catch {
+    try { parsed = JSON.parse(cleaned); } catch {
       const braceStart = cleaned.indexOf("{");
       const braceEnd = cleaned.lastIndexOf("}");
       if (braceStart !== -1 && braceEnd > braceStart) {
         try { parsed = JSON.parse(cleaned.substring(braceStart, braceEnd + 1)); } catch { parsed = null; }
       }
     }
-
     if (parsed) {
       const analysis = parsed.analysis || "";
       const solution = parsed.solution || "";
       const reply = solution ? `${analysis}\n\n${solution}` : analysis || raw;
-
       if (parsed.fixFiles && Array.isArray(parsed.fixFiles) && parsed.fixFiles.length > 0) {
-        return {
-          reply,
-          actions: { type: "fix", files: parsed.fixFiles },
-        };
+        return { reply, actions: { type: "fix", files: parsed.fixFiles } };
       }
       return { reply };
     }
