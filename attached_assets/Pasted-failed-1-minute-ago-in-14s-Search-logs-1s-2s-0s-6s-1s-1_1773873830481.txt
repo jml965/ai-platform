@@ -1,0 +1,82 @@
+failed 1 minute ago in 14s
+Search logs
+1s
+2s
+0s
+6s
+1s
+1s
+Run docker build -t ***-docker.pkg.dev/***/mrcodeai/mrcodeai-app:b9a496bc88f2df6e1dbe7e14b85f4db272af84a0 .
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.56kB done
+#1 DONE 0.0s
+
+#2 [auth] library/node:pull token for registry-1.docker.io
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/node:20-slim
+#3 DONE 0.4s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 133B done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 3.93MB 0.1s done
+#5 DONE 0.1s
+
+#6 [base 2/8] RUN corepack enable && corepack prepare pnpm@latest --activate
+#6 CACHED
+
+#7 [production  6/11] COPY artifacts/api-server/package.json ./artifacts/api-server/package.json
+#7 CACHED
+
+#8 [production  7/11] COPY artifacts/website-builder/package.json ./artifacts/website-builder/package.json
+#8 CACHED
+
+#9 [base 3/8] WORKDIR /app
+#9 CACHED
+
+#10 [base 5/8] COPY lib/ ./lib/
+#10 CACHED
+
+#11 [base 4/8] COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+#11 CACHED
+
+#12 [production  8/11] COPY scripts/package.json ./scripts/package.json 2>/dev/null || true
+#12 ERROR: failed to calculate checksum of ref d09189cb-1d3f-4984-a57a-14f8dab86177::orvw4zjliaxs1lg34yn0jvkt6: "/||": not found
+
+#13 [base 1/8] FROM docker.io/library/node:20-slim@sha256:17281e8d1dc4d671976c6b89a12f47a44c2f390b63a989e2e327631041f544fd
+#13 resolve docker.io/library/node:20-slim@sha256:17281e8d1dc4d671976c6b89a12f47a44c2f390b63a989e2e327631041f544fd done
+#13 sha256:17281e8d1dc4d671976c6b89a12f47a44c2f390b63a989e2e327631041f544fd 6.49kB / 6.49kB done
+#13 sha256:450617c43da25e890a85e935526b3f6a8cfc5377155404a0074cb3116f48f06c 1.93kB / 1.93kB done
+#13 sha256:a42f4ddc4f03969c83e6dd5022079a3265abcc74874042691cc586ee8d41785e 6.88kB / 6.88kB done
+#13 CANCELED
+
+#14 [base 6/8] COPY artifacts/api-server/ ./artifacts/api-server/
+#14 CACHED
+
+#15 [base 7/8] COPY artifacts/website-builder/ ./artifacts/website-builder/
+#15 CACHED
+
+#16 [base 8/8] COPY scripts/ ./scripts/ 2>/dev/null || true
+#16 ERROR: failed to calculate checksum of ref d09189cb-1d3f-4984-a57a-14f8dab86177::orvw4zjliaxs1lg34yn0jvkt6: "/||": not found
+------
+ > [production  8/11] COPY scripts/package.json ./scripts/package.json 2>/dev/null || true:
+------
+------
+ > [base 8/8] COPY scripts/ ./scripts/ 2>/dev/null || true:
+------
+Dockerfile:34
+--------------------
+  32 |     COPY artifacts/api-server/package.json ./artifacts/api-server/package.json
+  33 |     COPY artifacts/website-builder/package.json ./artifacts/website-builder/package.json
+  34 | >>> COPY scripts/package.json ./scripts/package.json 2>/dev/null || true
+  35 |     
+  36 |     RUN pnpm install --frozen-lockfile --prod --ignore-scripts 2>/dev/null || pnpm install --no-frozen-lockfile --prod --ignore-scripts
+--------------------
+ERROR: failed to build: failed to solve: failed to compute cache key: failed to calculate checksum of ref d09189cb-1d3f-4984-a57a-14f8dab86177::orvw4zjliaxs1lg34yn0jvkt6: "/||": not found
+Error: Process completed with exit code 1.
+0s
