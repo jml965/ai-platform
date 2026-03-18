@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, LayoutTemplate, Trash2, Loader2, Coins, LogOut, CreditCard, Users, ShieldCheck, Activity, Globe, ExternalLink, Square, RefreshCw, Rocket, Bell, Palette, Home, Smartphone, Play, BarChart2, Gamepad2, FileText, Settings, BookOpen, Gift, Search, ChevronDown, Upload, UploadCloud, Download, Cpu, Wand2, Camera, ArrowRight, Check, X, Bot, FolderGit2, Plug, ChevronRight, Shield, Crown } from "lucide-react";
+import { Plus, LayoutTemplate, Trash2, Loader2, Coins, LogOut, CreditCard, Users, ShieldCheck, Activity, Globe, ExternalLink, Square, RefreshCw, Rocket, Bell, Palette, Home, Smartphone, Play, BarChart2, Gamepad2, FileText, Settings, BookOpen, Gift, Search, ChevronDown, Upload, UploadCloud, Download, Cpu, Wand2, Camera, ArrowRight, Check, X, Bot, FolderGit2, Plug, ChevronRight, Shield, Crown, Lock, Database, Crosshair, FlaskConical, Send, Copy, Server, Maximize2, Minimize2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import type { Project, ProjectStatus as ProjectStatusType } from "@workspace/api-client-react";
@@ -45,6 +45,7 @@ function ReplitLogo() {
 export default function Dashboard() {
   const { t, lang } = useI18n();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [infraChatAgent, setInfraChatAgent] = useState<SidebarInfraAgent | null>(null);
   
   const { data: projectsData, isLoading: loadingProjects, refetch } = useListProjects();
   const { data: tokenSummary } = useGetTokenSummary();
@@ -52,7 +53,7 @@ export default function Dashboard() {
   const { data: me } = useGetMe({ query: { queryKey: ["getMe"], retry: false } });
   const isAdmin = (me as any)?.role === "admin";
   const logout = useAuthLogout();
-  const userName = (me as any)?.name || (me as any)?.email?.split("@")[0] || "User";
+  const userName = (me as any)?.name || (me as any)?.displayName || (me as any)?.email?.split("@")[0] || "User";
 
   const [, navigate] = useLocation();
   const createProjectMut = useCreateProject();
@@ -123,7 +124,7 @@ export default function Dashboard() {
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        <HomeSidebar t={t} lang={lang} userName={userName} isAdmin={isAdmin} />
+        <HomeSidebar t={t} lang={lang} userName={userName} isAdmin={isAdmin} onSelectInfraAgent={setInfraChatAgent} />
 
         <div className="flex-1 overflow-y-auto">
           <HomeHeroSection t={t} lang={lang} userName={userName} onStart={handleStartProject} isStarting={createProjectMut.isPending} />
@@ -198,6 +199,452 @@ export default function Dashboard() {
         onClose={() => setIsModalOpen(false)} 
         onSuccess={refetch} 
       />
+
+      {infraChatAgent && (
+        <InfraFloatingChat
+          agent={infraChatAgent}
+          lang={lang}
+          onClose={() => setInfraChatAgent(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+const SIDEBAR_AGENT_ICONS: Record<string, React.ReactNode> = {
+  infra_sysadmin: <Crown className="w-4 h-4" />,
+  infra_monitor: <Activity className="w-4 h-4" />,
+  infra_bugfixer: <Crosshair className="w-4 h-4" />,
+  infra_builder: <Server className="w-4 h-4" />,
+  infra_ui: <Palette className="w-4 h-4" />,
+  infra_db: <Database className="w-4 h-4" />,
+  infra_security: <Lock className="w-4 h-4" />,
+  infra_deploy: <Rocket className="w-4 h-4" />,
+  infra_qa: <FlaskConical className="w-4 h-4" />,
+};
+
+const SIDEBAR_AGENT_COLORS: Record<string, string> = {
+  infra_sysadmin: "text-yellow-400",
+  infra_monitor: "text-green-400",
+  infra_bugfixer: "text-red-400",
+  infra_builder: "text-blue-400",
+  infra_ui: "text-purple-400",
+  infra_db: "text-amber-400",
+  infra_security: "text-emerald-400",
+  infra_deploy: "text-cyan-400",
+  infra_qa: "text-pink-400",
+};
+
+interface SidebarInfraAgent {
+  agentKey: string;
+  displayNameEn: string;
+  displayNameAr: string;
+  description: string;
+  enabled: boolean;
+  primaryModel: { provider: string; model: string };
+}
+
+interface InfraChatMsg {
+  id: string;
+  role: "user" | "assistant" | "status";
+  content: string;
+  timestamp: Date;
+  tokensUsed?: number;
+  cost?: number;
+  model?: string;
+  models?: string[];
+}
+
+function InfraFloatingChat({ agent, lang, onClose }: { agent: SidebarInfraAgent; lang: string; onClose: () => void }) {
+  const [messages, setMessages] = useState<InfraChatMsg[]>([]);
+  const [prompt, setPrompt] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const userScrolledUpRef = useRef(false);
+  const programmaticScrollRef = useRef(false);
+  const isRTL = lang === "ar";
+
+  const scrollToBottom = () => {
+    if (userScrolledUpRef.current) return;
+    const el = chatContainerRef.current;
+    if (!el) return;
+    programmaticScrollRef.current = true;
+    el.scrollTop = el.scrollHeight;
+    requestAnimationFrame(() => { programmaticScrollRef.current = false; });
+  };
+
+  const handleStop = () => {
+    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
+    setLoading(false);
+  };
+
+  const handleSend = async () => {
+    if (!prompt.trim() || loading) return;
+    const currentPrompt = prompt;
+    setPrompt("");
+    setLoading(true);
+    userScrolledUpRef.current = false;
+
+    setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "user", content: currentPrompt, timestamp: new Date() }]);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      const streamMsgId = crypto.randomUUID();
+      let streamedContent = "";
+      let displayedContent = "";
+      let streamMeta: { tokensUsed?: number; cost?: number; model?: string; models?: string[] } = {};
+      let typewriterRunning = false;
+      let typewriterStopped = false;
+
+      const typewriterFlush = () => {
+        if (typewriterRunning || typewriterStopped) return;
+        typewriterRunning = true;
+        const tick = () => {
+          if (typewriterStopped) { typewriterRunning = false; return; }
+          if (displayedContent.length < streamedContent.length) {
+            const remaining = streamedContent.slice(displayedContent.length);
+            const alreadyInCode = (displayedContent.match(/```/g) || []).length % 2 === 1;
+            if (alreadyInCode) {
+              const closeIdx = remaining.indexOf("```");
+              displayedContent = closeIdx !== -1 ? streamedContent.slice(0, displayedContent.length + closeIdx + 3) : streamedContent;
+            } else {
+              const openTick = remaining.indexOf("```");
+              if (openTick === 0) {
+                const afterOpen = remaining.slice(3);
+                const closeIdx = afterOpen.indexOf("```");
+                displayedContent = closeIdx !== -1 ? streamedContent.slice(0, displayedContent.length + 3 + closeIdx + 3) : streamedContent;
+              } else {
+                displayedContent = streamedContent.slice(0, displayedContent.length + 1);
+              }
+            }
+            setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, content: displayedContent } : m));
+            scrollToBottom();
+            setTimeout(tick, alreadyInCode ? 0 : 18);
+          } else {
+            typewriterRunning = false;
+          }
+        };
+        tick();
+      };
+
+      controller.signal.addEventListener("abort", () => { typewriterStopped = true; });
+      setMessages(prev => [...prev, { id: streamMsgId, role: "assistant", content: "", timestamp: new Date() }]);
+
+      const isDirector = agent.agentKey === "infra_sysadmin";
+      const endpoint = isDirector ? "/api/infra/director-stream" : "/api/infra/chat-stream";
+      const body = isDirector ? { message: currentPrompt } : { agentKey: agent.agentKey, message: currentPrompt };
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        signal: controller.signal,
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        let errMsg = `Error ${res.status}`;
+        try { const errData = await res.json(); errMsg = errData?.error?.message || errMsg; } catch {}
+        throw new Error(errMsg);
+      }
+
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const event = JSON.parse(line.slice(6));
+            if (event.type === "chunk") { streamedContent += event.text; typewriterFlush(); }
+            else if (event.type === "status") {
+              setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "status", content: event.message || event.messageEn, timestamp: new Date() }]);
+              scrollToBottom();
+            }
+            else if (event.type === "done") { streamMeta = { tokensUsed: event.tokensUsed, cost: event.cost, model: event.model, models: event.models }; }
+            else if (event.type === "error") { streamedContent += event.message; typewriterFlush(); }
+          } catch {}
+        }
+      }
+
+      await new Promise<void>(resolve => {
+        const wait = () => {
+          if (displayedContent.length >= streamedContent.length) resolve();
+          else setTimeout(wait, 30);
+        };
+        wait();
+      });
+
+      setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, ...streamMeta } : m));
+    } catch (err: any) {
+      if (err.name !== "AbortError") {
+        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "assistant", content: `Error: ${err.message}`, timestamp: new Date() }]);
+      }
+    } finally {
+      setLoading(false);
+      abortRef.current = null;
+    }
+  };
+
+  const agentColor = SIDEBAR_AGENT_COLORS[agent.agentKey] || "text-[#8b949e]";
+  const agentIcon = SIDEBAR_AGENT_ICONS[agent.agentKey] || <Bot className="w-4 h-4" />;
+
+  const renderMessageContent = (content: string) => {
+    const segments: Array<{ type: "text" | "code"; lang?: string; value: string }> = [];
+    let remaining = content;
+    while (remaining.length > 0) {
+      const openIdx = remaining.indexOf("```");
+      if (openIdx === -1) { segments.push({ type: "text", value: remaining }); break; }
+      if (openIdx > 0) segments.push({ type: "text", value: remaining.slice(0, openIdx) });
+      const afterOpen = remaining.slice(openIdx + 3);
+      const langMatch = afterOpen.match(/^(\w*)\n?/);
+      const codeStart = langMatch ? langMatch[0].length : 0;
+      const closeIdx = afterOpen.indexOf("```", codeStart);
+      if (closeIdx === -1) { segments.push({ type: "code", lang: langMatch?.[1], value: afterOpen.slice(codeStart) }); break; }
+      segments.push({ type: "code", lang: langMatch?.[1], value: afterOpen.slice(codeStart, closeIdx) });
+      remaining = afterOpen.slice(closeIdx + 3);
+    }
+    return (
+      <div className="text-[13px] leading-relaxed break-words">
+        {segments.map((seg, i) => {
+          if (seg.type === "code") {
+            return (
+              <div key={i} className="my-2 rounded border border-[#30363d] overflow-hidden">
+                <div className="px-2 py-1 bg-[#1c2333] text-[9px] text-[#8b949e] uppercase">{seg.lang || "code"}</div>
+                <pre className="p-2 bg-[#0d1117] text-[12px] text-[#e1e4e8] overflow-x-auto" dir="ltr"><code>{seg.value.trim()}</code></pre>
+              </div>
+            );
+          }
+          return (
+            <span key={i} className="whitespace-pre-wrap">
+              {seg.value.split(/(\*\*[^*]+\*\*)/g).map((part, j) => {
+                const bold = part.match(/^\*\*([^*]+)\*\*$/);
+                if (bold) return <strong key={j} className="font-bold text-[#e1e4e8]">{bold[1]}</strong>;
+                return part.split(/(`[^`]+`)/g).map((ip, k) => {
+                  const inl = ip.match(/^`([^`]+)`$/);
+                  if (inl) return <code key={`${j}-${k}`} className="px-1 py-0.5 bg-[#1c2333] rounded text-[11px] text-cyan-300 border border-[#30363d]" dir="ltr">{inl[1]}</code>;
+                  return <React.Fragment key={`${j}-${k}`}>{ip}</React.Fragment>;
+                });
+              })}
+            </span>
+          );
+        })}
+      </div>
+    );
+  };
+
+  return (
+    <div
+      className={`fixed z-50 bg-[#0d1117] border border-[#1c2333] rounded-xl shadow-2xl shadow-black/50 flex flex-col transition-all duration-300 ${
+        expanded
+          ? "bottom-4 end-4 w-[700px] h-[600px]"
+          : "bottom-4 end-4 w-[380px] h-[420px]"
+      }`}
+      dir={isRTL ? "rtl" : "ltr"}
+    >
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-[#1c2333] bg-[#161b22] rounded-t-xl flex-shrink-0">
+        <div className={`p-1.5 rounded-md bg-[#0d1117] ${agentColor}`}>
+          {agentIcon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-[12px] font-semibold text-[#e1e4e8] truncate">
+            {isRTL ? agent.displayNameAr : agent.displayNameEn}
+          </div>
+          <div className="text-[9px] text-[#484f58] truncate">{agent.primaryModel?.model?.split("-").slice(0, 2).join("-")}</div>
+        </div>
+        <button onClick={() => setExpanded(!expanded)} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] transition-colors rounded">
+          {expanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+        </button>
+        <button
+          onClick={() => { setMessages([]); }}
+          className="p-1 text-[#8b949e] hover:text-red-400 transition-colors rounded"
+          title={isRTL ? "مسح" : "Clear"}
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+        <button onClick={onClose} className="p-1 text-[#8b949e] hover:text-red-400 transition-colors rounded">
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      <div
+        ref={chatContainerRef}
+        className="flex-1 overflow-y-auto p-3 space-y-3"
+        onWheel={(e) => {
+          if (e.deltaY < 0) userScrolledUpRef.current = true;
+          else {
+            const el = chatContainerRef.current;
+            if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 40) userScrolledUpRef.current = false;
+          }
+        }}
+      >
+        {messages.length === 0 && (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className={`w-10 h-10 mx-auto rounded-lg flex items-center justify-center mb-2 bg-[#161b22] ${agentColor}`}>
+                {agentIcon}
+              </div>
+              <p className="text-[11px] text-[#484f58] max-w-[200px]">
+                {isRTL ? "اكتب أمرك وسيتم تنفيذه" : "Type your command"}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {messages.map(msg => {
+          if (msg.role === "status") {
+            return (
+              <div key={msg.id} className="flex items-center justify-center py-0.5">
+                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#161b22] border border-[#30363d]">
+                  <div className="w-1 h-1 bg-yellow-400 rounded-full animate-pulse" />
+                  <span className="text-[10px] text-[#8b949e]">{msg.content}</span>
+                </div>
+              </div>
+            );
+          }
+          return (
+            <div key={msg.id} className={msg.role === "user" ? "text-end" : ""}>
+              <div className={`inline-block text-start max-w-full ${msg.role === "user" ? "text-cyan-400 text-[13px]" : "text-[#c9d1d9]"}`}>
+                {msg.role === "assistant" && !msg.content && loading ? (
+                  <div className="flex items-center gap-1.5 py-1">
+                    <div className="w-1 h-1 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <div className="w-1 h-1 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <div className="w-1 h-1 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                    <span className="text-[10px] text-[#8b949e]">{isRTL ? "يحلل..." : "Analyzing..."}</span>
+                  </div>
+                ) : renderMessageContent(msg.content)}
+                {msg.tokensUsed && (
+                  <div className="text-[9px] text-[#484f58] mt-0.5">
+                    {msg.models ? msg.models.join(" + ") : msg.model} · {msg.tokensUsed.toLocaleString()} tokens
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+        <div ref={chatEndRef} />
+      </div>
+
+      <div className="border-t border-[#1c2333] p-2 flex-shrink-0">
+        <div className="relative">
+          <textarea
+            ref={textareaRef}
+            value={prompt}
+            onChange={e => setPrompt(e.target.value)}
+            placeholder={isRTL ? "اكتب أمرك..." : "Type command..."}
+            className="w-full bg-[#161b22] border border-[#30363d] rounded-lg px-3 py-2 pe-10 text-[12px] text-[#e1e4e8] placeholder-[#484f58] resize-none focus:outline-none focus:border-cyan-500/50 transition-colors"
+            rows={1}
+            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+          />
+          {loading ? (
+            <button onClick={handleStop} className="absolute end-1.5 bottom-1.5 p-1.5 bg-red-500 hover:bg-red-400 text-white rounded-md transition-colors">
+              <X className="w-3 h-3" />
+            </button>
+          ) : (
+            <button onClick={handleSend} disabled={!prompt.trim()} className="absolute end-1.5 bottom-1.5 p-1.5 bg-cyan-500 hover:bg-cyan-400 text-black rounded-md disabled:opacity-40 transition-colors">
+              <Send className={`w-3 h-3 ${isRTL ? "rotate-180" : ""}`} />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InfraAgentsSection({ t, lang, onSelectAgent }: { t: any; lang: string; onSelectAgent: (agent: SidebarInfraAgent) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const [agents, setAgents] = useState<SidebarInfraAgent[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const isRTL = lang === "ar";
+
+  useEffect(() => {
+    if (expanded && !loaded) {
+      fetch("/api/infra/agents", { credentials: "include" })
+        .then(r => r.ok ? r.json() : [])
+        .then(data => { if (Array.isArray(data)) { setAgents(data); setLoaded(true); } })
+        .catch(() => {});
+    }
+  }, [expanded, loaded]);
+
+  const director = agents.find(a => a.agentKey === "infra_sysadmin");
+  const others = agents.filter(a => a.agentKey !== "infra_sysadmin");
+
+  return (
+    <div className="border-b border-white/7 pb-1">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center justify-between w-full px-3 py-2 rounded-md hover:bg-white/5 transition-colors group"
+      >
+        <div className="flex items-center gap-2">
+          <Shield className="w-4 h-4 text-cyan-400" />
+          <span className="text-[12.5px] font-semibold text-cyan-400">
+            {t.home_nav_infrastructure}
+          </span>
+        </div>
+        <ChevronDown className={`w-3 h-3 text-[#8b949e] transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
+      </button>
+
+      <div className={`overflow-hidden transition-all duration-300 ease-in-out ${expanded ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"}`}>
+        <div className="px-1 pb-1 space-y-0.5">
+          {!loaded && expanded && (
+            <div className="flex items-center justify-center py-3">
+              <Loader2 className="w-4 h-4 animate-spin text-[#484f58]" />
+            </div>
+          )}
+
+          {director && (
+            <>
+              <button
+                onClick={() => onSelectAgent(director)}
+                className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md bg-gradient-to-r from-yellow-500/10 to-transparent border border-yellow-500/20 hover:border-yellow-500/40 transition-all text-start"
+              >
+                <Crown className="w-4 h-4 text-yellow-400 flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11.5px] font-bold text-yellow-300 truncate">
+                    {isRTL ? director.displayNameAr : director.displayNameEn}
+                  </div>
+                  <div className="text-[9px] text-yellow-500/60 truncate">models + governor</div>
+                </div>
+                <Settings className="w-3 h-3 text-yellow-500/30 flex-shrink-0" />
+              </button>
+              <div className="border-t border-white/5 my-0.5" />
+            </>
+          )}
+
+          {others.map(agent => (
+            <button
+              key={agent.agentKey}
+              onClick={() => onSelectAgent(agent)}
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md hover:bg-[#161b22] transition-all text-start group/agent"
+            >
+              <div className={`flex-shrink-0 ${SIDEBAR_AGENT_COLORS[agent.agentKey] || "text-[#8b949e]"}`}>
+                {SIDEBAR_AGENT_ICONS[agent.agentKey] || <Bot className="w-4 h-4" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[11.5px] font-medium text-[#c9d1d9] truncate">
+                  {isRTL ? agent.displayNameAr : agent.displayNameEn}
+                </div>
+                <div className="text-[9px] text-[#484f58] truncate">
+                  {agent.primaryModel?.model?.split("-").slice(0, 2).join("-") || ""}
+                </div>
+              </div>
+              <Settings className="w-3 h-3 text-[#484f58]/0 group-hover/agent:text-[#484f58] flex-shrink-0 transition-colors" />
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -205,7 +652,6 @@ export default function Dashboard() {
 function AdminPanelSection({ t }: { t: any }) {
   const [expanded, setExpanded] = useState(true);
   const adminItems = [
-    { icon: Crown, label: t.home_nav_infrastructure, href: "/infra", highlight: true },
     { icon: Bot, label: t.home_nav_agents, href: "/agents" },
     { icon: Cpu, label: t.home_nav_control_center, href: "/control-center" },
     { icon: Shield, label: t.home_nav_admin_dashboard, href: "/admin" },
@@ -230,11 +676,7 @@ function AdminPanelSection({ t }: { t: any }) {
             <Link
               key={i}
               href={item.href}
-              className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer text-[12.5px] transition-colors ${
-                item.highlight
-                  ? "text-yellow-400 hover:bg-yellow-500/10 font-medium"
-                  : "text-[#8b949e] hover:bg-white/5"
-              }`}
+              className="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer text-[12.5px] text-[#8b949e] hover:bg-white/5 transition-colors"
             >
               <item.icon className="w-4 h-4" />
               <span>{item.label}</span>
@@ -246,7 +688,7 @@ function AdminPanelSection({ t }: { t: any }) {
   );
 }
 
-function HomeSidebar({ t, lang, userName, isAdmin }: { t: any; lang: string; userName: string; isAdmin: boolean }) {
+function HomeSidebar({ t, lang, userName, isAdmin, onSelectInfraAgent }: { t: any; lang: string; userName: string; isAdmin: boolean; onSelectInfraAgent: (agent: SidebarInfraAgent) => void }) {
   const navItems = [
     { icon: Home, label: t.home_nav_home, active: true },
     { icon: LayoutTemplate, label: t.home_nav_apps },
@@ -287,7 +729,9 @@ function HomeSidebar({ t, lang, userName, isAdmin }: { t: any; lang: string; use
         </button>
       </div>
 
-      <nav className="flex flex-col gap-0.5 px-2 py-3 flex-1">
+      <nav className="flex flex-col gap-0.5 px-2 py-3 flex-1 overflow-y-auto">
+        {isAdmin && <InfraAgentsSection t={t} lang={lang} onSelectAgent={onSelectInfraAgent} />}
+
         {navItems.map((item, i) => (
           <div
             key={i}
