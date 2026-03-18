@@ -29,6 +29,7 @@ interface AgentConfig {
   enabled: boolean;
   isCustom: boolean;
   governorEnabled: boolean;
+  autoGovernor: boolean;
   governorModel: { provider: string; model: string; creativity: number; timeoutSeconds: number; maxTokens: number } | null;
   primaryModel: ModelSlot;
   secondaryModel: ModelSlot | null;
@@ -479,6 +480,7 @@ function AgentListItem({ agent, selected, onClick, isRTL }: { agent: AgentConfig
         <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded">{agent.pipelineOrder}</span>
       )}
       {agent.governorEnabled && <Zap className="w-3 h-3 text-yellow-400 flex-shrink-0" />}
+      {agent.autoGovernor && <Activity className="w-3 h-3 text-emerald-400 flex-shrink-0" />}
     </button>
   );
 }
@@ -605,7 +607,11 @@ function ModelsTab({ agent, onUpdate, isRTL }: { agent: AgentConfig; onUpdate: (
             <span className="font-medium text-sm">{isRTL ? "نظام الحاكم (Governor)" : "Governor System"}</span>
           </div>
           <button
-            onClick={() => onUpdate({ governorEnabled: !agent.governorEnabled })}
+            onClick={() => {
+              const updates: Partial<AgentConfig> = { governorEnabled: !agent.governorEnabled };
+              if (!agent.governorEnabled) updates.autoGovernor = false;
+              onUpdate(updates);
+            }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] transition-colors ${
               agent.governorEnabled ? "bg-yellow-500/15 text-yellow-400 border border-yellow-500/30" : "bg-white/5 text-[#8b949e] border border-white/10"
             }`}
@@ -620,6 +626,53 @@ function ModelsTab({ agent, onUpdate, isRTL }: { agent: AgentConfig; onUpdate: (
             : "When enabled: All 3 models think independently about the same problem, then the Governor extracts the best ideas from each and merges them into a superior final solution. When disabled: Only the primary model is used."
           }
         </p>
+
+        <div className="bg-[#0d1117] border border-white/7 rounded-lg p-3 mb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Activity className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-[12px] font-medium text-emerald-400">{isRTL ? "الحاكم التلقائي (Auto-Governor)" : "Auto-Governor"}</span>
+            </div>
+            <button
+              onClick={() => {
+                const updates: Partial<AgentConfig> = { autoGovernor: !agent.autoGovernor };
+                if (!agent.autoGovernor) updates.governorEnabled = false;
+                onUpdate(updates);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] transition-colors ${
+                agent.autoGovernor ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" : "bg-white/5 text-[#8b949e] border border-white/10"
+              }`}
+            >
+              {agent.autoGovernor ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+              {agent.autoGovernor ? (isRTL ? "مفعّل" : "Active") : (isRTL ? "معطّل" : "Off")}
+            </button>
+          </div>
+          <p className="text-[10px] text-[#8b949e] mt-2 leading-relaxed">
+            {isRTL
+              ? "يقدّر تعقيد الرسالة تلقائياً (0-100) ويختار الوضع المناسب: بسيط (نموذج خفيف) → عادي (النموذج الأساسي) → متقدم (3 نماذج + حاكم). يصعّد تلقائياً لو الرد ضعيف. يوفّر التوكنات والوقت."
+              : "Automatically scores message complexity (0-100) and picks the right mode: Simple (lightweight model) → Standard (main model) → Advanced (3 models + judge). Auto-escalates if response quality is low. Saves tokens and time."
+            }
+          </p>
+          {agent.autoGovernor && (
+            <div className="mt-2 grid grid-cols-3 gap-1.5">
+              <div className="bg-[#161b22] rounded px-2 py-1.5 text-center">
+                <div className="text-[10px] text-emerald-400 font-medium">{isRTL ? "بسيط" : "Simple"}</div>
+                <div className="text-[9px] text-[#8b949e]">{isRTL ? "0-20 نقطة" : "0-20 pts"}</div>
+                <div className="text-[9px] text-[#6e7681]">{isRTL ? "نموذج خفيف" : "Lightweight"}</div>
+              </div>
+              <div className="bg-[#161b22] rounded px-2 py-1.5 text-center">
+                <div className="text-[10px] text-blue-400 font-medium">{isRTL ? "عادي" : "Standard"}</div>
+                <div className="text-[9px] text-[#8b949e]">{isRTL ? "21-55 نقطة" : "21-55 pts"}</div>
+                <div className="text-[9px] text-[#6e7681]">{isRTL ? "النموذج الأساسي" : "Main model"}</div>
+              </div>
+              <div className="bg-[#161b22] rounded px-2 py-1.5 text-center">
+                <div className="text-[10px] text-orange-400 font-medium">{isRTL ? "متقدم" : "Advanced"}</div>
+                <div className="text-[9px] text-[#8b949e]">{isRTL ? "56-100 نقطة" : "56-100 pts"}</div>
+                <div className="text-[9px] text-[#6e7681]">{isRTL ? "3 نماذج + حاكم" : "3 models + judge"}</div>
+              </div>
+            </div>
+          )}
+        </div>
 
         {agent.governorEnabled && (() => {
           const gov = agent.governorModel || { provider: "", model: "", creativity: 0.5, timeoutSeconds: 300, maxTokens: 16000 };

@@ -34,27 +34,140 @@ interface ConversationMessage {
   content: string;
 }
 
-type MessageComplexity = "simple" | "technical";
+type AutoGovernorMode = "simple" | "standard" | "advanced";
 
-function classifyMessageComplexity(message: string, hasAttachments: boolean): MessageComplexity {
-  if (hasAttachments) return "technical";
+interface ComplexityResult {
+  mode: AutoGovernorMode;
+  score: number;
+  breakdown: { length: number; keywords: number; codeAttachments: number; errors: number };
+  hasTechnicalKeyword: boolean;
+}
 
+const TECHNICAL_KEYWORDS = [
+  "error", "bug", "crash", "fail", "fix", "broken", "undefined", "null", "exception",
+  "component", "api", "server", "database", "css", "html", "build", "deploy",
+  "webpack", "vite", "react", "node", "typescript", "import", "export", "function",
+  "route", "endpoint", "port", "auth", "permission", "migration", "schema",
+  "refactor", "optimize", "performance", "debug", "console", "log",
+  "not working", "doesn't work",
+  "خطأ", "مشكل", "كود", "عطل", "لا يعمل", "أداء", "تحسين", "هيكل",
+];
+
+const ERROR_PATTERNS = [
+  "exception", "stack trace", "traceback", "typeerror", "referenceerror",
+  "syntaxerror", "cannot read", "enoent", "econnrefused", "segfault",
+  "500", "404", "403", "502", "503",
+];
+
+function computeComplexityScore(message: string, hasFileAttachments: boolean, hasImageAttachments: boolean): ComplexityResult {
   const trimmed = message.trim();
+  const lower = trimmed.toLowerCase();
   const wordCount = trimmed.split(/\s+/).length;
 
-  const greetings = /^(مرحب|أهل|سلام|هلا|هاي|صباح|مساء|hi|hello|hey|good morning|good evening|thanks|thank you|شكر|ممتاز|تمام|ok|okay|bye|مع السلام|وداع)/i;
-  if (greetings.test(trimmed) && wordCount <= 8) return "simple";
+  let lengthScore = 0;
+  if (wordCount <= 5) lengthScore = 0;
+  else if (wordCount <= 15) lengthScore = 3;
+  else if (wordCount <= 30) lengthScore = 6;
+  else if (wordCount <= 50) lengthScore = 8;
+  else lengthScore = 10;
 
-  if (wordCount <= 4 && !/error|bug|خطأ|مشكل|كود|code|fix|عطل|crash|fail/i.test(trimmed)) return "simple";
+  let keywordScore = 0;
+  let hasTechnicalKeyword = false;
+  for (const kw of TECHNICAL_KEYWORDS) {
+    if (lower.includes(kw.toLowerCase())) {
+      keywordScore += 7;
+      hasTechnicalKeyword = true;
+    }
+  }
+  keywordScore = Math.min(keywordScore, 35);
 
-  const technicalPatterns = /error|bug|خطأ|مشكل|كود|code|fix|عطل|crash|fail|import|export|function|component|api|server|database|css|html|build|deploy|webpack|vite|react|node|typescript|لا يعمل|doesn't work|not working|broken|undefined|null|exception|stack trace|console|log|debug|refactor|optimize|performance|أداء|تحسين|هيكل|architecture|migration|schema|route|endpoint|port|token|auth|permission/i;
-  if (technicalPatterns.test(trimmed)) return "technical";
+  let codeScore = 0;
+  if (/[`{}()\[\];=]/.test(trimmed)) codeScore += 15;
+  if (hasFileAttachments) codeScore += 15;
+  if (hasImageAttachments) codeScore += 10;
+  codeScore = Math.min(codeScore, 30);
 
-  if (wordCount >= 30) return "technical";
+  let errorScore = 0;
+  for (const pat of ERROR_PATTERNS) {
+    if (lower.includes(pat)) {
+      errorScore = 25;
+      break;
+    }
+  }
 
-  if (/[`{}()<>\[\];=]/.test(trimmed)) return "technical";
+  const total = Math.min(lengthScore + keywordScore + codeScore + errorScore, 100);
 
-  return "simple";
+  let mode: AutoGovernorMode;
+  if (hasTechnicalKeyword) {
+    if (total <= 55) mode = "standard";
+    else mode = "advanced";
+  } else {
+    if (total <= 20) mode = "simple";
+    else if (total <= 55) mode = "standard";
+    else mode = "advanced";
+  }
+
+  return {
+    mode,
+    score: total,
+    breakdown: { length: lengthScore, keywords: keywordScore, codeAttachments: codeScore, errors: errorScore },
+    hasTechnicalKeyword,
+  };
+}
+
+interface EscalationCheck {
+  shouldEscalate: boolean;
+  reason: string;
+  reasonAr: string;
+}
+
+function checkLazyEscalation(responseText: string, currentMode: AutoGovernorMode, hasTechnicalKeyword: boolean): EscalationCheck {
+  if (currentMode === "advanced") {
+    return { shouldEscalate: false, reason: "Already in advanced mode", reasonAr: "الوضع متقدم بالفعل" };
+  }
+
+  if (!responseText || responseText.trim().length === 0) {
+    return { shouldEscalate: true, reason: "Empty response", reasonAr: "رد فارغ" };
+  }
+
+  if (hasTechnicalKeyword && responseText.trim().length < 50) {
+    return { shouldEscalate: true, reason: "Response too short for technical query", reasonAr: "رد قصير جداً لسؤال تقني" };
+  }
+
+  const uncertaintyPatterns = /not sure|need more info|لست متأكد|أحتاج معلومات|i'm not certain|unclear|غير واضح/i;
+  if (uncertaintyPatterns.test(responseText)) {
+    return { shouldEscalate: true, reason: "Response contains uncertainty", reasonAr: "الرد يحتوي عدم يقين" };
+  }
+
+  if (hasTechnicalKeyword) {
+    let parsed: any = null;
+    try {
+      const cleaned = responseText.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+      try { parsed = JSON.parse(cleaned); } catch {
+        const bs = cleaned.indexOf("{");
+        const be = cleaned.lastIndexOf("}");
+        if (bs !== -1 && be > bs) try { parsed = JSON.parse(cleaned.substring(bs, be + 1)); } catch {}
+      }
+    } catch {}
+
+    if (!parsed) {
+      return { shouldEscalate: true, reason: "Technical response without JSON — confidence = 0", reasonAr: "رد تقني بدون JSON — الثقة = 0" };
+    }
+
+    if (parsed.confidence !== undefined && parsed.confidence < 0.5) {
+      return { shouldEscalate: true, reason: `Low confidence: ${parsed.confidence}`, reasonAr: `ثقة منخفضة: ${parsed.confidence}` };
+    }
+
+    if (!parsed.executionSteps || !Array.isArray(parsed.executionSteps) || parsed.executionSteps.length === 0) {
+      return { shouldEscalate: true, reason: "No execution steps provided", reasonAr: "بدون خطوات تنفيذ" };
+    }
+
+    if (!parsed.solution || parsed.solution.trim().length < 20) {
+      return { shouldEscalate: true, reason: "No actionable solution", reasonAr: "بدون حل حقيقي" };
+    }
+  }
+
+  return { shouldEscalate: false, reason: "Response quality acceptable", reasonAr: "جودة الرد مقبولة" };
 }
 
 const STRATEGIC_SYSTEM_PROMPT = `You are the Strategic Execution Agent — the primary reasoning and problem-solving brain of the AI Website Builder system.
@@ -322,20 +435,28 @@ export async function runStrategicAgent(
     throw new Error("No enabled models for strategic agent");
   }
 
-  const hasAttachments = (fileAttachments && fileAttachments.length > 0) || (imageAttachments && imageAttachments.length > 0);
-  let useGovernor = config.governorEnabled && slots.length >= 2;
+  const hasFileAtts = attachments ? attachments.filter(a => !a.type.startsWith("image/")).length > 0 : false;
+  const hasImageAtts = imageAttachments.length > 0;
 
-  if ((config as any).autoGovernor && slots.length >= 2) {
-    const complexity = classifyMessageComplexity(userMessage, hasAttachments);
-    if (complexity === "technical") {
+  let useGovernor = config.governorEnabled && slots.length >= 2;
+  let autoGovMode: AutoGovernorMode | null = null;
+  let autoGovScore: ComplexityResult | null = null;
+
+  if ((config as any).autoGovernor) {
+    autoGovScore = computeComplexityScore(userMessage, hasFileAtts, hasImageAtts);
+    autoGovMode = autoGovScore.mode;
+
+    if (autoGovMode === "advanced" && slots.length >= 2) {
       useGovernor = true;
-      console.log(`[Strategic] Auto-Governor: technical message detected — activating multi-model`);
-      logStrategicActivity("auto_governor", "Auto-Governor activated: technical message detected", "الحاكم التلقائي: رسالة تقنية — تفعيل النماذج المتعددة", { status: "info", details: { complexity, wordCount: userMessage.trim().split(/\s+/).length, hasAttachments } });
     } else {
       useGovernor = false;
-      console.log(`[Strategic] Auto-Governor: simple message detected — using single model`);
-      logStrategicActivity("auto_governor", "Auto-Governor: simple message — single model", "الحاكم التلقائي: رسالة بسيطة — نموذج واحد", { status: "info", details: { complexity, wordCount: userMessage.trim().split(/\s+/).length } });
     }
+
+    console.log(`[Strategic] Auto-Governor: mode=${autoGovMode}, score=${autoGovScore.score}, breakdown=${JSON.stringify(autoGovScore.breakdown)}`);
+    logStrategicActivity("auto_governor", `Auto-Governor: ${autoGovMode} (score: ${autoGovScore.score})`, `الحاكم التلقائي: ${autoGovMode === "simple" ? "بسيط" : autoGovMode === "standard" ? "عادي" : "متقدم"} (درجة: ${autoGovScore.score})`, {
+      status: "info",
+      details: { mode: autoGovMode, score: autoGovScore.score, breakdown: autoGovScore.breakdown, hasTechnicalKeyword: autoGovScore.hasTechnicalKeyword },
+    });
   }
 
   const thinking: { model: string; summary: string; durationMs: number }[] = [];
@@ -344,9 +465,18 @@ export async function runStrategicAgent(
   const effectiveCreativity = config.creativity ? parseFloat(String(config.creativity)) : undefined;
   const tokenLimitCap = config.tokenLimit || 0;
 
+  function pickSlotForMode(mode: AutoGovernorMode | null): ModelSlot {
+    if (mode === "simple") {
+      const lightweight = slots[slots.length - 1];
+      return lightweight;
+    }
+    return slots[0];
+  }
+
   if (!useGovernor) {
-    const slot = slots[0];
-    logStrategicActivity("think_single", `Starting single-model analysis: ${slot.model}`, `بدء تحليل بنموذج واحد: ${slot.model}`, { status: "in_progress", details: { model: slot.model, governorEnabled: false, messagePreview: userMessage.substring(0, 100) } });
+    const slot = pickSlotForMode(autoGovMode);
+    const modeLabel = autoGovMode || "single";
+    logStrategicActivity("think_single", `[${modeLabel}] Starting analysis: ${slot.model}`, `[${modeLabel === "simple" ? "بسيط" : modeLabel === "standard" ? "عادي" : "مفرد"}] بدء تحليل: ${slot.model}`, { status: "in_progress", details: { model: slot.model, autoGovMode: autoGovMode, messagePreview: userMessage.substring(0, 100) } });
     const start = Date.now();
     let maxTok = slot.maxTokens || 16000;
     if (tokenLimitCap > 0 && tokenLimitCap < maxTok) maxTok = tokenLimitCap;
@@ -359,31 +489,43 @@ export async function runStrategicAgent(
     const duration = Date.now() - start;
 
     if (!result) {
-      logStrategicActivity("think_failed", "Single model returned empty response", "النموذج أرجع استجابة فارغة", { level: "error", status: "failed", durationMs: duration, details: { model: slot.model } });
+      logStrategicActivity("think_failed", "Model returned empty response", "النموذج أرجع استجابة فارغة", { level: "error", status: "failed", durationMs: duration, details: { model: slot.model } });
       throw new Error("Strategic agent model returned empty response");
     }
 
-    thinking.push({ model: slot.model, summary: "Single model analysis", durationMs: duration });
+    thinking.push({ model: slot.model, summary: `${modeLabel} analysis`, durationMs: duration });
     totalTokens = result.tokensUsed;
 
-    const parsed = parseResponse(result.content, userMessage);
-    const cost = totalTokens * 0.000015;
+    if ((config as any).autoGovernor && autoGovScore && slots.length >= 2) {
+      const escalation = checkLazyEscalation(result.content, autoGovMode || "standard", autoGovScore.hasTechnicalKeyword);
+      if (escalation.shouldEscalate) {
+        console.log(`[Strategic] Lazy Escalation triggered: ${escalation.reason}`);
+        logStrategicActivity("escalation", `Lazy Escalation: ${escalation.reason} — upgrading to Advanced`, `تصعيد: ${escalation.reasonAr} — ترقية للوضع المتقدم`, {
+          status: "info",
+          details: { reason: escalation.reason, previousMode: autoGovMode, previousResponse: result.content.substring(0, 200) },
+        });
+        useGovernor = true;
+      }
+    }
 
-    await updateStats(config.agentKey, totalTokens, true, duration, cost);
-    logStrategicActivity("response_complete", `Single-model response: ${slot.model}, ${totalTokens} tokens, ${duration}ms`, `اكتمل رد النموذج الواحد: ${slot.model}، ${totalTokens} توكن، ${duration} مللي ثانية`, { status: "completed", tokensUsed: totalTokens, durationMs: duration, details: { model: slot.model, cost: cost.toFixed(4) } });
-
-    return {
-      reply: parsed.reply,
-      actions: parsed.actions,
-      thinking,
-      tokensUsed: totalTokens,
-      modelsUsed: [slot.model],
-      cost,
-    };
+    if (!useGovernor) {
+      const parsed = parseResponse(result.content, userMessage);
+      const cost = totalTokens * 0.000015;
+      await updateStats(config.agentKey, totalTokens, true, duration, cost);
+      logStrategicActivity("response_complete", `[${modeLabel}] Response: ${slot.model}, ${totalTokens} tokens, ${duration}ms`, `[${modeLabel === "simple" ? "بسيط" : "عادي"}] اكتمل: ${slot.model}، ${totalTokens} توكن، ${duration}ms`, { status: "completed", tokensUsed: totalTokens, durationMs: duration, details: { model: slot.model, autoGovMode: autoGovMode, cost: cost.toFixed(4) } });
+      return {
+        reply: parsed.reply,
+        actions: parsed.actions,
+        thinking,
+        tokensUsed: totalTokens,
+        modelsUsed: [slot.model],
+        cost,
+      };
+    }
   }
 
-  console.log(`[Strategic] Running ${slots.length} thinker models in parallel`);
-  logStrategicActivity("think_parallel", `Running ${slots.length} thinker models in parallel`, `تشغيل ${slots.length} نموذج تفكير بالتوازي`, { status: "in_progress", details: { models: slots.map(s => s.model), governorEnabled: true, messagePreview: userMessage.substring(0, 100) } });
+  console.log(`[Strategic] Running ${slots.length} thinker models in parallel (Advanced mode)`);
+  logStrategicActivity("think_parallel", `Running ${slots.length} thinker models in parallel`, `تشغيل ${slots.length} نموذج تفكير بالتوازي`, { status: "in_progress", details: { models: slots.map(s => s.model), autoGovMode: autoGovMode || "manual", escalated: autoGovMode !== "advanced", messagePreview: userMessage.substring(0, 100) } });
 
   const thinkResults = await Promise.allSettled(
     slots.map(async (slot): Promise<ThinkResult | null> => {
