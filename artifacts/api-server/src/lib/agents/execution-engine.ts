@@ -18,6 +18,7 @@ import { FileManagerAgent } from "./filemanager-agent";
 import { SurgicalEditAgent, isModificationRequest } from "./surgical-edit-agent";
 import { PackageRunnerAgent, setRunner, removeRunner, getRunner } from "./package-runner-agent";
 import { PlannerAgent, classifyComplexity } from "./planner-agent";
+import { getAgentConfig } from "./governor";
 import { checkSpendingLimits, checkAndNotifyLimits } from "../token-limits";
 import { runQaWithRetry } from "./qa-pipeline";
 import { emitBuildComplete, emitBuildError } from "../notificationEvents";
@@ -364,7 +365,22 @@ async function executeBuildPipeline(
       return;
     }
 
-    const existingFiles = await fileManager.getProjectFiles(projectId);
+    let existingFiles = await fileManager.getProjectFiles(projectId);
+
+    const codegenSourceFiles = codegenAgent.getSourceFiles();
+    if (codegenSourceFiles.length > 0) {
+      const projectScopeFiles = codegenSourceFiles.filter(sf => !sf.startsWith("artifacts/") && !sf.includes("node_modules"));
+      if (projectScopeFiles.length > 0) {
+        const filtered = existingFiles.filter(f =>
+          projectScopeFiles.some(sf => f.filePath === sf || f.filePath.startsWith(sf + "/") || f.filePath.startsWith(sf))
+        );
+        if (filtered.length > 0) {
+          existingFiles = filtered;
+          console.log(`[Pipeline] codegen sourceFiles filter: ${existingFiles.length} files match ${projectScopeFiles.length} patterns`);
+        }
+      }
+    }
+
     const context: BuildContext = {
       buildId,
       projectId,
@@ -493,6 +509,23 @@ async function executeBuildPipeline(
       return;
     }
 
+    const codegenSendsTo = codegenAgent.getSendsTo();
+    const skipReview = codegenSendsTo === "output";
+    const skipFixer = skipReview;
+
+    if (skipReview) {
+      console.log(`[Pipeline] codegen sendsTo=output, skipping reviewer and fixer`);
+      logExecution(buildId, projectId, null, "system", "pipeline_skip_review", "completed", {
+        message: lang === "ar"
+          ? "تم تخطي المراجعة — الوكيل مُعدّ للتسليم المباشر"
+          : "Review skipped — agent configured for direct output",
+      });
+    }
+
+    let reviewApproved = skipReview;
+    let errorIssues: CodeIssue[] = [];
+
+    if (!skipReview) {
     const reviewTaskId = await createTask(buildId, projectId, "reviewer");
     logExecution(buildId, projectId, reviewTaskId, "reviewer", "review_code", "in_progress", {
       message: lang === "ar"
@@ -541,15 +574,20 @@ async function executeBuildPipeline(
       | { approved: boolean; issues: CodeIssue[] }
       | undefined;
 
+    reviewApproved = !review || review.approved || review.issues.length === 0;
     if (review && !review.approved && review.issues.length > 0) {
+      errorIssues = review.issues.filter((i) => i.severity === "error");
+    }
+    }
+
+    if (!reviewApproved && errorIssues.length > 0) {
       if (build.cancelRequested) {
         await finalizeBuild(buildId, projectId, "cancelled", totalTokens, totalCost);
         return;
       }
 
-      const errorIssues = review.issues.filter((i) => i.severity === "error");
-      if (errorIssues.length === 0) {
-        console.log(`Build ${buildId}: review had warnings/info only, proceeding without fix`);
+      if (errorIssues.length === 0 || skipFixer) {
+        console.log(`Build ${buildId}: review had warnings/info only or fixer skipped, proceeding`);
       } else {
         const fixTaskId = await createTask(buildId, projectId, "fixer");
         logExecution(buildId, projectId, fixTaskId, "fixer", "fix_code", "in_progress", {
@@ -980,16 +1018,21 @@ async function executeBatchedBuildPipeline(
 
     const remainingModules = modules;
     if (remainingModules.length > 0) {
+      const codegenConfig = await getAgentConfig("codegen");
+      const rawBatchSize = codegenConfig?.batchSize || 10;
+      const concurrencyLimit = Math.max(1, Math.min(rawBatchSize, 50));
+
       logExecution(buildId, projectId, null, "system", "parallel_modules_started", "in_progress", {
         moduleCount: remainingModules.length,
+        concurrencyLimit,
         message: lang === "ar"
-          ? `🚀 أطلق ${remainingModules.length} وكيل مبرمج بالتوازي: ${remainingModules.map(m => m.nameAr || m.name).join(", ")}`
-          : `🚀 Launching ${remainingModules.length} parallel developer agents: ${remainingModules.map(m => m.name).join(", ")}`,
+          ? `🚀 أطلق ${remainingModules.length} وكيل مبرمج (${concurrencyLimit} بالتوازي): ${remainingModules.map(m => m.nameAr || m.name).join(", ")}`
+          : `🚀 Launching ${remainingModules.length} parallel agents (${concurrencyLimit} concurrent): ${remainingModules.map(m => m.name).join(", ")}`,
       });
 
       let earlySandboxInitiated = !!getRunner(buildId);
 
-      const modulePromises = remainingModules.map(async (mod, idx) => {
+      const processModule = async (mod: PlannedModule, idx: number) => {
         const moduleTaskId = await createTask(buildId, projectId, "codegen", `Module: ${mod.name}`);
 
         logExecution(buildId, projectId, moduleTaskId, "codegen", "generate_module", "in_progress", {
@@ -1105,9 +1148,19 @@ async function executeBatchedBuildPipeline(
         }
 
         return { result, moduleTaskId, mod };
-      });
+      };
 
-      await Promise.allSettled(modulePromises);
+      const batches: PlannedModule[][] = [];
+      for (let i = 0; i < remainingModules.length; i += concurrencyLimit) {
+        batches.push(remainingModules.slice(i, i + concurrencyLimit));
+      }
+
+      let globalIdx = 0;
+      for (const batch of batches) {
+        const batchPromises = batch.map((mod, localIdx) => processModule(mod, globalIdx + localIdx));
+        await Promise.allSettled(batchPromises);
+        globalIdx += batch.length;
+      }
     }
 
     if (allGeneratedFiles.length === 0) {
@@ -1362,6 +1415,12 @@ async function executeBuildPipelineWithPlan(
   const fixerAgent = new FixerAgent(constitution);
   const fileManager = new FileManagerAgent(constitution);
 
+  await Promise.allSettled([
+    codegenAgent.loadConfigFromDB(),
+    reviewerAgent.loadConfigFromDB(),
+    fixerAgent.loadConfigFromDB(),
+  ]);
+
   let totalTokens = 0;
   let totalCost = 0;
 
@@ -1385,7 +1444,20 @@ async function executeBuildPipelineWithPlan(
       return;
     }
 
-    const existingFiles = await fileManager.getProjectFiles(projectId);
+    let existingFiles = await fileManager.getProjectFiles(projectId);
+
+    const planSourceFiles = codegenAgent.getSourceFiles();
+    if (planSourceFiles.length > 0) {
+      const projectScopeFiles = planSourceFiles.filter(sf => !sf.startsWith("artifacts/") && !sf.includes("node_modules"));
+      if (projectScopeFiles.length > 0) {
+        const filtered = existingFiles.filter(f =>
+          projectScopeFiles.some(sf => f.filePath === sf || f.filePath.startsWith(sf + "/") || f.filePath.startsWith(sf))
+        );
+        if (filtered.length > 0) {
+          existingFiles = filtered;
+        }
+      }
+    }
 
     const planContext = `
 Approved Project Plan:

@@ -210,7 +210,28 @@ export async function runStrategicAgent(
     }
   }
 
-  const fullSystemPrompt = config.systemPrompt || STRATEGIC_SYSTEM_PROMPT;
+  let fullSystemPrompt = config.systemPrompt || STRATEGIC_SYSTEM_PROMPT;
+
+  if (config.description && (config.description as string).trim()) {
+    fullSystemPrompt += `\n\nAgent description: ${(config.description as string).trim()}`;
+  }
+
+  if (config.instructions && (config.instructions as string).trim()) {
+    fullSystemPrompt += `\n\nAdditional instructions:\n${(config.instructions as string).trim()}`;
+  }
+
+  if (config.permissions && Array.isArray(config.permissions) && config.permissions.length > 0) {
+    fullSystemPrompt += `\n\nYour permissions: ${config.permissions.join(", ")}. Only perform actions within these permissions.`;
+  }
+
+  if (config.roleOnReceive && (config.roleOnReceive as string).trim()) {
+    fullSystemPrompt += `\n\nWhen receiving input: ${(config.roleOnReceive as string).trim()}`;
+  }
+
+  if (config.roleOnSend && (config.roleOnSend as string).trim()) {
+    fullSystemPrompt += `\n\nWhen sending output: ${(config.roleOnSend as string).trim()}`;
+  }
+
   const enrichedPrompt = fullSystemPrompt + contextBlock + memoryBlock + attachmentBlock;
 
   let userContent: any = userMessage;

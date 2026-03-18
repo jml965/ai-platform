@@ -77,7 +77,7 @@ If the modification is too complex for surgical edits (e.g., requires restructur
 
       const { content, tokensUsed } = await this.callLLM(
         [
-          { role: "system", content: this.systemPrompt },
+          { role: "system", content: this.getEffectivePrompt() },
           {
             role: "user",
             content: `Apply this modification to the existing code:\n\nModification request: ${context.prompt}\n\nExisting code (with line numbers):\n${numberedFiles}`,

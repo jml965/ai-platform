@@ -42,7 +42,7 @@ IMPORTANT: Return ONLY valid JSON. Do not include any explanation or markdown.`;
     try {
       const { content, tokensUsed } = await this.callLLM(
         [
-          { role: "system", content: this.systemPrompt },
+          { role: "system", content: this.getEffectivePrompt() },
           { role: "user", content: context.prompt },
         ],
         context
@@ -85,7 +85,7 @@ ${entriesText}`;
 
     const { content, tokensUsed } = await this.callLLM(
       [
-        { role: "system", content: this.systemPrompt },
+        { role: "system", content: this.getEffectivePrompt() },
         { role: "user", content: prompt },
       ],
       buildContext

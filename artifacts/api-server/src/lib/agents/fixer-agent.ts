@@ -42,7 +42,7 @@ Response format (strict JSON):
 
       const { content, tokensUsed } = await this.callLLM(
         [
-          { role: "system", content: this.systemPrompt },
+          { role: "system", content: this.getEffectivePrompt() },
           {
             role: "user",
             content: `Fix the following issues in the code:\n\nIssues:\n${issuesText}\n\nCode:\n${filesContent}`,

@@ -24,6 +24,17 @@ export abstract class BaseAgent {
   private _overrideCreativity: number | null = null;
   private _overrideTimeoutSeconds: number | null = null;
   private _overrideMaxTokens: number | null = null;
+  private _instructions: string = "";
+  private _description: string = "";
+  private _permissions: string[] = [];
+  private _shortTermMemory: any[] = [];
+  private _longTermMemory: any[] = [];
+  private _batchSize: number = 10;
+  private _sourceFiles: string[] = [];
+  private _receivesFrom: string = "";
+  private _sendsTo: string = "";
+  private _roleOnReceive: string = "";
+  private _roleOnSend: string = "";
 
   constructor(constitution: AgentConstitution) {
     this.constitution = constitution;
@@ -53,6 +64,31 @@ export abstract class BaseAgent {
         if (config.systemPrompt && config.systemPrompt.trim().length > 20) {
           this._overridePrompt = config.systemPrompt;
         }
+        if (config.instructions && config.instructions.trim().length > 0) {
+          this._instructions = config.instructions.trim();
+        }
+        if (config.description && config.description.trim().length > 0) {
+          this._description = config.description.trim();
+        }
+        if (config.permissions && Array.isArray(config.permissions)) {
+          this._permissions = config.permissions;
+        }
+        if (config.shortTermMemory && Array.isArray(config.shortTermMemory) && config.shortTermMemory.length > 0) {
+          this._shortTermMemory = config.shortTermMemory;
+        }
+        if (config.longTermMemory && Array.isArray(config.longTermMemory) && config.longTermMemory.length > 0) {
+          this._longTermMemory = config.longTermMemory;
+        }
+        if (typeof config.batchSize === "number" && config.batchSize > 0) {
+          this._batchSize = config.batchSize;
+        }
+        if (config.sourceFiles && Array.isArray(config.sourceFiles) && config.sourceFiles.length > 0) {
+          this._sourceFiles = config.sourceFiles;
+        }
+        if (config.receivesFrom) this._receivesFrom = config.receivesFrom;
+        if (config.sendsTo) this._sendsTo = config.sendsTo;
+        if (config.roleOnReceive) this._roleOnReceive = config.roleOnReceive;
+        if (config.roleOnSend) this._roleOnSend = config.roleOnSend;
       }
     } catch (err) {
     }
@@ -63,7 +99,37 @@ export abstract class BaseAgent {
   }
 
   protected getEffectivePrompt(): string {
-    return this._overridePrompt || this.systemPrompt;
+    let prompt = this._overridePrompt || this.systemPrompt;
+
+    if (this._description) {
+      prompt += `\n\nAgent description: ${this._description}`;
+    }
+
+    if (this._instructions) {
+      prompt += `\n\nAdditional instructions:\n${this._instructions}`;
+    }
+
+    if (this._permissions.length > 0) {
+      prompt += `\n\nYour permissions: ${this._permissions.join(", ")}. Only perform actions within these permissions.`;
+    }
+
+    if (this._roleOnReceive) {
+      prompt += `\n\nWhen receiving input: ${this._roleOnReceive}`;
+    }
+
+    if (this._roleOnSend) {
+      prompt += `\n\nWhen sending output: ${this._roleOnSend}`;
+    }
+
+    if (this._shortTermMemory.length > 0) {
+      prompt += `\n\nShort-term memory (recent context):\n${JSON.stringify(this._shortTermMemory.slice(-10))}`;
+    }
+
+    if (this._longTermMemory.length > 0) {
+      prompt += `\n\nLong-term memory (persistent learnings):\n${JSON.stringify(this._longTermMemory.slice(-20))}`;
+    }
+
+    return prompt;
   }
 
   protected getEffectiveCreativity(): number | undefined {
@@ -81,6 +147,30 @@ export abstract class BaseAgent {
 
   protected getEffectiveMaxTokens(): number | undefined {
     return this._overrideMaxTokens ?? undefined;
+  }
+
+  protected getPermissions(): string[] {
+    return this._permissions;
+  }
+
+  protected hasPermission(perm: string): boolean {
+    return this._permissions.length === 0 || this._permissions.includes(perm);
+  }
+
+  getBatchSize(): number {
+    return this._batchSize;
+  }
+
+  getSourceFiles(): string[] {
+    return this._sourceFiles;
+  }
+
+  getReceivesFrom(): string {
+    return this._receivesFrom;
+  }
+
+  getSendsTo(): string {
+    return this._sendsTo;
   }
 
   protected async trackStats(tokensUsed: number, success: boolean, durationMs: number, costUsd: number) {

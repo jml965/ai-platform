@@ -187,7 +187,7 @@ MULTI-PAGE PROJECTS:
 
       const { content, tokensUsed } = await this.callLLM(
         [
-          { role: "system", content: `${this.systemPrompt}\n\n${qualityRules}` },
+          { role: "system", content: `${this.getEffectivePrompt()}\n\n${qualityRules}` },
           {
             role: "user",
             content: `Generate a complete project based on this description:\n\n${context.prompt}${frameworkHint}${existingFilesInfo}`,
@@ -288,7 +288,7 @@ IMPORTANT:
 
       const { content, tokensUsed } = await this.callLLM(
         [
-          { role: "system", content: `${this.systemPrompt}\n\n${qualityRules}` },
+          { role: "system", content: `${this.getEffectivePrompt()}\n\n${qualityRules}` },
           { role: "user", content: batchPrompt },
         ],
         context
@@ -365,7 +365,7 @@ IMPORTANT:
 
       const { content, tokensUsed } = await this.callLLM(
         [
-          { role: "system", content: `${this.systemPrompt}\n\n${qualityRules}` },
+          { role: "system", content: `${this.getEffectivePrompt()}\n\n${qualityRules}` },
           { role: "user", content: modulePrompt },
         ],
         context
