@@ -177,7 +177,7 @@ function MessageContent({ content, fontSize, lineSpacing, fontWeight }: { conten
   const segments = parseContent(content);
 
   return (
-    <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", fontSize: `${fontSize}px`, lineHeight: lineSpacing, fontWeight }}>
+    <div style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif", fontSize: `${fontSize}px`, lineHeight: lineSpacing, fontWeight, wordBreak: "break-word", overflowWrap: "break-word" }}>
       {segments.map((seg, i) => {
         if (seg.type === "code") {
           const code = seg.value.trim();
@@ -1277,7 +1277,7 @@ export default function StrategicAgent() {
             <div key={msg.id} className={cn("py-1", msg.role === "user" ? "text-end" : "")}>
               <div
                 className={cn(
-                  "inline-block text-start text-sm leading-relaxed",
+                  "inline-block text-start text-sm leading-relaxed max-w-full overflow-hidden",
                   msg.role === "user" ? "text-amber-400" : "text-[#c9d1d9]",
                   hasDetails && "cursor-pointer"
                 )}
