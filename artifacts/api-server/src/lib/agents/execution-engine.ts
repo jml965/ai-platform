@@ -1612,6 +1612,46 @@ ${prompt}`;
       return;
     }
 
+    const planCodegenSendsTo = codegenAgent.getSendsTo();
+    const planReviewerHasPermission = reviewerAgent.hasAnyPermission(["read_code", "report_issues", "score_quality"]);
+    const planFixerHasPermission = fixerAgent.hasAnyPermission(["fix_issues", "modify_code"]);
+    const planSkipReview = planCodegenSendsTo === "output" || !planReviewerHasPermission;
+    const planSkipFixer = planSkipReview || !planFixerHasPermission;
+
+    if (planSkipReview) {
+      const skipReason = !planReviewerHasPermission ? "no_permission" : "sendsTo_output";
+      console.log(`[Pipeline-Plan] skipping reviewer (${skipReason}) and fixer`);
+      logExecution(buildId, projectId, null, "system", "pipeline_skip_review", "completed", {
+        reason: skipReason,
+        message: lang === "ar"
+          ? "تم تخطي المراجعة — الوكيل مُعدّ للتسليم المباشر"
+          : "Review skipped — agent configured for direct output",
+      });
+
+      await fileManager.saveProjectFiles(
+        projectId,
+        generatedFiles,
+        plan.packages,
+        buildId,
+        prompt,
+        "ai-planner",
+        totalTokens,
+        totalCost
+      );
+
+      logExecution(buildId, projectId, null, "system", "build_completed", "completed", {
+        totalTokens,
+        totalCost: totalCost.toFixed(4),
+        filesGenerated: generatedFiles.length,
+        message: lang === "ar"
+          ? `اكتمل البناء! ${generatedFiles.length} ملف`
+          : `Build completed! ${generatedFiles.length} files`,
+      });
+
+      await finalizeBuild(buildId, projectId, "completed", totalTokens, totalCost);
+      return;
+    }
+
     const reviewTaskId = await createTask(buildId, projectId, "reviewer");
     logExecution(buildId, projectId, reviewTaskId, "reviewer", "review_code", "in_progress", {
       message: lang === "ar"
@@ -1659,7 +1699,7 @@ ${prompt}`;
       | { approved: boolean; issues: CodeIssue[] }
       | undefined;
 
-    if (review && !review.approved && review.issues.length > 0) {
+    if (review && !review.approved && review.issues.length > 0 && !planSkipFixer) {
       if (build.cancelRequested) {
         await finalizeBuild(buildId, projectId, "cancelled", totalTokens, totalCost);
         return;

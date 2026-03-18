@@ -747,6 +747,194 @@ export async function addToMemory(
   }).where(eq(agentConfigsTable.agentKey, agentKey));
 }
 
+export async function streamStrategicAgent(
+  projectId: string,
+  userMessage: string,
+  history: ConversationMessage[],
+  shortTermMemory: any[],
+  longTermMemory: any[],
+  onChunk: (text: string) => void,
+  attachments?: FileAttachment[]
+): Promise<{ tokensUsed: number; modelsUsed: string[]; cost: number; fullReply: string }> {
+  const [config] = await db.select().from(agentConfigsTable)
+    .where(eq(agentConfigsTable.agentKey, "strategic"))
+    .limit(1);
+
+  if (!config || !config.enabled) {
+    throw new Error("Strategic agent is not configured or disabled");
+  }
+
+  const files = projectId === "general" ? [] : await db.select({
+    filePath: projectFilesTable.filePath,
+  }).from(projectFilesTable).where(eq(projectFilesTable.projectId, projectId));
+
+  let contextBlock = "";
+  if (files.length > 0) {
+    const fileList = files.map(f => f.filePath).join("\n");
+    contextBlock = `\n\nProject files (${files.length} files):\n${fileList}`;
+  }
+
+  let memoryBlock = "";
+  if (shortTermMemory.length > 0) {
+    memoryBlock += `\n\nShort-term memory:\n${JSON.stringify(shortTermMemory.slice(-10))}`;
+  }
+  if (longTermMemory.length > 0) {
+    memoryBlock += `\n\nLong-term memory:\n${JSON.stringify(longTermMemory.slice(-20))}`;
+  }
+
+  let attachmentBlock = "";
+  const imageAttachments: { name: string; data: string; mediaType: string }[] = [];
+  if (attachments && attachments.length > 0) {
+    for (const att of attachments) {
+      if (att.type.startsWith("image/")) {
+        imageAttachments.push({
+          name: att.name,
+          data: att.content.replace(/^data:[^;]+;base64,/, ""),
+          mediaType: att.type,
+        });
+      } else {
+        const decoded = att.content.startsWith("data:")
+          ? Buffer.from(att.content.split(",")[1] || "", "base64").toString("utf-8")
+          : att.content;
+        attachmentBlock += `\n\n--- Attached file: ${att.name} (${att.type}) ---\n${decoded.slice(0, 50000)}`;
+      }
+    }
+  }
+
+  let fullSystemPrompt = config.systemPrompt || STRATEGIC_SYSTEM_PROMPT;
+  if (config.description && (config.description as string).trim()) {
+    fullSystemPrompt += `\n\nAgent description: ${(config.description as string).trim()}`;
+  }
+  if (config.instructions && (config.instructions as string).trim()) {
+    fullSystemPrompt += `\n\nAdditional instructions:\n${(config.instructions as string).trim()}`;
+  }
+  if (config.permissions && Array.isArray(config.permissions) && config.permissions.length > 0) {
+    fullSystemPrompt += `\n\nYour permissions: ${config.permissions.join(", ")}. Only perform actions within these permissions.`;
+  }
+  if (config.roleOnReceive && (config.roleOnReceive as string).trim()) {
+    fullSystemPrompt += `\n\nWhen receiving input: ${(config.roleOnReceive as string).trim()}`;
+  }
+  if (config.roleOnSend && (config.roleOnSend as string).trim()) {
+    fullSystemPrompt += `\n\nWhen sending output: ${(config.roleOnSend as string).trim()}`;
+  }
+
+  const enrichedPrompt = fullSystemPrompt + contextBlock + memoryBlock + attachmentBlock;
+
+  let userContent: any = userMessage;
+  if (imageAttachments.length > 0) {
+    const parts: any[] = [];
+    for (const img of imageAttachments) {
+      parts.push({
+        type: "image",
+        source: { type: "base64", media_type: img.mediaType, data: img.data },
+      });
+    }
+    parts.push({ type: "text", text: userMessage + (attachmentBlock ? `\n\nAdditional attached files:${attachmentBlock}` : "") });
+    userContent = parts;
+  } else if (attachmentBlock) {
+    userContent = userMessage + `\n\nAttached files:${attachmentBlock}`;
+  }
+
+  const conversationMessages: ConversationMessage[] = [
+    ...history.slice(-20),
+    { role: "user", content: userContent },
+  ];
+
+  const slots = getEnabledSlots(config);
+  if (slots.length === 0) throw new Error("No enabled models for strategic agent");
+
+  let autoGovMode: AutoGovernorMode | null = null;
+  if ((config as any).autoGovernor) {
+    const hasFileAtts = attachments ? attachments.filter(a => !a.type.startsWith("image/")).length > 0 : false;
+    const hasImageAtts = attachments ? attachments.filter(a => a.type.startsWith("image/")).length > 0 : false;
+    const autoGovScore = computeComplexityScore(userMessage, hasFileAtts, hasImageAtts);
+    autoGovMode = autoGovScore.mode;
+  }
+
+  const slot = autoGovMode === "simple" ? slots[slots.length - 1] : slots[0];
+  const effectiveCreativity = config.creativity ? parseFloat(String(config.creativity)) : undefined;
+  let maxTok = slot.maxTokens || 16000;
+  const tokenLimitCap = config.tokenLimit || 0;
+  if (tokenLimitCap > 0 && tokenLimitCap < maxTok) maxTok = tokenLimitCap;
+  const timeoutMs = (slot.timeoutSeconds || 240) * 1000;
+
+  let fullReply = "";
+  let tokensUsed = 0;
+
+  if (slot.provider === "anthropic") {
+    const client = await getAnthropicClient();
+    const chatMsgs = conversationMessages
+      .filter(m => m.role !== "system")
+      .map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
+    const streamParams: any = {
+      model: slot.model,
+      max_tokens: Math.min(maxTok, 64000),
+      system: enrichedPrompt,
+      messages: chatMsgs,
+    };
+    if (effectiveCreativity !== undefined && effectiveCreativity >= 0) {
+      streamParams.temperature = Math.min(effectiveCreativity, 1.0);
+    }
+    const stream = client.messages.stream(streamParams);
+    stream.on("text", (text: string) => { fullReply += text; onChunk(text); });
+    const response = await Promise.race([
+      stream.finalMessage(),
+      new Promise<never>((_, reject) => setTimeout(() => { stream.abort(); reject(new Error("Timeout")); }, timeoutMs)),
+    ]);
+    tokensUsed = (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0);
+  } else if (slot.provider === "openai") {
+    const client = await getOpenAIClient();
+    const msgs: any[] = [
+      { role: "system", content: enrichedPrompt },
+      ...conversationMessages.map(m => ({ role: m.role, content: m.content })),
+    ];
+    const streamParams: any = { model: slot.model, max_completion_tokens: maxTok, messages: msgs, stream: true };
+    if (effectiveCreativity !== undefined && effectiveCreativity >= 0) {
+      streamParams.temperature = Math.min(effectiveCreativity, 2.0);
+    }
+    const stream = await client.chat.completions.create(streamParams);
+    for await (const chunk of stream as any) {
+      const delta = chunk.choices?.[0]?.delta?.content;
+      if (delta) { fullReply += delta; onChunk(delta); }
+      if (chunk.usage) {
+        tokensUsed = (chunk.usage.prompt_tokens ?? 0) + (chunk.usage.completion_tokens ?? 0);
+      }
+    }
+    if (!tokensUsed) tokensUsed = Math.ceil(fullReply.length / 3);
+  } else if (slot.provider === "google") {
+    const client = await getGoogleClient();
+    const chatMsgs = conversationMessages.map(m => {
+      const textContent = typeof m.content === "string" ? m.content : userMessage;
+      return {
+        role: m.role === "assistant" ? "model" as const : "user" as const,
+        parts: [{ text: textContent }],
+      };
+    });
+    const response = await Promise.race([
+      client.models.generateContentStream({
+        model: slot.model,
+        contents: chatMsgs,
+        config: {
+          systemInstruction: enrichedPrompt,
+          maxOutputTokens: maxTok,
+          temperature: effectiveCreativity !== undefined && effectiveCreativity >= 0 ? Math.min(effectiveCreativity, 2.0) : undefined,
+        },
+      }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), timeoutMs)),
+    ]);
+    for await (const chunk of response as any) {
+      const text = chunk.text;
+      if (text) { fullReply += text; onChunk(text); }
+    }
+    tokensUsed = Math.ceil(fullReply.length / 3);
+  }
+
+  const cost = tokensUsed * 0.000015;
+  await updateStats(config.agentKey, tokensUsed, true, 0, cost);
+
+  return { tokensUsed, modelsUsed: [slot.model], cost, fullReply };
+}
+
 export async function callModelForConfig(
   provider: string,
   model: string,

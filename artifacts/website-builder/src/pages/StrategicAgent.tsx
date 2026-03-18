@@ -551,7 +551,18 @@ export default function StrategicAgent() {
           content: a.content,
         }));
 
-        const res = await fetch("/api/strategic/chat", {
+        const streamMsgId = crypto.randomUUID();
+        let streamedContent = "";
+        let streamMeta: { tokensUsed?: number; cost?: number } = {};
+
+        setMessages(prev => [...prev, {
+          id: streamMsgId,
+          role: "assistant",
+          content: "",
+          timestamp: new Date(),
+        }]);
+
+        const res = await fetch("/api/strategic/chat-stream", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
@@ -563,26 +574,56 @@ export default function StrategicAgent() {
           }),
         });
 
-        const data = await res.json();
         if (!res.ok) {
+          const data = await res.json();
           const errMsg = (lang === "ar" ? data?.error?.message_ar : null) || data?.error?.message || "Request failed";
           throw new Error(errMsg);
         }
 
-        const assistantMsg: ChatMessage = {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: data.reply || "",
-          timestamp: new Date(),
-          thinking: data.thinking,
-          tokensUsed: data.tokensUsed,
-          cost: data.cost,
-          fixApplied: data.fixApplied,
-          fixedFiles: data.fixedFiles,
-        };
+        const reader = res.body!.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
 
-        setMessages(prev => [...prev, assistantMsg]);
-        if (threadId) saveMessageToThread(threadId, assistantMsg);
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            try {
+              const event = JSON.parse(line.slice(6));
+              if (event.type === "chunk") {
+                streamedContent += event.text;
+                setMessages(prev => prev.map(m =>
+                  m.id === streamMsgId ? { ...m, content: streamedContent } : m
+                ));
+              } else if (event.type === "done") {
+                streamMeta = { tokensUsed: event.tokensUsed, cost: event.cost };
+                setMessages(prev => prev.map(m =>
+                  m.id === streamMsgId ? { ...m, tokensUsed: event.tokensUsed, cost: event.cost } : m
+                ));
+              } else if (event.type === "error") {
+                streamedContent += event.message;
+                setMessages(prev => prev.map(m =>
+                  m.id === streamMsgId ? { ...m, content: streamedContent } : m
+                ));
+              }
+            } catch {}
+          }
+        }
+
+        if (threadId) {
+          saveMessageToThread(threadId, {
+            id: streamMsgId,
+            role: "assistant",
+            content: streamedContent,
+            timestamp: new Date(),
+            tokensUsed: streamMeta.tokensUsed,
+            cost: streamMeta.cost,
+          });
+        }
       }
     } catch (err: any) {
       if (err.name === "AbortError") return;

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { getUserId } from "../middlewares/permissions";
-import { runStrategicAgent, addToMemory, clearMemory } from "../lib/agents/strategic-agent";
+import { runStrategicAgent, streamStrategicAgent, addToMemory, clearMemory } from "../lib/agents/strategic-agent";
 import { db } from "@workspace/db";
 import { agentConfigsTable, usersTable, strategicThreadsTable, strategicMessagesTable } from "@workspace/db/schema";
 import { eq, sql, desc, and, gte } from "drizzle-orm";
@@ -134,6 +134,89 @@ export interface FileAttachment {
 }
 
 const strategicSessions = new Map<string, { role: "user" | "assistant"; content: string }[]>();
+
+router.post("/strategic/chat-stream", async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const { projectId, message, sessionId, attachments } = req.body as {
+      projectId: string;
+      message: string;
+      sessionId?: string;
+      attachments?: FileAttachment[];
+    };
+
+    if (!message?.trim()) {
+      res.status(400).json({ error: { code: "VALIDATION", message: "Message is required" } });
+      return;
+    }
+
+    const effectiveProjectId = projectId || "general";
+
+    const [user] = await db.select({ creditBalanceUsd: usersTable.creditBalanceUsd })
+      .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+    const credits = parseFloat(user?.creditBalanceUsd ?? "0");
+    if (credits <= 0) {
+      res.status(402).json({ error: { code: "INSUFFICIENT_CREDITS", message: "Insufficient credits." } });
+      return;
+    }
+
+    const [config] = await db.select().from(agentConfigsTable)
+      .where(eq(agentConfigsTable.agentKey, "strategic")).limit(1);
+    if (!config || !config.enabled) {
+      res.status(503).json({ error: { code: "AGENT_DISABLED", message: "Strategic agent is disabled" } });
+      return;
+    }
+
+    const sKey = sessionId || `${userId}_${effectiveProjectId}`;
+    const history = strategicSessions.get(sKey) || [];
+
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    });
+
+    const result = await streamStrategicAgent(
+      effectiveProjectId,
+      message,
+      history,
+      config.shortTermMemory || [],
+      config.longTermMemory || [],
+      (chunk: string) => {
+        res.write(`data: ${JSON.stringify({ type: "chunk", text: chunk })}\n\n`);
+      },
+      attachments
+    );
+
+    history.push({ role: "user", content: message });
+    history.push({ role: "assistant", content: result.fullReply });
+    if (history.length > 40) history.splice(0, history.length - 40);
+    strategicSessions.set(sKey, history);
+
+    const costUsd = result.cost;
+    await db.update(usersTable).set({
+      creditBalanceUsd: String(Math.max(0, credits - costUsd)),
+    }).where(eq(usersTable.id, userId));
+
+    await addToMemory("strategic", "short", {
+      content: `Q: ${message.slice(0, 200)} | A: ${result.fullReply.slice(0, 300)}`,
+      timestamp: new Date().toISOString(),
+      context: effectiveProjectId,
+    });
+
+    res.write(`data: ${JSON.stringify({ type: "done", tokensUsed: result.tokensUsed, cost: costUsd, modelsUsed: result.modelsUsed })}\n\n`);
+    res.end();
+  } catch (error: any) {
+    const reason = error?.reason || error?.message || "Unknown error";
+    if (!res.headersSent) {
+      res.status(500).json({ error: { code: "INTERNAL", message: reason } });
+    } else {
+      res.write(`data: ${JSON.stringify({ type: "error", message: reason })}\n\n`);
+      res.end();
+    }
+  }
+});
 
 router.post("/strategic/chat", async (req, res) => {
   try {
