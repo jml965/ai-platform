@@ -398,6 +398,107 @@ router.post("/agents/configs", requireAdmin, async (req, res) => {
   }
 });
 
+router.post("/agents/reset/:agentKey", requireAdmin, async (req, res) => {
+  try {
+    const { agentKey } = req.params;
+    const defaultAgent = DEFAULT_AGENTS.find(a => a.agentKey === agentKey);
+    if (!defaultAgent) {
+      res.status(404).json({ error: { code: "NOT_FOUND", message: "No default config for this agent", messageAr: "لا توجد إعدادات افتراضية لهذا الوكيل" } });
+      return;
+    }
+
+    const [updated] = await db.update(agentConfigsTable)
+      .set({
+        displayNameEn: defaultAgent.displayNameEn,
+        displayNameAr: defaultAgent.displayNameAr,
+        description: defaultAgent.description,
+        enabled: true,
+        isCustom: false,
+        governorEnabled: false,
+        primaryModel: defaultAgent.primaryModel,
+        secondaryModel: defaultAgent.secondaryModel,
+        tertiaryModel: defaultAgent.tertiaryModel,
+        systemPrompt: defaultAgent.systemPrompt,
+        instructions: "",
+        permissions: defaultAgent.permissions,
+        pipelineOrder: defaultAgent.pipelineOrder,
+        receivesFrom: defaultAgent.receivesFrom,
+        sendsTo: defaultAgent.sendsTo,
+        roleOnReceive: defaultAgent.roleOnReceive,
+        roleOnSend: defaultAgent.roleOnSend,
+        tokenLimit: defaultAgent.tokenLimit,
+        batchSize: defaultAgent.batchSize,
+        creativity: defaultAgent.creativity,
+        sourceFiles: defaultAgent.sourceFiles,
+        shortTermMemory: [],
+        longTermMemory: [],
+        updatedAt: new Date(),
+      })
+      .where(eq(agentConfigsTable.agentKey, agentKey))
+      .returning();
+
+    if (!updated) {
+      res.status(404).json({ error: { code: "NOT_FOUND", message: "Agent not found" } });
+      return;
+    }
+    res.json(updated);
+  } catch (error) {
+    console.error("Failed to reset agent:", error);
+    res.status(500).json({ error: { code: "INTERNAL", message: "Failed to reset agent config" } });
+  }
+});
+
+router.post("/agents/reset-all", requireAdmin, async (_req, res) => {
+  try {
+    const results = [];
+    for (const defaultAgent of DEFAULT_AGENTS) {
+      const [updated] = await db.update(agentConfigsTable)
+        .set({
+          displayNameEn: defaultAgent.displayNameEn,
+          displayNameAr: defaultAgent.displayNameAr,
+          description: defaultAgent.description,
+          enabled: true,
+          isCustom: false,
+          governorEnabled: false,
+          primaryModel: defaultAgent.primaryModel,
+          secondaryModel: defaultAgent.secondaryModel,
+          tertiaryModel: defaultAgent.tertiaryModel,
+          systemPrompt: defaultAgent.systemPrompt,
+          instructions: "",
+          permissions: defaultAgent.permissions,
+          pipelineOrder: defaultAgent.pipelineOrder,
+          receivesFrom: defaultAgent.receivesFrom,
+          sendsTo: defaultAgent.sendsTo,
+          roleOnReceive: defaultAgent.roleOnReceive,
+          roleOnSend: defaultAgent.roleOnSend,
+          tokenLimit: defaultAgent.tokenLimit,
+          batchSize: defaultAgent.batchSize,
+          creativity: defaultAgent.creativity,
+          sourceFiles: defaultAgent.sourceFiles,
+          shortTermMemory: [],
+          longTermMemory: [],
+          updatedAt: new Date(),
+        })
+        .where(eq(agentConfigsTable.agentKey, defaultAgent.agentKey))
+        .returning();
+      if (updated) results.push(updated);
+    }
+
+    const customAgents = await db.select()
+      .from(agentConfigsTable)
+      .where(eq(agentConfigsTable.isCustom, true));
+    for (const ca of customAgents) {
+      await db.delete(agentConfigsTable).where(eq(agentConfigsTable.agentKey, ca.agentKey));
+    }
+
+    const configs = await db.select().from(agentConfigsTable).orderBy(agentConfigsTable.pipelineOrder);
+    res.json({ agents: configs, resetCount: results.length, removedCustom: customAgents.length });
+  } catch (error) {
+    console.error("Failed to reset all agents:", error);
+    res.status(500).json({ error: { code: "INTERNAL", message: "Failed to reset all agents" } });
+  }
+});
+
 router.delete("/agents/configs/:agentKey", requireAdmin, async (req, res) => {
   try {
     const [deleted] = await db.delete(agentConfigsTable)

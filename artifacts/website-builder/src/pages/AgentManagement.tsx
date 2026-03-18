@@ -195,6 +195,47 @@ export default function AgentManagement() {
     }
   }
 
+  async function resetAgent(agentKey: string) {
+    if (!confirm(isRTL ? "هل أنت متأكد من إعادة هذا الوكيل للإعدادات الافتراضية؟" : "Reset this agent to factory defaults?")) return;
+    try {
+      const res = await fetch(`${API}/agents/reset/${agentKey}`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setAgents(prev => prev.map(a => a.agentKey === agentKey ? updated : a));
+        setSaveMsg(isRTL ? "تمت إعادة الوكيل للافتراضي ✓" : "Agent reset to defaults ✓");
+        setTimeout(() => setSaveMsg(""), 3000);
+      } else {
+        setSaveMsg(isRTL ? "فشل الإعادة — قد يكون وكيل مخصص" : "Reset failed — may be a custom agent");
+        setTimeout(() => setSaveMsg(""), 3000);
+      }
+    } catch (e) {
+      console.error("Failed to reset agent:", e);
+    }
+  }
+
+  async function resetAllAgents() {
+    if (!confirm(isRTL
+      ? "هل أنت متأكد من إعادة جميع الوكلاء للإعدادات الافتراضية؟ سيتم حذف الوكلاء المخصصين."
+      : "Reset ALL agents to factory defaults? Custom agents will be removed.")) return;
+    try {
+      const res = await fetch(`${API}/agents/reset-all`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAgents(data.agents || []);
+        setSaveMsg(isRTL ? `تمت إعادة ${data.resetCount} وكيل للافتراضي ✓` : `${data.resetCount} agents reset to defaults ✓`);
+        setTimeout(() => setSaveMsg(""), 3000);
+      }
+    } catch (e) {
+      console.error("Failed to reset all agents:", e);
+    }
+  }
+
   async function savePipelineOrder() {
     const pipelineAgents = agents.filter(a => a.pipelineOrder > 0).sort((a, b) => a.pipelineOrder - b.pipelineOrder);
     const order = pipelineAgents.map(a => ({
@@ -246,6 +287,16 @@ export default function AgentManagement() {
           </Link>
           <Bot className="w-5 h-5 text-[#7c3aed]" />
           <span className="font-semibold text-sm">{isRTL ? "إدارة الوكلاء" : "Agent Management"}</span>
+        </div>
+
+        <div className="p-2 border-b border-white/7">
+          <button
+            onClick={resetAllAgents}
+            className="flex items-center gap-2 w-full px-3 py-2 rounded-md text-[12px] text-orange-400 bg-orange-400/10 hover:bg-orange-400/20 transition-colors"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            {isRTL ? "إعادة النظام للافتراضي" : "Reset System Defaults"}
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-2">
@@ -317,6 +368,16 @@ export default function AgentManagement() {
                     <><ToggleLeft className="w-4 h-4 text-red-400" /><span className="text-red-400">{isRTL ? "معطّل" : "Disabled"}</span></>
                   )}
                 </button>
+                {!currentAgent.isCustom && (
+                  <button
+                    onClick={() => resetAgent(currentAgent.agentKey)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] text-orange-400 border border-orange-400/30 hover:bg-orange-400/10 transition-colors"
+                    title={isRTL ? "إعادة للافتراضي" : "Reset to defaults"}
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    {isRTL ? "افتراضي" : "Reset"}
+                  </button>
+                )}
                 {currentAgent.isCustom && (
                   <button onClick={() => deleteAgent(currentAgent.agentKey)} className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/10">
                     <Trash2 className="w-4 h-4" />
