@@ -126,9 +126,13 @@ async function callModelDirect(
       return { content, tokensUsed };
     }
     return null;
-  } catch (error) {
+  } catch (error: any) {
+    const reason = error?.message || String(error);
     console.error(`[Strategic] Model ${model} failed:`, error);
-    return null;
+    const err = new Error(`Model ${model} failed: ${reason}`);
+    (err as any).reason = reason;
+    (err as any).model = model;
+    throw err;
   }
 }
 
@@ -239,21 +243,22 @@ export async function runStrategicAgent(
   let totalTokens = 0;
 
   const effectiveCreativity = config.creativity ? parseFloat(String(config.creativity)) : undefined;
-  const effectiveMaxTokens = config.tokenLimit || undefined;
+  const tokenLimitCap = config.tokenLimit || 0;
 
   if (!useGovernor) {
     const slot = slots[0];
     const start = Date.now();
-    const maxTok = effectiveMaxTokens || slot.maxTokens || 16000;
+    let maxTok = slot.maxTokens || 16000;
+    if (tokenLimitCap > 0 && tokenLimitCap < maxTok) maxTok = tokenLimitCap;
     const result = await callModelDirect(
       slot.provider, slot.model,
       enrichedPrompt, conversationMessages,
-      maxTok, slot.timeoutSeconds ?? 120,
+      maxTok, slot.timeoutSeconds || 240,
       effectiveCreativity
     );
     const duration = Date.now() - start;
 
-    if (!result) throw new Error("Strategic agent model failed");
+    if (!result) throw new Error("Strategic agent model returned empty response");
 
     thinking.push({ model: slot.model, summary: "Single model analysis", durationMs: duration });
     totalTokens = result.tokensUsed;
@@ -278,10 +283,12 @@ export async function runStrategicAgent(
   const thinkResults = await Promise.allSettled(
     slots.map(async (slot): Promise<ThinkResult | null> => {
       const start = Date.now();
+      let slotMaxTok = slot.maxTokens || 16000;
+      if (tokenLimitCap > 0 && tokenLimitCap < slotMaxTok) slotMaxTok = tokenLimitCap;
       const result = await callModelDirect(
         slot.provider, slot.model,
         enrichedPrompt, conversationMessages,
-        effectiveMaxTokens || slot.maxTokens || 16000, slot.timeoutSeconds ?? 120,
+        slotMaxTok, slot.timeoutSeconds || 240,
         effectiveCreativity
       );
       const duration = Date.now() - start;

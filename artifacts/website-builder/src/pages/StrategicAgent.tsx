@@ -253,11 +253,19 @@ export default function StrategicAgent() {
 
   const saveStrategicField = async (field: string, value: any) => {
     try {
+      let updates: Record<string, any>;
+      if (field.startsWith("primaryModel.")) {
+        const subKey = field.split(".")[1];
+        const current = (strategicInfo?.primaryModel as any) || {};
+        updates = { primaryModel: { ...current, [subKey]: value } };
+      } else {
+        updates = { [field]: value };
+      }
       await fetch("/api/strategic/configure-agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ agentKey: "strategic", updates: { [field]: value } }),
+        body: JSON.stringify({ agentKey: "strategic", updates }),
       });
       await fetchStrategicInfo();
     } catch {}
@@ -505,7 +513,10 @@ export default function StrategicAgent() {
         });
 
         const data = await res.json();
-        if (!res.ok) throw new Error(data?.error?.message || "Request failed");
+        if (!res.ok) {
+          const errMsg = (lang === "ar" ? data?.error?.message_ar : null) || data?.error?.message || "Request failed";
+          throw new Error(errMsg);
+        }
 
         const assistantMsg: ChatMessage = {
           id: crypto.randomUUID(),
@@ -544,7 +555,10 @@ export default function StrategicAgent() {
         });
 
         const data = await res.json();
-        if (!res.ok) throw new Error(data?.error?.message || "Request failed");
+        if (!res.ok) {
+          const errMsg = (lang === "ar" ? data?.error?.message_ar : null) || data?.error?.message || "Request failed";
+          throw new Error(errMsg);
+        }
 
         const assistantMsg: ChatMessage = {
           id: crypto.randomUUID(),
@@ -761,6 +775,8 @@ export default function StrategicAgent() {
                 { key: "tokenLimit", label: lang === "ar" ? "حد التوكنات" : "Token Limit", value: strategicInfo.tokenLimit, type: "number" },
                 { key: "creativity", label: lang === "ar" ? "الإبداعية" : "Creativity", value: strategicInfo.creativity, type: "number" },
                 { key: "batchSize", label: lang === "ar" ? "حجم الدُفعة" : "Batch Size", value: strategicInfo.batchSize, type: "number" },
+                { key: "primaryModel.maxTokens", label: lang === "ar" ? "حد توكنات النموذج" : "Model Max Tokens", value: (strategicInfo.primaryModel as any)?.maxTokens, type: "number" },
+                { key: "primaryModel.timeoutSeconds", label: lang === "ar" ? "المهلة الزمنية (ثانية)" : "Timeout (seconds)", value: (strategicInfo.primaryModel as any)?.timeoutSeconds, type: "number" },
               ].map(item => (
                 <div key={item.key} className="flex items-center justify-between">
                   <span className="text-[11px] text-[#8b949e]">{item.label}</span>

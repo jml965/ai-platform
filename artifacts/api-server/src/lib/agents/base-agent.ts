@@ -44,7 +44,11 @@ export abstract class BaseAgent {
           this._overrideCreativity = parseFloat(config.creativity);
         }
         if (typeof config.tokenLimit === "number" && config.tokenLimit > 0) {
-          this._overrideMaxTokens = config.tokenLimit;
+          if (this._overrideMaxTokens) {
+            this._overrideMaxTokens = Math.min(this._overrideMaxTokens, config.tokenLimit);
+          } else {
+            this._overrideMaxTokens = config.tokenLimit;
+          }
         }
         if (config.systemPrompt && config.systemPrompt.trim().length > 20) {
           this._overridePrompt = config.systemPrompt;

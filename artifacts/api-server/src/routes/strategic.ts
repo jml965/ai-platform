@@ -6,6 +6,33 @@ import { agentConfigsTable, usersTable, strategicThreadsTable, strategicMessages
 import { eq, sql, desc, and, gte } from "drizzle-orm";
 import { startSurgicalFix, checkBuildLimits } from "../lib/agents/execution-engine";
 
+function translateErrorReason(reason: string): string {
+  if (reason.includes("Timeout after")) {
+    const match = reason.match(/Timeout after (\d+)s/);
+    const secs = match ? match[1] : "?";
+    return `انتهت المهلة الزمنية (${secs} ثانية). حاول تقليل حجم الرسالة أو زيادة المهلة من الإعدادات.`;
+  }
+  if (reason.includes("overloaded") || reason.includes("529")) {
+    return "الخادم مشغول حالياً. يرجى المحاولة بعد قليل.";
+  }
+  if (reason.includes("rate_limit") || reason.includes("429")) {
+    return "تم تجاوز حد الطلبات. يرجى الانتظار قليلاً والمحاولة مجدداً.";
+  }
+  if (reason.includes("authentication") || reason.includes("401") || reason.includes("invalid.*key")) {
+    return "خطأ في مفتاح API. تحقق من صحة المفتاح في الإعدادات.";
+  }
+  if (reason.includes("No enabled models")) {
+    return "لا يوجد نموذج مفعّل. فعّل نموذجاً واحداً على الأقل من إعدادات الوكيل.";
+  }
+  if (reason.includes("empty response")) {
+    return "النموذج أرجع رداً فارغاً. حاول مرة أخرى.";
+  }
+  if (reason.includes("INSUFFICIENT_CREDITS") || reason.includes("insufficient")) {
+    return "رصيد غير كافٍ.";
+  }
+  return `فشل الوكيل: ${reason}`;
+}
+
 const router: IRouter = Router();
 
 const DEFAULT_AGENTS: Record<string, any> = {
@@ -195,8 +222,14 @@ router.post("/strategic/chat", async (req, res) => {
     });
   } catch (error: any) {
     console.error("[Strategic] Chat error:", error);
+    const reason = error?.reason || error?.message || "Unknown error";
+    const reasonAr = translateErrorReason(reason);
     res.status(500).json({
-      error: { code: "INTERNAL", message: error?.message || "Strategic agent failed", message_ar: "فشل الوكيل الاستراتيجي" },
+      error: {
+        code: "INTERNAL",
+        message: reason,
+        message_ar: reasonAr,
+      },
     });
   }
 });
@@ -213,6 +246,11 @@ router.get("/strategic/config", async (_req, res) => {
       enabled: config.enabled,
       governorEnabled: config.governorEnabled,
       tokenLimit: config.tokenLimit,
+      creativity: config.creativity,
+      batchSize: config.batchSize,
+      primaryModel: config.primaryModel,
+      secondaryModel: config.secondaryModel,
+      tertiaryModel: config.tertiaryModel,
       modelsActive: [
         config.primaryModel,
         config.secondaryModel,
@@ -563,8 +601,10 @@ Respond in the same language as the user.`;
     });
   } catch (error: any) {
     console.error("[Strategic] Agent chat error:", error);
+    const reason = error?.reason || error?.message || "Unknown error";
+    const reasonAr = translateErrorReason(reason);
     res.status(500).json({
-      error: { code: "INTERNAL", message: error?.message || "Failed to process agent configuration" },
+      error: { code: "INTERNAL", message: reason, message_ar: reasonAr },
     });
   }
 });
