@@ -556,11 +556,13 @@ export default function StrategicAgent() {
         let displayedContent = "";
         let streamMeta: { tokensUsed?: number; cost?: number } = {};
         let typewriterRunning = false;
+        let typewriterStopped = false;
 
         const typewriterFlush = () => {
-          if (typewriterRunning) return;
+          if (typewriterRunning || typewriterStopped) return;
           typewriterRunning = true;
           const tick = () => {
+            if (typewriterStopped) { typewriterRunning = false; return; }
             if (displayedContent.length < streamedContent.length) {
               displayedContent = streamedContent.slice(0, displayedContent.length + 1);
               setMessages(prev => prev.map(m =>
@@ -573,6 +575,13 @@ export default function StrategicAgent() {
           };
           tick();
         };
+
+        controller.signal.addEventListener("abort", () => {
+          typewriterStopped = true;
+          setMessages(prev => prev.map(m =>
+            m.id === streamMsgId ? { ...m, content: streamedContent || displayedContent } : m
+          ));
+        });
 
         setMessages(prev => [...prev, {
           id: streamMsgId,
