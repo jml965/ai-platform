@@ -73,20 +73,25 @@ async function callModelDirect(
   systemPrompt: string,
   messages: { role: "user" | "assistant"; content: string }[],
   maxTokens: number,
-  timeoutSeconds: number
+  timeoutSeconds: number,
+  temperature?: number
 ): Promise<{ content: string; tokensUsed: number } | null> {
   const timeoutMs = timeoutSeconds * 1000;
 
   try {
     if (provider === "anthropic") {
       const client = await getAnthropicClient();
+      const createParams: any = {
+        model,
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages,
+      };
+      if (temperature !== undefined && temperature >= 0) {
+        createParams.temperature = Math.min(temperature, 1.0);
+      }
       const response = await Promise.race([
-        client.messages.create({
-          model,
-          max_tokens: maxTokens,
-          system: systemPrompt,
-          messages,
-        }),
+        client.messages.create(createParams),
         new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error(`Timeout after ${timeoutSeconds}s`)), timeoutMs)
         ),
@@ -99,15 +104,19 @@ async function callModelDirect(
       return { content, tokensUsed };
     } else if (provider === "openai") {
       const client = await getOpenAIClient();
+      const createParams: any = {
+        model,
+        max_completion_tokens: maxTokens,
+        messages: [
+          { role: "system" as const, content: systemPrompt },
+          ...messages.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
+        ],
+      };
+      if (temperature !== undefined && temperature >= 0) {
+        createParams.temperature = Math.min(temperature, 2.0);
+      }
       const response = await Promise.race([
-        client.chat.completions.create({
-          model,
-          max_completion_tokens: maxTokens,
-          messages: [
-            { role: "system" as const, content: systemPrompt },
-            ...messages.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
-          ],
-        }),
+        client.chat.completions.create(createParams),
         new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error(`Timeout after ${timeoutSeconds}s`)), timeoutMs)
         ),
@@ -229,13 +238,18 @@ export async function runStrategicAgent(
   const thinking: { model: string; summary: string; durationMs: number }[] = [];
   let totalTokens = 0;
 
+  const effectiveCreativity = config.creativity ? parseFloat(String(config.creativity)) : undefined;
+  const effectiveMaxTokens = config.tokenLimit || undefined;
+
   if (!useGovernor) {
     const slot = slots[0];
     const start = Date.now();
+    const maxTok = effectiveMaxTokens || slot.maxTokens || 16000;
     const result = await callModelDirect(
       slot.provider, slot.model,
       enrichedPrompt, conversationMessages,
-      slot.maxTokens ?? 16000, slot.timeoutSeconds ?? 240
+      maxTok, slot.timeoutSeconds ?? 120,
+      effectiveCreativity
     );
     const duration = Date.now() - start;
 
@@ -267,7 +281,8 @@ export async function runStrategicAgent(
       const result = await callModelDirect(
         slot.provider, slot.model,
         enrichedPrompt, conversationMessages,
-        slot.maxTokens ?? 16000, slot.timeoutSeconds ?? 240
+        effectiveMaxTokens || slot.maxTokens || 16000, slot.timeoutSeconds ?? 120,
+        effectiveCreativity
       );
       const duration = Date.now() - start;
       if (!result) return null;
@@ -312,7 +327,8 @@ export async function runStrategicAgent(
     govProvider, govModel,
     GOVERNOR_MERGE_PROMPT,
     [{ role: "user", content: `User's original message: "${userMessage}"\n\n${proposalsText}\n\nProduce the BEST unified analysis:` }],
-    govMaxTokens, govTimeout
+    govMaxTokens, govTimeout,
+    effectiveCreativity
   );
   const govDuration = Date.now() - govStart;
 
