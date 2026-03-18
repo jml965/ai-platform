@@ -1299,7 +1299,20 @@ export default function StrategicAgent() {
                   </div>
                 )}
 
-                <MessageContent content={msg.content} fontSize={fontSize} lineSpacing={lineSpacing} fontWeight={fontWeight} />
+                {msg.role === "assistant" && !msg.content && loading && msg.id === messages[messages.length - 1]?.id ? (
+                  <div className="flex items-center gap-2 py-1">
+                    <div className="flex items-center gap-1">
+                      <div className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                      <div className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                      <div className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                    </div>
+                    <span className="text-[12px] text-[#8b949e]">
+                      {lang === "ar" ? "يفكر..." : "Thinking..."}
+                    </span>
+                  </div>
+                ) : (
+                  <MessageContent content={msg.content} fontSize={fontSize} lineSpacing={lineSpacing} fontWeight={fontWeight} />
+                )}
 
                 {msg.images && msg.images.length > 0 && (
                   <div className="mt-2 grid grid-cols-2 gap-2">
