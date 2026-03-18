@@ -199,15 +199,15 @@ function MessageContent({ content, fontSize, lineSpacing, fontWeight }: { conten
             URL.revokeObjectURL(url);
           };
           return (
-            <div key={i} className="my-3 rounded-lg overflow-hidden border border-[#30363d]">
-              <div className="px-3 py-1.5 bg-[#1c2333]">
+            <div key={i} className="my-3 rounded-lg border border-[#30363d]">
+              <div className="flex items-center justify-between px-3 py-1.5 bg-[#1c2333] rounded-t-lg">
                 <span className="text-[10px] text-[#8b949e] uppercase tracking-wide">{langLabel}</span>
               </div>
               <pre className="p-3 bg-[#0d1117] text-[13px] leading-relaxed text-[#e1e4e8] overflow-x-auto" dir="ltr">
                 <code>{code}</code>
               </pre>
               {code.length > 0 && (
-                <div className="sticky bottom-0 flex items-center justify-end gap-2 px-3 py-1.5 bg-[#1c2333] border-t border-[#30363d]">
+                <div className="sticky bottom-0 z-10 flex items-center justify-end gap-2 px-3 py-1.5 bg-[#1c2333] border-t border-[#30363d] rounded-b-lg">
                   <button
                     onClick={() => handleCopy(code, i)}
                     className="flex items-center gap-1 text-[10px] text-[#8b949e] hover:text-[#e1e4e8] transition-colors"
@@ -1324,7 +1324,7 @@ export default function StrategicAgent() {
             <div key={msg.id} className={cn("py-1", msg.role === "user" ? "text-end" : "")}>
               <div
                 className={cn(
-                  "inline-block text-start text-sm leading-relaxed max-w-full overflow-hidden",
+                  "inline-block text-start text-sm leading-relaxed max-w-full",
                   msg.role === "user" ? "text-amber-400" : "text-[#c9d1d9]",
                   hasDetails && "cursor-pointer"
                 )}
