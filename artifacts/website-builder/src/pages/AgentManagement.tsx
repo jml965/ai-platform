@@ -68,11 +68,16 @@ interface AgentStats {
 }
 
 const MODEL_OPTIONS = [
-  { provider: "anthropic", model: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
   { provider: "anthropic", model: "claude-opus-4-20250514", label: "Claude Opus 4" },
+  { provider: "anthropic", model: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
+  { provider: "anthropic", model: "claude-haiku-3-5-20241022", label: "Claude Haiku 3.5" },
   { provider: "openai", model: "o3", label: "OpenAI o3" },
-  { provider: "openai", model: "gpt-4o", label: "GPT-4o" },
+  { provider: "openai", model: "o4-mini", label: "OpenAI o4-mini" },
   { provider: "openai", model: "gpt-4.1", label: "GPT-4.1" },
+  { provider: "openai", model: "gpt-4.1-mini", label: "GPT-4.1 Mini" },
+  { provider: "openai", model: "gpt-4.1-nano", label: "GPT-4.1 Nano" },
+  { provider: "openai", model: "gpt-4o", label: "GPT-4o" },
+  { provider: "openai", model: "gpt-4o-mini", label: "GPT-4o Mini" },
   { provider: "local", model: "none", label: "Local (No AI)" },
 ];
 
