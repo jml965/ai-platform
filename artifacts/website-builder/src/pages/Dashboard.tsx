@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, LayoutTemplate, Trash2, Loader2, Coins, LogOut, CreditCard, Users, ShieldCheck, Activity, Globe, ExternalLink, Square, RefreshCw, Rocket, Bell, Palette, Home, Smartphone, Play, BarChart2, Gamepad2, FileText, Settings, BookOpen, Gift, Search, ChevronDown, Upload, UploadCloud, Download, Cpu, Wand2, Camera, ArrowRight, Check, X, Bot, FolderGit2, Plug, ChevronRight, Shield, Crown, Lock, Database, Crosshair, FlaskConical, Send, Copy, Server, Maximize2, Minimize2 } from "lucide-react";
+import { Plus, LayoutTemplate, Trash2, Loader2, Coins, LogOut, CreditCard, Users, ShieldCheck, Activity, Globe, ExternalLink, Square, RefreshCw, Rocket, Bell, Palette, Home, Smartphone, Play, BarChart2, Gamepad2, FileText, Settings, BookOpen, Gift, Search, ChevronDown, Upload, UploadCloud, Download, Cpu, Wand2, Camera, ArrowRight, Check, X, Bot, FolderGit2, Plug, ChevronRight, Shield, Crown, Lock, Database, Crosshair, FlaskConical, Send, Copy, Server, Maximize2, Minimize2, MousePointer2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import type { Project, ProjectStatus as ProjectStatusType } from "@workspace/api-client-react";
@@ -257,11 +258,23 @@ interface InfraChatMsg {
   models?: string[];
 }
 
+interface WandTarget {
+  tag: string;
+  id?: string;
+  classes: string;
+  text: string;
+  rect: { x: number; y: number; width: number; height: number };
+  styles: { color: string; backgroundColor: string; fontSize: string; fontWeight: string };
+  path: string;
+}
+
 function InfraInlineChat({ agent, lang, onClose }: { agent: SidebarInfraAgent; lang: string; onClose: () => void }) {
   const [messages, setMessages] = useState<InfraChatMsg[]>([]);
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [wandMode, setWandMode] = useState(false);
+  const [wandHighlight, setWandHighlight] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -269,6 +282,93 @@ function InfraInlineChat({ agent, lang, onClose }: { agent: SidebarInfraAgent; l
   const userScrolledUpRef = useRef(false);
   const programmaticScrollRef = useRef(false);
   const isRTL = lang === "ar";
+
+  const getElementPath = (el: HTMLElement): string => {
+    const parts: string[] = [];
+    let current: HTMLElement | null = el;
+    while (current && current !== document.body) {
+      let selector = current.tagName.toLowerCase();
+      if (current.id) selector += `#${current.id}`;
+      else if (current.className && typeof current.className === "string") {
+        const cls = current.className.split(/\s+/).filter(c => c && !c.startsWith("hover:") && !c.startsWith("transition")).slice(0, 2).join(".");
+        if (cls) selector += `.${cls}`;
+      }
+      parts.unshift(selector);
+      current = current.parentElement;
+      if (parts.length >= 4) break;
+    }
+    return parts.join(" > ");
+  };
+
+  const handleWandClick = (e: MouseEvent) => {
+    const target = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement;
+    if (!target || target.closest("[data-wand-overlay]") || target.closest("[data-infra-chat]")) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const rect = target.getBoundingClientRect();
+    const computed = window.getComputedStyle(target);
+    const textContent = target.innerText?.trim().slice(0, 100) || "";
+
+    const info: WandTarget = {
+      tag: target.tagName.toLowerCase(),
+      id: target.id || undefined,
+      classes: target.className && typeof target.className === "string" ? target.className.split(/\s+/).slice(0, 5).join(" ") : "",
+      text: textContent,
+      rect: { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) },
+      styles: {
+        color: computed.color,
+        backgroundColor: computed.backgroundColor,
+        fontSize: computed.fontSize,
+        fontWeight: computed.fontWeight,
+      },
+      path: getElementPath(target),
+    };
+
+    const desc = isRTL
+      ? `[عصا سحرية] العنصر المحدد:\n• النوع: <${info.tag}>${info.id ? ` id="${info.id}"` : ""}\n• المسار: ${info.path}\n• النص: "${info.text}"\n• الحجم: ${info.rect.width}×${info.rect.height}px\n• الموقع: (${info.rect.x}, ${info.rect.y})\n• اللون: ${info.styles.color}\n• الخلفية: ${info.styles.backgroundColor}\n• الخط: ${info.styles.fontSize} ${info.styles.fontWeight}\n\nما التعديل المطلوب على هذا العنصر؟`
+      : `[Magic Wand] Selected element:\n• Tag: <${info.tag}>${info.id ? ` id="${info.id}"` : ""}\n• Path: ${info.path}\n• Text: "${info.text}"\n• Size: ${info.rect.width}×${info.rect.height}px\n• Position: (${info.rect.x}, ${info.rect.y})\n• Color: ${info.styles.color}\n• Background: ${info.styles.backgroundColor}\n• Font: ${info.styles.fontSize} ${info.styles.fontWeight}\n\nWhat change do you want on this element?`;
+
+    setPrompt(desc);
+    setWandMode(false);
+    setWandHighlight(null);
+    textareaRef.current?.focus();
+  };
+
+  const wandRafRef = useRef(0);
+  const handleWandMove = (e: MouseEvent) => {
+    cancelAnimationFrame(wandRafRef.current);
+    wandRafRef.current = requestAnimationFrame(() => {
+      const target = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement;
+      if (!target || target.closest("[data-wand-overlay]") || target.closest("[data-infra-chat]")) {
+        setWandHighlight(null);
+        return;
+      }
+      const rect = target.getBoundingClientRect();
+      setWandHighlight({ x: rect.x, y: rect.y, w: rect.width, h: rect.height });
+    });
+  };
+
+  useEffect(() => {
+    if (!wandMode) return;
+    const onClick = (e: MouseEvent) => handleWandClick(e);
+    const onMove = (e: MouseEvent) => handleWandMove(e);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { setWandMode(false); setWandHighlight(null); } };
+    document.addEventListener("click", onClick, true);
+    document.addEventListener("mousemove", onMove, true);
+    document.addEventListener("keydown", onKey);
+    const style = document.createElement("style");
+    style.id = "wand-cursor-style";
+    style.textContent = "* { cursor: crosshair !important; }";
+    document.head.appendChild(style);
+    return () => {
+      document.removeEventListener("click", onClick, true);
+      document.removeEventListener("mousemove", onMove, true);
+      document.removeEventListener("keydown", onKey);
+      cancelAnimationFrame(wandRafRef.current);
+      style.remove();
+    };
+  }, [wandMode, isRTL]);
 
   const scrollToBottom = () => {
     if (userScrolledUpRef.current) return;
@@ -449,6 +549,7 @@ function InfraInlineChat({ agent, lang, onClose }: { agent: SidebarInfraAgent; l
 
   return (
     <div
+      data-infra-chat="true"
       className={`bg-[#0d1117] border-s border-[#1c2333] flex flex-col transition-all duration-300 flex-shrink-0 h-full ${
         expanded ? "w-[500px]" : "w-[340px]"
       }`}
@@ -464,6 +565,13 @@ function InfraInlineChat({ agent, lang, onClose }: { agent: SidebarInfraAgent; l
           </div>
           <div className="text-[10px] text-[#484f58] truncate">{agent.primaryModel?.model?.split("-").slice(0, 2).join("-")}</div>
         </div>
+        <button
+          onClick={() => { setWandMode(!wandMode); setWandHighlight(null); }}
+          className={`p-1 transition-colors rounded hover:bg-white/5 ${wandMode ? "text-amber-400 bg-amber-500/15" : "text-[#8b949e] hover:text-amber-400"}`}
+          title={isRTL ? "عصا سحرية — حدد عنصر لتعديله" : "Magic Wand — select element to edit"}
+        >
+          <Wand2 className="w-3.5 h-3.5" />
+        </button>
         <button onClick={() => setExpanded(!expanded)} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] transition-colors rounded hover:bg-white/5" title={expanded ? (isRTL ? "تضييق" : "Narrow") : (isRTL ? "توسيع" : "Widen")}>
           {expanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
         </button>
@@ -478,6 +586,15 @@ function InfraInlineChat({ agent, lang, onClose }: { agent: SidebarInfraAgent; l
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
+
+      {wandMode && (
+        <div className="px-3 py-1.5 bg-amber-500/10 border-b border-amber-500/20 flex items-center gap-2 flex-shrink-0">
+          <Wand2 className="w-3 h-3 text-amber-400 animate-pulse" />
+          <span className="text-[11px] text-amber-300">
+            {isRTL ? "اضغط على أي عنصر في الصفحة لتحديده — Esc للإلغاء" : "Click any element on the page to select it — Esc to cancel"}
+          </span>
+        </div>
+      )}
 
       <div
         ref={chatContainerRef}
@@ -545,7 +662,7 @@ function InfraInlineChat({ agent, lang, onClose }: { agent: SidebarInfraAgent; l
             onChange={e => setPrompt(e.target.value)}
             placeholder={isRTL ? "اكتب أمرك..." : "Type command..."}
             className="w-full bg-[#161b22] border border-[#30363d] rounded-xl px-4 py-2.5 pe-12 text-[13px] text-[#e1e4e8] placeholder-[#484f58] resize-none focus:outline-none focus:border-cyan-500/50 transition-colors"
-            rows={1}
+            rows={prompt.includes("\n") ? 4 : 1}
             onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
           />
           {loading ? (
@@ -559,6 +676,30 @@ function InfraInlineChat({ agent, lang, onClose }: { agent: SidebarInfraAgent; l
           )}
         </div>
       </div>
+
+      {wandMode && createPortal(
+        <div
+          data-wand-overlay="true"
+          className="fixed inset-0 z-[9999] pointer-events-none"
+        >
+          {wandHighlight && (
+            <div
+              className="absolute border-2 border-amber-400 bg-amber-400/10 rounded-sm pointer-events-none transition-all duration-75"
+              style={{
+                left: wandHighlight.x,
+                top: wandHighlight.y,
+                width: wandHighlight.w,
+                height: wandHighlight.h,
+              }}
+            >
+              <div className="absolute -top-5 start-0 bg-amber-500 text-black text-[9px] font-bold px-1.5 py-0.5 rounded-sm whitespace-nowrap">
+                {wandHighlight.w}×{wandHighlight.h}
+              </div>
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
