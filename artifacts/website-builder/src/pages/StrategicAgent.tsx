@@ -654,7 +654,7 @@ export default function StrategicAgent() {
                   </div>
                 )}
 
-                <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">{msg.content}</pre>
+                <p className="whitespace-pre-wrap text-sm leading-relaxed" style={{ fontFamily: "system-ui, -apple-system, 'Segoe UI', sans-serif" }}>{msg.content}</p>
 
                 {msg.images && msg.images.length > 0 && (
                   <div className="mt-2 grid grid-cols-2 gap-2">
