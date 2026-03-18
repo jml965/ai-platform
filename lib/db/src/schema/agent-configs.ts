@@ -10,6 +10,7 @@ export const agentConfigsTable = pgTable("agent_configs", {
   description: text("description"),
   enabled: boolean("enabled").notNull().default(true),
   isCustom: boolean("is_custom").notNull().default(false),
+  agentLayer: text("agent_layer").notNull().default("service"),
 
   governorEnabled: boolean("governor_enabled").notNull().default(false),
   autoGovernor: boolean("auto_governor").notNull().default(false),
