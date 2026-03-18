@@ -547,7 +547,8 @@ export default function InfraPanel() {
     try {
       const res = await fetch("/api/agents/configs", { credentials: "include" });
       if (!res.ok) return;
-      const configs: FullAgentConfig[] = await res.json();
+      const body = await res.json();
+      const configs: FullAgentConfig[] = Array.isArray(body) ? body : (body.agents || []);
       const cfg = configs.find(c => c.agentKey === agentKey);
       if (cfg) {
         setFullConfig(cfg);
@@ -763,20 +764,19 @@ export default function InfraPanel() {
 
         <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
           {agents.filter(a => a.agentKey === "infra_sysadmin").map(agent => (
-            <button
+            <div
               key={agent.agentKey}
-              onClick={() => selectAgent(agent)}
               className={cn(
-                "group w-full flex items-center gap-3 px-3 py-3 rounded-lg text-start transition-all mb-2",
+                "w-full flex items-center gap-3 px-3 py-3 rounded-lg text-start transition-all mb-2",
                 selectedAgent?.agentKey === agent.agentKey
                   ? "bg-gradient-to-r from-yellow-500/20 to-amber-500/10 border border-yellow-500/40"
                   : "bg-gradient-to-r from-yellow-500/10 to-transparent border border-yellow-500/20 hover:border-yellow-500/40"
               )}
             >
-              <div className="flex-shrink-0 text-yellow-400">
+              <div className="flex-shrink-0 text-yellow-400 cursor-pointer" onClick={() => selectAgent(agent)}>
                 <Crown className="w-6 h-6" />
               </div>
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 cursor-pointer" onClick={() => selectAgent(agent)}>
                 <div className="text-sm font-bold text-yellow-300 truncate">
                   {lang === "ar" ? agent.displayNameAr : agent.displayNameEn}
                 </div>
@@ -784,27 +784,26 @@ export default function InfraPanel() {
                   3 models + governor
                 </div>
               </div>
-              <span onClick={(e) => openSettings(agent.agentKey, e)} className="flex-shrink-0 p-1 rounded hover:bg-yellow-500/20 text-yellow-500/50 hover:text-yellow-400 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer" title={lang === "ar" ? "إعدادات الوكيل" : "Agent Settings"}>
-                <Settings className="w-3.5 h-3.5" />
-              </span>
-            </button>
+              <button onClick={(e) => { e.stopPropagation(); openSettings(agent.agentKey, e); }} className="flex-shrink-0 p-1.5 rounded hover:bg-yellow-500/20 text-yellow-500/40 hover:text-yellow-400 transition-colors" title={lang === "ar" ? "إعدادات الوكيل" : "Agent Settings"}>
+                <Settings className="w-4 h-4" />
+              </button>
+            </div>
           ))}
           <div className="border-t border-[#1c2333] my-2" />
           {agents.filter(a => a.agentKey !== "infra_sysadmin").map(agent => (
-            <button
+            <div
               key={agent.agentKey}
-              onClick={() => selectAgent(agent)}
               className={cn(
-                "group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-start transition-all",
+                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-start transition-all",
                 selectedAgent?.agentKey === agent.agentKey
                   ? "bg-[#1c2333] border border-cyan-500/30"
                   : "hover:bg-[#161b22] border border-transparent"
               )}
             >
-              <div className={cn("flex-shrink-0", AGENT_COLORS[agent.agentKey] || "text-[#8b949e]")}>
+              <div className={cn("flex-shrink-0 cursor-pointer", AGENT_COLORS[agent.agentKey] || "text-[#8b949e]")} onClick={() => selectAgent(agent)}>
                 {AGENT_ICONS[agent.agentKey] || <Bot className="w-5 h-5" />}
               </div>
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 cursor-pointer" onClick={() => selectAgent(agent)}>
                 <div className="text-sm font-medium text-[#e1e4e8] truncate">
                   {lang === "ar" ? agent.displayNameAr : agent.displayNameEn}
                 </div>
@@ -812,10 +811,10 @@ export default function InfraPanel() {
                   {agent.primaryModel?.model?.split("-").slice(0, 2).join("-") || ""}
                 </div>
               </div>
-              <span onClick={(e) => openSettings(agent.agentKey, e)} className="flex-shrink-0 p-1 rounded hover:bg-[#1c2333] text-[#484f58] hover:text-cyan-400 transition-colors opacity-0 group-hover:opacity-100" title={lang === "ar" ? "إعدادات الوكيل" : "Agent Settings"}>
+              <button onClick={(e) => { e.stopPropagation(); openSettings(agent.agentKey, e); }} className="flex-shrink-0 p-1.5 rounded hover:bg-[#1c2333] text-[#484f58] hover:text-cyan-400 transition-colors" title={lang === "ar" ? "إعدادات الوكيل" : "Agent Settings"}>
                 <Settings className="w-3.5 h-3.5" />
-              </span>
-            </button>
+              </button>
+            </div>
           ))}
         </div>
       </div>
