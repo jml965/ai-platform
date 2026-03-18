@@ -207,7 +207,7 @@ function MessageContent({ content, fontSize, lineSpacing, fontWeight }: { conten
                 <code>{code}</code>
               </pre>
               {code.length > 0 && (
-                <div className="sticky bottom-0 z-10 flex items-center justify-end gap-2 px-3 py-1.5 bg-[#1c2333] border-t border-[#30363d] rounded-b-lg">
+                <div className="sticky bottom-0 z-10 flex items-center justify-end gap-2 px-2 py-1">
                   <button
                     onClick={() => handleCopy(code, i)}
                     className="flex items-center gap-1 text-[10px] text-[#8b949e] hover:text-[#e1e4e8] transition-colors"
@@ -220,7 +220,6 @@ function MessageContent({ content, fontSize, lineSpacing, fontWeight }: { conten
                     className="flex items-center gap-1 text-[10px] text-[#8b949e] hover:text-[#e1e4e8] transition-colors"
                   >
                     <Download className="w-3 h-3" />
-                    <span>Download</span>
                   </button>
                 </div>
               )}
