@@ -553,7 +553,28 @@ export default function StrategicAgent() {
 
         const streamMsgId = crypto.randomUUID();
         let streamedContent = "";
+        let displayedContent = "";
         let streamMeta: { tokensUsed?: number; cost?: number } = {};
+        let typewriterRunning = false;
+
+        const typewriterFlush = () => {
+          if (typewriterRunning) return;
+          typewriterRunning = true;
+          const tick = () => {
+            if (displayedContent.length < streamedContent.length) {
+              const remaining = streamedContent.length - displayedContent.length;
+              const charsToAdd = remaining > 80 ? Math.ceil(remaining / 8) : remaining > 20 ? 3 : 1;
+              displayedContent = streamedContent.slice(0, displayedContent.length + charsToAdd);
+              setMessages(prev => prev.map(m =>
+                m.id === streamMsgId ? { ...m, content: displayedContent } : m
+              ));
+              requestAnimationFrame(tick);
+            } else {
+              typewriterRunning = false;
+            }
+          };
+          requestAnimationFrame(tick);
+        };
 
         setMessages(prev => [...prev, {
           id: streamMsgId,
@@ -596,23 +617,31 @@ export default function StrategicAgent() {
               const event = JSON.parse(line.slice(6));
               if (event.type === "chunk") {
                 streamedContent += event.text;
-                setMessages(prev => prev.map(m =>
-                  m.id === streamMsgId ? { ...m, content: streamedContent } : m
-                ));
+                typewriterFlush();
               } else if (event.type === "done") {
                 streamMeta = { tokensUsed: event.tokensUsed, cost: event.cost };
-                setMessages(prev => prev.map(m =>
-                  m.id === streamMsgId ? { ...m, tokensUsed: event.tokensUsed, cost: event.cost } : m
-                ));
               } else if (event.type === "error") {
                 streamedContent += event.message;
-                setMessages(prev => prev.map(m =>
-                  m.id === streamMsgId ? { ...m, content: streamedContent } : m
-                ));
+                typewriterFlush();
               }
             } catch {}
           }
         }
+
+        await new Promise<void>(resolve => {
+          const wait = () => {
+            if (displayedContent.length >= streamedContent.length) {
+              resolve();
+            } else {
+              setTimeout(wait, 30);
+            }
+          };
+          wait();
+        });
+
+        setMessages(prev => prev.map(m =>
+          m.id === streamMsgId ? { ...m, content: streamedContent, tokensUsed: streamMeta.tokensUsed, cost: streamMeta.cost } : m
+        ));
 
         if (threadId) {
           saveMessageToThread(threadId, {
