@@ -120,7 +120,7 @@ const DEFAULT_AGENTS: Record<string, any> = {
     primaryModel: { provider: "anthropic", model: "claude-sonnet-4-20250514", enabled: true, creativity: 0.7, timeoutSeconds: 240, maxTokens: 16000 },
     secondaryModel: { provider: "openai", model: "o3", enabled: true, creativity: 0.7, timeoutSeconds: 240, maxTokens: 16000 },
     tertiaryModel: { provider: "openai", model: "gpt-4o", enabled: true, creativity: 0.7, timeoutSeconds: 240, maxTokens: 16000 },
-    systemPrompt: `You are the Strategic Execution Agent — an elite AI debugger and problem solver.`,
+    systemPrompt: `You are the Strategic Execution Agent — the primary reasoning and problem-solving brain of the AI Website Builder system.`,
     permissions: ["read_code", "analyze_bugs", "suggest_fixes", "access_project_files", "debug_runtime", "modify_code"],
     tokenLimit: 64000, batchSize: 1, creativity: "0.70",
     governorEnabled: false, enabled: true,
