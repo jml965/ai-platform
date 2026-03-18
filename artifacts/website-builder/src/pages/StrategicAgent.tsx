@@ -112,6 +112,7 @@ export default function StrategicAgent() {
   const [fontSize, setFontSize] = useState(16);
   const [lineSpacing, setLineSpacing] = useState(1.75);
   const [fontWeight, setFontWeight] = useState(400);
+  const [showTextSettings, setShowTextSettings] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
@@ -490,32 +491,42 @@ export default function StrategicAgent() {
               {resettingAgent ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
             </button>
           )}
-          <div className="flex items-center gap-0.5 bg-[#1c2333] rounded-lg px-1 py-0.5">
-            <button onClick={() => setFontSize(s => Math.max(12, s - 1))} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] transition-colors" title={lang === "ar" ? "تصغير الخط" : "Decrease font"}>
-              <Minus className="w-3 h-3" />
+          <div className="relative">
+            <button
+              onClick={() => setShowTextSettings(p => !p)}
+              className={cn("p-1.5 rounded transition-colors", showTextSettings ? "bg-amber-500/20 text-amber-400" : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]")}
+              title={lang === "ar" ? "إعدادات النص" : "Text settings"}
+            >
+              <Settings className="w-4 h-4" />
             </button>
-            <span className="text-[10px] text-[#8b949e] min-w-[20px] text-center">{fontSize}</span>
-            <button onClick={() => setFontSize(s => Math.min(24, s + 1))} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] transition-colors" title={lang === "ar" ? "تكبير الخط" : "Increase font"}>
-              <Plus className="w-3 h-3" />
-            </button>
-          </div>
-          <div className="flex items-center gap-0.5 bg-[#1c2333] rounded-lg px-1 py-0.5">
-            <button onClick={() => setLineSpacing(s => Math.max(1, +(s - 0.25).toFixed(2)))} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] transition-colors" title={lang === "ar" ? "تقليل التباعد" : "Decrease spacing"}>
-              <Minus className="w-3 h-3" />
-            </button>
-            <span className="text-[10px] text-[#8b949e] min-w-[24px] text-center">{lineSpacing}</span>
-            <button onClick={() => setLineSpacing(s => Math.min(3, +(s + 0.25).toFixed(2)))} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] transition-colors" title={lang === "ar" ? "زيادة التباعد" : "Increase spacing"}>
-              <Plus className="w-3 h-3" />
-            </button>
-          </div>
-          <div className="flex items-center gap-0.5 bg-[#1c2333] rounded-lg px-1 py-0.5">
-            <button onClick={() => setFontWeight(w => Math.max(100, w - 100))} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] transition-colors" title={lang === "ar" ? "تخفيف الخط" : "Lighter"}>
-              <Minus className="w-3 h-3" />
-            </button>
-            <span className="text-[10px] text-[#8b949e] min-w-[16px] text-center font-bold">B</span>
-            <button onClick={() => setFontWeight(w => Math.min(900, w + 100))} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] transition-colors" title={lang === "ar" ? "تعريض الخط" : "Bolder"}>
-              <Plus className="w-3 h-3" />
-            </button>
+            {showTextSettings && (
+              <div className="absolute top-full mt-1 end-0 w-52 bg-[#161b22] border border-[#30363d] rounded-lg shadow-xl z-50 p-3 space-y-3">
+                <div>
+                  <div className="text-[10px] text-[#8b949e] mb-1.5">{lang === "ar" ? "حجم الخط" : "Font Size"}</div>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setFontSize(s => Math.max(12, s - 1))} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Minus className="w-3 h-3" /></button>
+                    <span className="text-xs text-[#c9d1d9] min-w-[28px] text-center">{fontSize}px</span>
+                    <button onClick={() => setFontSize(s => Math.min(24, s + 1))} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Plus className="w-3 h-3" /></button>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-[#8b949e] mb-1.5">{lang === "ar" ? "تباعد الأسطر" : "Line Spacing"}</div>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setLineSpacing(s => Math.max(1, +(s - 0.25).toFixed(2)))} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Minus className="w-3 h-3" /></button>
+                    <span className="text-xs text-[#c9d1d9] min-w-[28px] text-center">{lineSpacing}</span>
+                    <button onClick={() => setLineSpacing(s => Math.min(3, +(s + 0.25).toFixed(2)))} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Plus className="w-3 h-3" /></button>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] text-[#8b949e] mb-1.5">{lang === "ar" ? "تعريض الخط" : "Font Weight"}</div>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setFontWeight(w => Math.max(100, w - 100))} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Minus className="w-3 h-3" /></button>
+                    <span className="text-xs text-[#c9d1d9] min-w-[28px] text-center">{fontWeight}</span>
+                    <button onClick={() => setFontWeight(w => Math.min(900, w + 100))} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Plus className="w-3 h-3" /></button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <button
             onClick={clearChat}
