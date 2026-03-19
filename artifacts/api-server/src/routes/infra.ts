@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { agentConfigsTable, projectsTable, projectFilesTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getSystemBlueprint } from "../lib/system-blueprint";
+import { getFullLiveContext, detectAndExecuteCommands, queryTable, executeSqlQuery, readProjectFile, getProjectFileTree, getSystemHealth } from "../lib/system-live-context";
 const router = Router();
 
 function requireInfraAdmin(req: any, res: any, next: any) {
@@ -615,6 +616,13 @@ router.post("/infra/chat-stream", requireInfraAdmin, async (req, res) => {
     }
 
     const blueprint = getSystemBlueprint();
+    const liveContext = await getFullLiveContext();
+
+    const commandResult = await detectAndExecuteCommands(message);
+    let commandData = "";
+    if (commandResult) {
+      commandData = `\n\n# ===== نتيجة تنفيذ الأمر الحقيقي =====\n${commandResult}\n# ===== نهاية النتيجة =====\n`;
+    }
 
     const infraSystemPrompt = `أنت ${config.displayNameAr} (${config.displayNameEn}) — وكيل بنية تحتية لمنصة Mr Code AI.
 
@@ -623,7 +631,19 @@ router.post("/infra/chat-stream", requireInfraAdmin, async (req, res) => {
 أنت تعمل على البنية التحتية للمنصة نفسها — لست وكيل خدمة عملاء.
 المالك يتحدث معك مباشرة ويطلب منك مهام تتعلق بالنظام.
 
+## هام جداً — أنت متصل فعلياً بالنظام:
+- أنت لديك وصول حقيقي لقاعدة البيانات (PostgreSQL) ويمكنك قراءة الجداول والبيانات
+- أنت لديك وصول حقيقي لملفات المشروع ويمكنك قراءتها
+- أنت لديك معلومات حية عن حالة النظام (ذاكرة، معالج، إلخ)
+- البيانات أدناه حقيقية تم جلبها لحظياً من قاعدة البيانات والخادم
+- عندما يسألك المالك عن بيانات، أجب من البيانات الحقيقية أدناه
+- لا تخترع أرقام أو بيانات — استخدم البيانات الحقيقية فقط
+
 ${blueprint}
+
+${liveContext}
+
+${commandData}
 
 القواعد:
 - رد بالعربية إذا المالك يتحدث بالعربية، وبالإنجليزية إذا يتحدث بالإنجليزية
@@ -632,6 +652,7 @@ ${blueprint}
 - إذا تحتاج تعديل كود، اكتب الكود الكامل مع المسار
 - استخدم markdown code blocks لأي كود
 - لا تخترع ملفات غير موجودة — اعتمد على خريطة النظام
+- عند عرض البيانات استخدم الجداول والأرقام الحقيقية
 ${config.instructions ? `\n\nتعليمات إضافية:\n${config.instructions}` : ""}
 ${config.permissions && Array.isArray(config.permissions) && config.permissions.length > 0 ? `\nصلاحياتك: ${config.permissions.join(", ")}` : ""}`;
 
@@ -761,6 +782,13 @@ router.post("/infra/director-stream", requireInfraAdmin, async (req, res) => {
     }
 
     const blueprint = getSystemBlueprint();
+    const liveContext = await getFullLiveContext();
+
+    const commandResult = await detectAndExecuteCommands(message);
+    let commandData = "";
+    if (commandResult) {
+      commandData = `\n\n# ===== نتيجة تنفيذ الأمر الحقيقي =====\n${commandResult}\n# ===== نهاية النتيجة =====\n`;
+    }
 
     const allAgents = await db.select({
       agentKey: agentConfigsTable.agentKey,
@@ -781,7 +809,18 @@ ${config.description}
 
 أنت تعمل بنظام Governor — ثلاثة نماذج ذكاء اصطناعي تحلل طلبك بالتوازي، ثم الحاكم يدمج أفضل النتائج في رد واحد نهائي دقيق جداً.
 
+## هام جداً — أنت متصل فعلياً بالنظام:
+- أنت لديك وصول حقيقي لقاعدة البيانات (PostgreSQL) ويمكنك قراءة الجداول والبيانات
+- أنت لديك وصول حقيقي لملفات المشروع ويمكنك قراءتها
+- أنت لديك معلومات حية عن حالة النظام (ذاكرة، معالج، إلخ)
+- البيانات أدناه حقيقية تم جلبها لحظياً
+- لا تخترع أرقام أو بيانات — استخدم البيانات الحقيقية فقط
+
 ${blueprint}
+
+${liveContext}
+
+${commandData}
 
 ## حالة الوكلاء الحالية:
 ${agentStatusReport}
@@ -793,6 +832,7 @@ ${agentStatusReport}
 - اذكر أسماء الملفات والمسارات بدقة
 - إذا تحتاج تعديل كود، اعرض التعديل الجراحي (قبل/بعد) مع المسار ورقم السطر
 - لا تخترع ملفات — اعتمد على خريطة النظام
+- عند عرض البيانات استخدم الجداول والأرقام الحقيقية
 - اقترح دائماً الخطوة التالية
 
 ${config.instructions || ""}
@@ -1149,6 +1189,56 @@ router.get("/infra/defaults/:agentKey", requireInfraAdmin, (req, res) => {
     return;
   }
   res.json(defaultAgent);
+});
+
+router.post("/infra/query-db", requireInfraAdmin, async (req, res) => {
+  try {
+    const { query: sqlQuery, table } = req.body as { query?: string; table?: string };
+    if (sqlQuery) {
+      const result = await executeSqlQuery(sqlQuery);
+      res.json({ result });
+    } else if (table) {
+      const result = await queryTable(table);
+      res.json({ result });
+    } else {
+      res.status(400).json({ error: { message: "query or table is required" } });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: { message: err.message } });
+  }
+});
+
+router.post("/infra/read-file", requireInfraAdmin, async (req, res) => {
+  try {
+    const { path: filePath } = req.body as { path: string };
+    if (!filePath) {
+      res.status(400).json({ error: { message: "path is required" } });
+      return;
+    }
+    const result = readProjectFile(filePath);
+    res.json({ result });
+  } catch (err: any) {
+    res.status(500).json({ error: { message: err.message } });
+  }
+});
+
+router.get("/infra/file-tree", requireInfraAdmin, async (req, res) => {
+  try {
+    const dir = req.query.dir as string | undefined;
+    const result = getProjectFileTree(dir);
+    res.json({ result });
+  } catch (err: any) {
+    res.status(500).json({ error: { message: err.message } });
+  }
+});
+
+router.get("/infra/system-health", requireInfraAdmin, async (req, res) => {
+  try {
+    const result = getSystemHealth();
+    res.json({ result });
+  } catch (err: any) {
+    res.status(500).json({ error: { message: err.message } });
+  }
 });
 
 router.post("/infra/create-project", requireInfraAdmin, async (req, res) => {
