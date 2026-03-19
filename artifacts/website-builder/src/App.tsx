@@ -83,17 +83,14 @@ function Router() {
       <Route path="/admin">
         <AdminGuard><AdminDashboard /></AdminGuard>
       </Route>
-      <Route path="/">
-        <AuthGuard><Dashboard /></AuthGuard>
-      </Route>
-      <Route path="/dashboard">
-        <AuthGuard><Dashboard /></AuthGuard>
+      <Route path="/project/:id/analytics">
+        <AuthGuard><Analytics /></AuthGuard>
       </Route>
       <Route path="/project/:id">
         <AuthGuard><Builder /></AuthGuard>
       </Route>
-      <Route path="/project/:id/analytics">
-        <AuthGuard><Analytics /></AuthGuard>
+      <Route path="/dashboard">
+        <AuthGuard><Dashboard /></AuthGuard>
       </Route>
       <Route path="/billing">
         <AuthGuard><Billing /></AuthGuard>
@@ -127,6 +124,9 @@ function Router() {
       </Route>
       <Route path="/infra">
         <AdminGuard><InfraPanel /></AdminGuard>
+      </Route>
+      <Route path="/">
+        <AuthGuard><Dashboard /></AuthGuard>
       </Route>
       <Route component={NotFound} />
     </Switch>
