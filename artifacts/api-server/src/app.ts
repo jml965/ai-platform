@@ -8,8 +8,16 @@ import { processStripeWebhook } from "./lib/stripeWebhookHandler";
 import { authSession } from "./middlewares/authSession";
 
 const app: Express = express();
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+
+function resolveDir(): string {
+  try {
+    if (typeof import.meta?.url === "string" && import.meta.url) {
+      return path.dirname(fileURLToPath(import.meta.url));
+    }
+  } catch {}
+  return __dirname;
+}
+const appDir = resolveDir();
 
 app.post(
   "/api/billing/webhook",
@@ -64,7 +72,7 @@ app.use(authSession);
 app.use("/api", router);
 
 if (process.env.NODE_ENV === "production") {
-  const frontendDist = path.resolve(__dirname, "../../website-builder/dist");
+  const frontendDist = path.resolve(appDir, "../../website-builder/dist");
   app.use(express.static(frontendDist));
   app.get("*", (req, res) => {
     res.sendFile(path.join(frontendDist, "index.html"));
