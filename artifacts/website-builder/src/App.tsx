@@ -23,16 +23,6 @@ import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
 
-// AUTH TEMPORARILY DISABLED FOR DEVELOPMENT - RE-ENABLE BEFORE PRODUCTION
-function AuthGuard({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
-}
-
-function AdminGuard({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
-}
-
-/* ORIGINAL AUTH GUARDS - UNCOMMENT TO RE-ENABLE
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { data: user, isLoading, isError } = useGetMe({ 
     query: { queryKey: ["getMe"], retry: false, refetchOnWindowFocus: false }
@@ -83,7 +73,6 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
 
   return <>{children}</>;
 }
-*/
 
 function Router() {
   return (
