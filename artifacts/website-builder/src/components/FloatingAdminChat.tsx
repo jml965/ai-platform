@@ -209,7 +209,7 @@ function FloatingChatInner() {
 
   const handleWandClick = useCallback((e: MouseEvent) => {
     const target = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement;
-    if (!target || target.closest("[data-floating-chat]") || target.closest("[data-wand-overlay]")) return;
+    if (!target || target.closest("[data-wand-overlay]")) return;
     e.preventDefault();
     e.stopPropagation();
 
@@ -242,7 +242,7 @@ function FloatingChatInner() {
     cancelAnimationFrame(wandRafRef.current);
     wandRafRef.current = requestAnimationFrame(() => {
       const target = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement;
-      if (!target || target.closest("[data-floating-chat]") || target.closest("[data-wand-overlay]")) {
+      if (!target || target.closest("[data-wand-overlay]")) {
         setWandHighlight(null);
         return;
       }
@@ -261,7 +261,7 @@ function FloatingChatInner() {
     document.addEventListener("keydown", onKey);
     const style = document.createElement("style");
     style.id = "wand-cursor-float";
-    style.textContent = `* { cursor: crosshair !important; } [data-floating-chat] * { cursor: default !important; }`;
+    style.textContent = `* { cursor: crosshair !important; } [data-wand-overlay] * { cursor: default !important; }`;
     document.head.appendChild(style);
     return () => {
       document.removeEventListener("click", onClick, true);
