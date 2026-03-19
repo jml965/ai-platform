@@ -310,6 +310,15 @@ function HomeSidebar({ t, lang, userName, isAdmin }: { t: any; lang: string; use
         ))}
 
         <div className="mt-2 border-t border-white/7 pt-2">
+          {isAdmin && (
+            <Link
+              href="/infra"
+              className="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer text-[12.5px] text-cyan-400/90 hover:bg-cyan-500/10 hover:text-cyan-300 transition-colors"
+            >
+              <Server className="w-4 h-4" />
+              <span>{t.home_nav_infrastructure}</span>
+            </Link>
+          )}
           <Link
             href="/strategic"
             className="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer text-[12.5px] text-amber-400/80 hover:bg-amber-500/10 hover:text-amber-400 transition-colors"
