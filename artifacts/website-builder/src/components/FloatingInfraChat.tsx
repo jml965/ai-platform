@@ -1,48 +1,26 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { useLocation } from "wouter";
 import { useI18n } from "@/lib/i18n";
 import {
-  Send,
-  X,
-  Copy,
-  Check,
-  Download,
-  Trash2,
-  Shield,
-  Crosshair,
-  Palette,
-  Database,
-  Lock,
-  Rocket,
-  Activity,
-  Bot,
-  Crown,
-  Server,
-  FlaskConical,
-  Minimize2,
-  Maximize2,
-  ChevronDown,
-  MessageSquare,
-  FolderPlus,
-  ExternalLink,
-  Loader2,
+  Send, X, Copy, Check, Download, Trash2, Shield, Crosshair, Palette,
+  Database, Lock, Rocket, Activity, Bot, Crown, Server, FlaskConical,
+  Minimize2, Maximize2, ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface InfraAgent {
-  id: string;
   agentKey: string;
   displayNameEn: string;
   displayNameAr: string;
   description: string;
-  enabled: boolean;
-  primaryModel: { provider: string; model: string };
+  primaryModel?: { provider: string; model: string };
 }
 
 interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "status";
   content: string;
-  timestamp: Date;
+  timestamp: string;
   tokensUsed?: number;
   cost?: number;
   model?: string;
@@ -73,89 +51,64 @@ const AGENT_COLORS: Record<string, string> = {
   infra_qa: "text-pink-400",
 };
 
-function FloatingMessageContent({ content }: { content: string }) {
+function MessageContent({ content }: { content: string }) {
   const [copiedIdx, setCopiedIdx] = React.useState<number | null>(null);
+  const handleCopy = (code: string, idx: number) => { navigator.clipboard.writeText(code); setCopiedIdx(idx); setTimeout(() => setCopiedIdx(null), 2000); };
 
-  const handleCopy = (code: string, idx: number) => {
-    navigator.clipboard.writeText(code);
-    setCopiedIdx(idx);
-    setTimeout(() => setCopiedIdx(null), 2000);
-  };
-
-  const parseContent = (text: string) => {
-    const segments: Array<{ type: "text" | "code"; lang?: string; value: string }> = [];
-    let remaining = text;
-    while (remaining.length > 0) {
-      const openIdx = remaining.indexOf("```");
-      if (openIdx === -1) { segments.push({ type: "text", value: remaining }); break; }
-      if (openIdx > 0) segments.push({ type: "text", value: remaining.slice(0, openIdx) });
-      const afterOpen = remaining.slice(openIdx + 3);
-      const langMatch = afterOpen.match(/^(\w*)\n?/);
-      const lang = langMatch ? langMatch[1] : "";
-      const codeStart = langMatch ? langMatch[0].length : 0;
-      const closeIdx = afterOpen.indexOf("```", codeStart);
-      if (closeIdx === -1) { segments.push({ type: "code", lang, value: afterOpen.slice(codeStart) }); break; }
-      segments.push({ type: "code", lang, value: afterOpen.slice(codeStart, closeIdx) });
-      remaining = afterOpen.slice(closeIdx + 3);
-    }
-    return segments;
-  };
+  const segments: Array<{ type: "text" | "code"; lang?: string; value: string }> = [];
+  let rem = content;
+  while (rem.length > 0) {
+    const oi = rem.indexOf("```");
+    if (oi === -1) { segments.push({ type: "text", value: rem }); break; }
+    if (oi > 0) segments.push({ type: "text", value: rem.slice(0, oi) });
+    const after = rem.slice(oi + 3);
+    const lm = after.match(/^(\w*)\n?/);
+    const lang = lm ? lm[1] : "";
+    const cs = lm ? lm[0].length : 0;
+    const ci = after.indexOf("```", cs);
+    if (ci === -1) { segments.push({ type: "code", lang, value: after.slice(cs) }); break; }
+    segments.push({ type: "code", lang, value: after.slice(cs, ci) });
+    rem = after.slice(ci + 3);
+  }
 
   const renderText = (text: string, keyPrefix: number) => {
     if (!text.trim()) return null;
-    const lines = text.split("\n");
-    return lines.map((line, li) => {
-      const boldParts = line.split(/(\*\*[^*]+\*\*)/g);
-      const rendered = boldParts.map((seg, si) => {
-        const boldMatch = seg.match(/^\*\*([^*]+)\*\*$/);
-        if (boldMatch) return <strong key={si} className="font-bold text-[#e1e4e8]">{boldMatch[1]}</strong>;
-        const inlineParts = seg.split(/(`[^`]+`)/g);
-        return inlineParts.map((ip, ii) => {
-          const inlineMatch = ip.match(/^`([^`]+)`$/);
-          if (inlineMatch) return <code key={`${si}-${ii}`} className="px-1 py-0.5 bg-[#1c2333] rounded text-[12px] text-cyan-300 border border-[#30363d]" dir="ltr">{inlineMatch[1]}</code>;
-          return <React.Fragment key={`${si}-${ii}`}>{ip}</React.Fragment>;
+    return text.split("\n").map((line, li) => {
+      const parts = line.split(/(\*\*[^*]+\*\*)/g).map((seg, si) => {
+        const b = seg.match(/^\*\*([^*]+)\*\*$/);
+        if (b) return <strong key={si} className="font-bold text-[#e1e4e8]">{b[1]}</strong>;
+        return seg.split(/(`[^`]+`)/g).map((ip, ii) => {
+          const m = ip.match(/^`([^`]+)`$/);
+          return m ? <code key={`${si}-${ii}`} className="px-1 py-0.5 bg-[#1c2333] rounded text-[12px] text-cyan-300 border border-[#30363d]" dir="ltr">{m[1]}</code> : <React.Fragment key={`${si}-${ii}`}>{ip}</React.Fragment>;
         });
       });
-      return <React.Fragment key={`${keyPrefix}-${li}`}>{li > 0 && <br />}{rendered}</React.Fragment>;
+      return <React.Fragment key={`${keyPrefix}-${li}`}>{li > 0 && <br />}{parts}</React.Fragment>;
     });
   };
 
-  const segments = parseContent(content);
-  const extMap: Record<string, string> = {
-    html: "html", css: "css", javascript: "js", js: "js", typescript: "ts", ts: "ts",
-    tsx: "tsx", jsx: "jsx", json: "json", bash: "sh", sql: "sql",
-  };
+  const extMap: Record<string, string> = { html: "html", css: "css", javascript: "js", js: "js", typescript: "ts", ts: "ts", json: "json", bash: "sh", sql: "sql" };
 
   return (
-    <div style={{ fontSize: "13px", lineHeight: 1.6, wordBreak: "break-word", overflowWrap: "break-word" }}>
+    <div style={{ fontSize: "13px", lineHeight: 1.6, wordBreak: "break-word" }}>
       {segments.map((seg, i) => {
         if (seg.type === "code") {
           const code = seg.value.trim();
           const langLabel = seg.lang || "code";
           const fileExt = extMap[langLabel.toLowerCase()] || "txt";
-          const handleDownload = () => {
-            const blob = new Blob([code], { type: "text/plain;charset=utf-8" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url; a.download = `code.${fileExt}`; a.click();
-            URL.revokeObjectURL(url);
-          };
           return (
             <div key={i} className="my-2 rounded-lg border border-[#30363d]">
               <div className="flex items-center justify-between px-2 py-1 bg-[#1c2333] rounded-t-lg">
-                <span className="text-[9px] text-[#8b949e] uppercase tracking-wide">{langLabel}</span>
+                <span className="text-[9px] text-[#8b949e] uppercase">{langLabel}</span>
                 <div className="flex gap-1">
-                  <button onClick={() => handleCopy(code, i)} className="p-0.5 rounded text-[#8b949e] hover:text-[#e1e4e8]">
+                  <button onClick={() => handleCopy(code, i)} className="p-0.5 text-[#8b949e] hover:text-white">
                     {copiedIdx === i ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                   </button>
-                  <button onClick={handleDownload} className="p-0.5 rounded text-[#8b949e] hover:text-[#e1e4e8]">
+                  <button onClick={() => { const b = new Blob([code], { type: "text/plain" }); const u = URL.createObjectURL(b); const a = document.createElement("a"); a.href = u; a.download = `code.${fileExt}`; a.click(); URL.revokeObjectURL(u); }} className="p-0.5 text-[#8b949e] hover:text-white">
                     <Download className="w-3 h-3" />
                   </button>
                 </div>
               </div>
-              <pre className="p-2 bg-[#0d1117] text-[12px] leading-relaxed text-[#e1e4e8] overflow-x-auto" dir="ltr">
-                <code>{code}</code>
-              </pre>
+              <pre className="p-2 bg-[#0d1117] text-[12px] text-[#e1e4e8] overflow-x-auto" dir="ltr"><code>{code}</code></pre>
             </div>
           );
         }
@@ -166,71 +119,72 @@ function FloatingMessageContent({ content }: { content: string }) {
 }
 
 export default function FloatingInfraChat() {
-  const { t, lang } = useI18n();
+  const [location] = useLocation();
+  const { lang } = useI18n();
   const isRTL = lang === "ar";
-  const [isOpen, setIsOpen] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [agents, setAgents] = useState<InfraAgent[]>([]);
-  const [selectedAgent, setSelectedAgent] = useState<InfraAgent | null>(null);
-  const [showAgentList, setShowAgentList] = useState(false);
+
+  const [agent, setAgent] = useState<InfraAgent | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [creatingProject, setCreatingProject] = useState(false);
-  const [showProjectForm, setShowProjectForm] = useState(false);
-  const [projectName, setProjectName] = useState("");
-  const [projectDesc, setProjectDesc] = useState("");
-  const abortRef = useRef<AbortController | null>(null);
+  const [minimized, setMinimized] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const chatRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const userScrolledUpRef = useRef(false);
   const programmaticScrollRef = useRef(false);
 
   useEffect(() => {
-    fetch(`${import.meta.env.BASE_URL}api/infra/agents`, { credentials: "include" })
-      .then(r => r.ok ? r.json() : [])
-      .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          setAgents(data);
-          const sysadmin = data.find((a: InfraAgent) => a.agentKey === "infra_sysadmin");
-          if (sysadmin) setSelectedAgent(sysadmin);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  const scrollToBottomIfNeeded = useCallback(() => {
-    if (userScrolledUpRef.current) return;
-    programmaticScrollRef.current = true;
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    setTimeout(() => { programmaticScrollRef.current = false; }, 100);
-  }, []);
+    try {
+      const s = sessionStorage.getItem("infra_selected_agent");
+      if (s) {
+        const a = JSON.parse(s);
+        setAgent(a);
+        const m = sessionStorage.getItem(`infra_msgs_${a.agentKey}`);
+        if (m) setMessages(JSON.parse(m));
+        else setMessages([]);
+      } else {
+        setAgent(null);
+        setMessages([]);
+      }
+    } catch {}
+  }, [location]);
 
   useEffect(() => {
-    if (isOpen) scrollToBottomIfNeeded();
-  }, [messages, isOpen, scrollToBottomIfNeeded]);
+    if (agent && messages.length > 0) {
+      sessionStorage.setItem(`infra_msgs_${agent.agentKey}`, JSON.stringify(messages.slice(-100)));
+    }
+  }, [messages, agent]);
 
-  const handleStop = () => {
-    abortRef.current?.abort();
-    setLoading(false);
+  const scrollToBottom = useCallback(() => {
+    if (userScrolledUpRef.current) return;
+    const el = chatRef.current;
+    if (!el) return;
+    programmaticScrollRef.current = true;
+    el.scrollTop = el.scrollHeight;
+    requestAnimationFrame(() => { programmaticScrollRef.current = false; });
+  }, []);
+
+  useEffect(() => { scrollToBottom(); }, [messages.length, scrollToBottom]);
+
+  if (location === "/infra" || !agent || messages.length === 0) return null;
+
+  const handleClose = () => {
+    setAgent(null);
+    setMessages([]);
+    sessionStorage.removeItem("infra_selected_agent");
   };
 
   const handleSend = async () => {
-    if (!prompt.trim() || loading || !selectedAgent) return;
-    const currentPrompt = prompt.trim();
+    if (!prompt.trim() || !agent || loading) return;
+    const currentPrompt = prompt;
     setPrompt("");
+    setLoading(true);
     userScrolledUpRef.current = false;
 
-    setMessages(prev => [...prev, {
-      id: crypto.randomUUID(),
-      role: "user",
-      content: currentPrompt,
-      timestamp: new Date(),
-    }]);
+    setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "user", content: currentPrompt, timestamp: new Date().toISOString() }]);
 
-    setLoading(true);
     const controller = new AbortController();
     abortRef.current = controller;
 
@@ -238,7 +192,7 @@ export default function FloatingInfraChat() {
       const streamMsgId = crypto.randomUUID();
       let streamedContent = "";
       let displayedContent = "";
-      let streamMeta: { tokensUsed?: number; cost?: number; model?: string; models?: string[] } = {};
+      let streamMeta: any = {};
       let typewriterRunning = false;
       let typewriterStopped = false;
 
@@ -249,61 +203,34 @@ export default function FloatingInfraChat() {
           if (typewriterStopped) { typewriterRunning = false; return; }
           if (displayedContent.length < streamedContent.length) {
             const remaining = streamedContent.slice(displayedContent.length);
-            const alreadyInCode = (displayedContent.match(/```/g) || []).length % 2 === 1;
-            const openTick = remaining.indexOf("```");
-
-            if (alreadyInCode) {
-              const closeIdx = remaining.indexOf("```");
-              displayedContent = closeIdx !== -1
-                ? streamedContent.slice(0, displayedContent.length + closeIdx + 3)
-                : streamedContent;
-            } else if (openTick === 0) {
-              const afterOpen = remaining.slice(3);
-              const closeIdx = afterOpen.indexOf("```");
-              displayedContent = closeIdx !== -1
-                ? streamedContent.slice(0, displayedContent.length + 3 + closeIdx + 3)
-                : streamedContent;
+            const inCode = (displayedContent.match(/```/g) || []).length % 2 === 1;
+            if (inCode) {
+              const ci = remaining.indexOf("```");
+              displayedContent = ci !== -1 ? streamedContent.slice(0, displayedContent.length + ci + 3) : streamedContent;
             } else {
-              displayedContent = streamedContent.slice(0, displayedContent.length + 1);
+              const oi = remaining.indexOf("```");
+              if (oi === 0) {
+                const af = remaining.slice(3); const ci = af.indexOf("```");
+                displayedContent = ci !== -1 ? streamedContent.slice(0, displayedContent.length + 3 + ci + 3) : streamedContent;
+              } else { displayedContent = streamedContent.slice(0, displayedContent.length + 1); }
             }
-
-            setMessages(prev => prev.map(m =>
-              m.id === streamMsgId ? { ...m, content: displayedContent } : m
-            ));
-            scrollToBottomIfNeeded();
-            setTimeout(tick, alreadyInCode ? 0 : 18);
-          } else {
-            typewriterRunning = false;
-          }
+            setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, content: displayedContent } : m));
+            scrollToBottom();
+            setTimeout(tick, inCode ? 0 : 18);
+          } else { typewriterRunning = false; }
         };
         tick();
       };
 
       controller.signal.addEventListener("abort", () => { typewriterStopped = true; });
+      setMessages(prev => [...prev, { id: streamMsgId, role: "assistant", content: "", timestamp: new Date().toISOString() }]);
 
-      setMessages(prev => [...prev, { id: streamMsgId, role: "assistant", content: "", timestamp: new Date() }]);
+      const isDirector = agent.agentKey === "infra_sysadmin";
+      const endpoint = isDirector ? "/api/infra/director-stream" : "/api/infra/chat-stream";
+      const body = isDirector ? { message: currentPrompt } : { agentKey: agent.agentKey, message: currentPrompt };
 
-      if (!isOpen) setUnreadCount(prev => prev + 1);
-
-      const isDirector = selectedAgent.agentKey === "infra_sysadmin";
-      const endpoint = `${import.meta.env.BASE_URL}api/${isDirector ? "infra/director-stream" : "infra/chat-stream"}`;
-      const body = isDirector
-        ? { message: currentPrompt }
-        : { agentKey: selectedAgent.agentKey, message: currentPrompt };
-
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        signal: controller.signal,
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        let errMsg = `Error ${res.status}`;
-        try { const errData = await res.json(); errMsg = errData?.error?.message || errData?.error || errMsg; } catch {}
-        throw new Error(errMsg);
-      }
+      const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", signal: controller.signal, body: JSON.stringify(body) });
+      if (!res.ok) { let e = `Error ${res.status}`; try { const d = await res.json(); e = d?.error?.message || e; } catch {} throw new Error(e); }
 
       const reader = res.body!.getReader();
       const decoder = new TextDecoder();
@@ -320,342 +247,109 @@ export default function FloatingInfraChat() {
           try {
             const event = JSON.parse(line.slice(6));
             if (event.type === "chunk") { streamedContent += event.text; typewriterFlush(); }
-            else if (event.type === "status") {
-              setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "status", content: event.message || event.messageEn, timestamp: new Date() }]);
-              scrollToBottomIfNeeded();
+            else if (event.type === "status") { setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "status", content: event.message || event.messageEn, timestamp: new Date().toISOString() }]); scrollToBottom(); }
+            else if (event.type === "agent_activity") {
+              const icon = event.step === "thinking" ? "🔄" : event.step === "done" ? "✅" : event.step === "failed" ? "❌" : event.step === "merging" ? "🏛️" : "⚡";
+              let m = `${icon} ${event.message}`;
+              if (event.preview) m += `\n> "${event.preview.slice(0, 80)}..."`;
+              setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "status", content: m, timestamp: new Date().toISOString() }]); scrollToBottom();
             }
+            else if (event.type === "agent_proposal") { setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "status", content: `💡 ${event.agent} (${(event.durationMs/1000).toFixed(1)}ث):\n> "${event.summary.slice(0, 120)}..."`, timestamp: new Date().toISOString() }]); scrollToBottom(); }
             else if (event.type === "done") { streamMeta = { tokensUsed: event.tokensUsed, cost: event.cost, model: event.model, models: event.models }; }
             else if (event.type === "error") { streamedContent += event.message; typewriterFlush(); }
           } catch {}
         }
       }
 
-      await new Promise<void>(resolve => {
-        const wait = () => {
-          if (displayedContent.length >= streamedContent.length) resolve();
-          else setTimeout(wait, 30);
-        };
-        wait();
-      });
-
-      setMessages(prev => prev.map(m =>
-        m.id === streamMsgId ? { ...m, content: streamedContent, ...streamMeta } : m
-      ));
+      await new Promise<void>(r => { const w = () => { if (displayedContent.length >= streamedContent.length) r(); else setTimeout(w, 30); }; w(); });
+      setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, content: streamedContent, ...streamMeta } : m));
     } catch (err: any) {
-      if (err.name !== "AbortError") {
-        setMessages(prev => [...prev, {
-          id: crypto.randomUUID(), role: "assistant",
-          content: `${isRTL ? "خطأ" : "Error"}: ${err.message}`, timestamp: new Date(),
-        }]);
-      }
-    } finally {
-      setLoading(false);
-      abortRef.current = null;
-    }
+      if (err.name !== "AbortError") { setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "assistant", content: `خطأ: ${err.message}`, timestamp: new Date().toISOString() }]); }
+    } finally { setLoading(false); abortRef.current = null; }
   };
 
   const clearSession = async () => {
-    if (!selectedAgent) return;
-    await fetch(`${import.meta.env.BASE_URL}api/infra/clear-session`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ agentKey: selectedAgent.agentKey }),
-    });
+    if (!agent) return;
+    await fetch("/api/infra/clear-session", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ agentKey: agent.agentKey }) });
     setMessages([]);
+    sessionStorage.removeItem(`infra_msgs_${agent.agentKey}`);
   };
 
-  const handleCreateProject = async () => {
-    if (!projectName.trim()) return;
-    setCreatingProject(true);
-    try {
-      const res = await fetch(`${import.meta.env.BASE_URL}api/infra/create-project`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ name: projectName.trim(), description: projectDesc.trim() }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setMessages(prev => [...prev, {
-          id: crypto.randomUUID(),
-          role: "status",
-          content: isRTL ? `تم إنشاء مشروع "${data.name}" بنجاح` : `Project "${data.name}" created successfully`,
-          timestamp: new Date(),
-        }]);
-        setShowProjectForm(false);
-        setProjectName("");
-        setProjectDesc("");
-        window.open(`${import.meta.env.BASE_URL}project/${data.id}`, "_blank");
-      } else {
-        const err = await res.json();
-        setMessages(prev => [...prev, {
-          id: crypto.randomUUID(),
-          role: "status",
-          content: `${isRTL ? "خطأ" : "Error"}: ${err?.error?.message || "Failed"}`,
-          timestamp: new Date(),
-        }]);
-      }
-    } catch (err: any) {
-      setMessages(prev => [...prev, {
-        id: crypto.randomUUID(),
-        role: "status",
-        content: `${isRTL ? "خطأ" : "Error"}: ${err.message}`,
-        timestamp: new Date(),
-      }]);
-    }
-    setCreatingProject(false);
-  };
+  const agentName = isRTL ? agent.displayNameAr : agent.displayNameEn;
+  const icon = AGENT_ICONS[agent.agentKey] || <Bot className="w-4 h-4" />;
+  const color = AGENT_COLORS[agent.agentKey] || "text-[#8b949e]";
 
-  const handleOpen = () => {
-    setIsOpen(true);
-    setUnreadCount(0);
-  };
+  if (minimized) {
+    return (
+      <div onClick={() => setMinimized(false)} className="fixed bottom-4 end-4 z-[9999] flex items-center gap-2 px-4 py-2.5 bg-[#161b22] border border-cyan-500/30 rounded-full cursor-pointer shadow-lg shadow-black/40 hover:border-cyan-400/50 transition-all" dir={isRTL ? "rtl" : "ltr"}>
+        <div className={cn("flex-shrink-0", color)}>{icon}</div>
+        <span className="text-sm font-medium text-[#e1e4e8]">{agentName}</span>
+        {loading && <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse" />}
+        <Maximize2 className="w-3.5 h-3.5 text-[#8b949e]" />
+      </div>
+    );
+  }
 
-  if (agents.length === 0) return null;
-
-  const panelWidth = isExpanded ? "w-[700px]" : "w-[420px]";
-  const panelHeight = isExpanded ? "h-[85vh]" : "h-[550px]";
+  const w = expanded ? "w-[700px]" : "w-[420px]";
+  const h = expanded ? "h-[85vh]" : "h-[560px]";
 
   return (
-    <>
-      {!isOpen && (
-        <button
-          onClick={handleOpen}
-          className={cn(
-            "fixed z-50 bottom-6 p-3.5 rounded-2xl shadow-2xl transition-all duration-300",
-            "bg-gradient-to-br from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500",
-            "hover:scale-110 active:scale-95",
-            isRTL ? "left-6" : "right-6"
-          )}
-        >
-          <Crown className="w-6 h-6 text-black" />
-          {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
-              {unreadCount}
-            </span>
-          )}
-        </button>
-      )}
-
-      {isOpen && (
-        <div
-          className={cn(
-            "fixed z-50 bottom-6 flex flex-col rounded-2xl overflow-hidden shadow-2xl border border-[#1c2333] bg-[#0a0e14] transition-all duration-300",
-            panelWidth, panelHeight,
-            isRTL ? "left-6" : "right-6"
-          )}
-          dir={isRTL ? "rtl" : "ltr"}
-        >
-          <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-[#161b22] to-[#0d1117] border-b border-[#1c2333]">
-            <div className="flex items-center gap-2.5">
-              <div className="relative">
-                <button
-                  onClick={() => setShowAgentList(!showAgentList)}
-                  className="flex items-center gap-2 hover:bg-[#1c2333] rounded-lg px-2 py-1 transition-colors"
-                >
-                  <div className={cn("p-1.5 rounded-lg bg-[#0d1117]", AGENT_COLORS[selectedAgent?.agentKey || ""] || "text-cyan-400")}>
-                    {selectedAgent ? AGENT_ICONS[selectedAgent.agentKey] || <Bot className="w-4 h-4" /> : <Shield className="w-4 h-4" />}
-                  </div>
-                  <div>
-                    <span className="text-sm font-semibold text-[#e1e4e8] block leading-tight">
-                      {selectedAgent ? (isRTL ? selectedAgent.displayNameAr : selectedAgent.displayNameEn) : (isRTL ? "مدير النظام" : "SysAdmin")}
-                    </span>
-                  </div>
-                  <ChevronDown className="w-3.5 h-3.5 text-[#484f58]" />
-                </button>
-
-                {showAgentList && (
-                  <div className={cn(
-                    "absolute top-full mt-1 w-64 bg-[#161b22] border border-[#30363d] rounded-xl shadow-2xl overflow-hidden z-50",
-                    isRTL ? "right-0" : "left-0"
-                  )}>
-                    {agents.map(agent => (
-                      <button
-                        key={agent.agentKey}
-                        onClick={() => { setSelectedAgent(agent); setShowAgentList(false); }}
-                        className={cn(
-                          "w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-[#1c2333] transition-colors text-start",
-                          selectedAgent?.agentKey === agent.agentKey && "bg-[#1c2333]"
-                        )}
-                      >
-                        <div className={cn(AGENT_COLORS[agent.agentKey] || "text-[#8b949e]")}>
-                          {AGENT_ICONS[agent.agentKey] || <Bot className="w-4 h-4" />}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium text-[#e1e4e8] truncate">
-                            {isRTL ? agent.displayNameAr : agent.displayNameEn}
-                          </div>
-                        </div>
-                        {agent.agentKey === "infra_sysadmin" && (
-                          <span className="text-[9px] text-yellow-400 bg-yellow-400/10 px-1.5 py-0.5 rounded-full">
-                            {isRTL ? "المدير" : "Director"}
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1">
-              <button onClick={() => setShowProjectForm(!showProjectForm)} className="p-1.5 text-[#484f58] hover:text-green-400 hover:bg-[#1c2333] rounded-lg transition-colors" title={isRTL ? "إنشاء مشروع" : "Create Project"}>
-                <FolderPlus className="w-3.5 h-3.5" />
-              </button>
-              <button onClick={clearSession} className="p-1.5 text-[#484f58] hover:text-red-400 hover:bg-[#1c2333] rounded-lg transition-colors" title={isRTL ? "مسح المحادثة" : "Clear"}>
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-              <button onClick={() => setIsExpanded(!isExpanded)} className="p-1.5 text-[#484f58] hover:text-[#e1e4e8] hover:bg-[#1c2333] rounded-lg transition-colors" title={isExpanded ? (isRTL ? "تصغير" : "Minimize") : (isRTL ? "تكبير" : "Expand")}>
-                {isExpanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-              </button>
-              <button onClick={() => setIsOpen(false)} className="p-1.5 text-[#484f58] hover:text-[#e1e4e8] hover:bg-[#1c2333] rounded-lg transition-colors">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-
-          <div
-            ref={chatContainerRef}
-            className="flex-1 overflow-y-auto p-4 space-y-3"
-            onWheel={(e) => {
-              if (e.deltaY < 0) userScrolledUpRef.current = true;
-              else {
-                const el = chatContainerRef.current;
-                if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 40) userScrolledUpRef.current = false;
-              }
-            }}
-          >
-            {messages.length === 0 && selectedAgent && (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <div className={cn("w-12 h-12 mx-auto rounded-xl flex items-center justify-center mb-3 bg-[#161b22]", AGENT_COLORS[selectedAgent.agentKey])}>
-                    {AGENT_ICONS[selectedAgent.agentKey] || <Bot className="w-6 h-6" />}
-                  </div>
-                  <h3 className="text-base font-semibold text-[#e1e4e8] mb-1">
-                    {isRTL ? selectedAgent.displayNameAr : selectedAgent.displayNameEn}
-                  </h3>
-                  <p className="text-xs text-[#484f58] max-w-xs">
-                    {isRTL
-                      ? "اكتب أمرك وسيتم تنفيذه"
-                      : "Type your command"}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {messages.map(msg => {
-              if (msg.role === "status") {
-                return (
-                  <div key={msg.id} className="flex items-center justify-center py-0.5">
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#161b22] border border-[#30363d]">
-                      <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse" />
-                      <span className="text-[10px] text-[#8b949e]">{msg.content}</span>
-                    </div>
-                  </div>
-                );
-              }
-              return (
-                <div key={msg.id} className={cn("py-0.5", msg.role === "user" ? "text-end" : "")}>
-                  <div className={cn(
-                    "inline-block text-start text-sm leading-relaxed max-w-[90%]",
-                    msg.role === "user"
-                      ? "bg-cyan-500/10 border border-cyan-500/20 rounded-xl px-3 py-2 text-cyan-300"
-                      : "text-[#c9d1d9]"
-                  )}>
-                    {msg.role === "assistant" && !msg.content && loading && msg.id === messages[messages.length - 1]?.id ? (
-                      <div className="flex items-center gap-2 py-1">
-                        <div className="flex items-center gap-1">
-                          <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                          <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                          <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                        </div>
-                        <span className="text-[11px] text-[#8b949e]">
-                          {isRTL ? "يحلل النظام..." : "Analyzing..."}
-                        </span>
-                      </div>
-                    ) : (
-                      <FloatingMessageContent content={msg.content} />
-                    )}
-                    {msg.tokensUsed && (
-                      <div className="text-[9px] text-[#484f58] mt-1">
-                        {msg.models ? msg.models.join(" + ") : msg.model} · {msg.tokensUsed.toLocaleString()} tokens{msg.cost ? ` · $${msg.cost.toFixed(4)}` : ""}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-            <div ref={chatEndRef} />
-          </div>
-
-          {showProjectForm && (
-            <div className="border-t border-[#1c2333] bg-[#161b22] p-3 space-y-2">
-              <div className="flex items-center gap-2 mb-1">
-                <FolderPlus className="w-4 h-4 text-green-400" />
-                <span className="text-xs font-medium text-[#e1e4e8]">{isRTL ? "إنشاء مشروع جديد" : "Create New Project"}</span>
-              </div>
-              <input
-                value={projectName}
-                onChange={e => setProjectName(e.target.value)}
-                placeholder={isRTL ? "اسم المشروع..." : "Project name..."}
-                className="w-full bg-[#0d1117] border border-[#30363d] rounded-lg px-3 py-2 text-sm text-[#e1e4e8] placeholder-[#484f58] focus:outline-none focus:border-green-500/50"
-              />
-              <input
-                value={projectDesc}
-                onChange={e => setProjectDesc(e.target.value)}
-                placeholder={isRTL ? "وصف المشروع (اختياري)..." : "Description (optional)..."}
-                className="w-full bg-[#0d1117] border border-[#30363d] rounded-lg px-3 py-2 text-sm text-[#e1e4e8] placeholder-[#484f58] focus:outline-none focus:border-green-500/50"
-              />
-              <div className="flex gap-2">
-                <button
-                  onClick={handleCreateProject}
-                  disabled={!projectName.trim() || creatingProject}
-                  className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-500 text-white rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-40 transition-colors"
-                >
-                  {creatingProject ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderPlus className="w-4 h-4" />}
-                  {isRTL ? "إنشاء" : "Create"}
-                </button>
-                <button
-                  onClick={() => setShowProjectForm(false)}
-                  className="px-3 py-2 text-sm text-[#8b949e] hover:text-[#e1e4e8] border border-[#30363d] rounded-lg hover:bg-[#1c2333] transition-colors"
-                >
-                  {isRTL ? "إلغاء" : "Cancel"}
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="border-t border-[#1c2333] bg-[#0d1117] p-3">
-            <div className="relative">
-              <textarea
-                ref={textareaRef}
-                value={prompt}
-                onChange={e => setPrompt(e.target.value)}
-                placeholder={isRTL ? "اكتب أمرك للوكيل..." : "Type your command..."}
-                className="w-full bg-[#161b22] border border-[#30363d] rounded-xl px-3 py-2.5 pe-10 text-sm text-[#e1e4e8] placeholder-[#484f58] resize-none focus:outline-none focus:border-cyan-500/50 transition-colors"
-                rows={2}
-                onKeyDown={e => {
-                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
-                }}
-              />
-              {loading ? (
-                <button onClick={handleStop} className="absolute end-2 bottom-2 p-1.5 bg-red-500 hover:bg-red-400 text-white rounded-lg transition-colors">
-                  <X className="w-4 h-4" />
-                </button>
-              ) : (
-                <button
-                  onClick={handleSend}
-                  disabled={!prompt.trim()}
-                  className="absolute end-2 bottom-2 p-1.5 bg-cyan-500 hover:bg-cyan-400 text-black rounded-lg disabled:opacity-40 transition-colors"
-                >
-                  <Send className={cn("w-4 h-4", isRTL && "rotate-180")} />
-                </button>
-              )}
-            </div>
+    <div className={cn("fixed bottom-4 end-4 z-[9999] bg-[#0d1117] border border-[#1c2333] rounded-xl shadow-2xl shadow-black/60 flex flex-col overflow-hidden", w, h)} dir={isRTL ? "rtl" : "ltr"}>
+      <div className="flex items-center justify-between px-3 py-2 bg-[#161b22] border-b border-[#1c2333]">
+        <div className="flex items-center gap-2">
+          <div className={cn("flex-shrink-0", color)}>{icon}</div>
+          <div>
+            <div className="text-sm font-semibold text-[#e1e4e8]">{agentName}</div>
+            <div className="text-[10px] text-[#484f58]">{agent.primaryModel?.model?.split("-").slice(0,2).join("-") || ""}</div>
           </div>
         </div>
-      )}
-    </>
+        <div className="flex items-center gap-1">
+          <button onClick={clearSession} className="p-1.5 text-[#8b949e] hover:text-red-400 hover:bg-[#1c2333] rounded transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+          <button onClick={() => setExpanded(!expanded)} className="p-1.5 text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333] rounded transition-colors">{expanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}</button>
+          <button onClick={() => setMinimized(true)} className="p-1.5 text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333] rounded transition-colors"><ChevronDown className="w-3.5 h-3.5" /></button>
+          <button onClick={handleClose} className="p-1.5 text-[#8b949e] hover:text-red-400 hover:bg-[#1c2333] rounded transition-colors"><X className="w-3.5 h-3.5" /></button>
+        </div>
+      </div>
+
+      <div ref={chatRef} className="flex-1 overflow-y-auto p-3 space-y-3" onWheel={(e) => { if (e.deltaY < 0) userScrolledUpRef.current = true; else { const el = chatRef.current; if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 40) userScrolledUpRef.current = false; } }}>
+        {messages.map(msg => {
+          if (msg.role === "status") return (
+            <div key={msg.id} className="flex justify-center py-0.5">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#161b22] border border-[#30363d]">
+                <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse" />
+                <span className="text-[10px] text-[#8b949e] whitespace-pre-wrap">{msg.content}</span>
+              </div>
+            </div>
+          );
+          return (
+            <div key={msg.id} className={cn("py-0.5", msg.role === "user" ? "text-end" : "")}>
+              <div className={cn("inline-block text-start max-w-full", msg.role === "user" ? "text-cyan-400 text-sm" : "text-[#c9d1d9]")}>
+                {msg.role === "assistant" && !msg.content && loading ? (
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" />
+                    <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                    <span className="text-[11px] text-[#8b949e]">{isRTL ? "يحلل..." : "Analyzing..."}</span>
+                  </div>
+                ) : <MessageContent content={msg.content} />}
+                {msg.tokensUsed && <div className="text-[9px] text-[#484f58] mt-0.5">{msg.models ? msg.models.join(" + ") : msg.model} · {msg.tokensUsed.toLocaleString()} tokens</div>}
+              </div>
+            </div>
+          );
+        })}
+        <div ref={chatEndRef} />
+      </div>
+
+      <div className="border-t border-[#1c2333] bg-[#0d1117] p-2">
+        <div className="relative">
+          <textarea value={prompt} onChange={e => setPrompt(e.target.value)} placeholder={isRTL ? "اكتب أمرك..." : "Type command..."} className="w-full bg-[#161b22] border border-[#30363d] rounded-lg px-3 py-2 pe-10 text-sm text-[#e1e4e8] placeholder-[#484f58] resize-none focus:outline-none focus:border-cyan-500/50" rows={2} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }} />
+          {loading ? (
+            <button onClick={() => { abortRef.current?.abort(); setLoading(false); }} className="absolute end-1.5 bottom-1.5 p-1.5 bg-red-500 hover:bg-red-400 text-white rounded-lg"><X className="w-3.5 h-3.5" /></button>
+          ) : (
+            <button onClick={handleSend} disabled={!prompt.trim()} className="absolute end-1.5 bottom-1.5 p-1.5 bg-cyan-500 hover:bg-cyan-400 text-black rounded-lg disabled:opacity-40"><Send className={cn("w-3.5 h-3.5", isRTL && "rotate-180")} /></button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
