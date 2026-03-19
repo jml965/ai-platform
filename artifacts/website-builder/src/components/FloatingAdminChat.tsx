@@ -3,7 +3,8 @@ import { createPortal } from "react-dom";
 import {
   Crown, Activity, Crosshair, Server, Palette, Database, Lock, Rocket,
   FlaskConical, Bot, Wand2, Trash2, X, Send, Minimize2, Maximize2,
-  ChevronDown, GripHorizontal, MessageSquare,
+  ChevronDown, GripHorizontal, MessageSquare, Terminal, FileText, HardDrive,
+  Settings, FolderOpen, Shield,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useGetMe } from "@workspace/api-client-react";
@@ -285,9 +286,9 @@ function FloatingChatInner() {
     setLoading(false);
   };
 
-  const handleSend = async () => {
-    if (!prompt.trim() || loading || !selectedAgent) return;
-    const currentPrompt = prompt;
+  const doSend = async (directMsg?: string) => {
+    const currentPrompt = directMsg || prompt;
+    if (!currentPrompt.trim() || loading || !selectedAgent) return;
     setPrompt("");
     setLoading(true);
     userScrolledUpRef.current = false;
@@ -345,7 +346,22 @@ function FloatingChatInner() {
 
       if (selectedAgent.agentKey === "strategic") {
         endpoint = `${BASE}api/strategic/chat-stream`;
-        body = { message: currentPrompt, projectId: "general" };
+        let infraContext = "";
+        try {
+          const [statusRes, tablesRes, envRes] = await Promise.all([
+            fetch(`${BASE}api/strategic/infra/status`, { credentials: "include" }).then(r => r.ok ? r.json() : null).catch(() => null),
+            fetch(`${BASE}api/strategic/infra/db-tables`, { credentials: "include" }).then(r => r.ok ? r.json() : null).catch(() => null),
+            fetch(`${BASE}api/strategic/infra/env`, { credentials: "include" }).then(r => r.ok ? r.json() : null).catch(() => null),
+          ]);
+          if (statusRes) infraContext += `\n[LIVE SYSTEM STATUS] DB: ${statusRes.database}, Users: ${statusRes.counts?.users}, Projects: ${statusRes.counts?.projects}, Agents: ${statusRes.counts?.agents}, Uptime: ${statusRes.server?.uptime}, Memory: ${statusRes.server?.memoryMB}MB, Node: ${statusRes.server?.nodeVersion}, ENV: ${statusRes.env}`;
+          if (tablesRes?.tables) infraContext += `\n[DB TABLES] ${tablesRes.tables.map((t: any) => `${t.table_name}(${t.column_count} cols)`).join(", ")}`;
+          if (envRes) {
+            const envKeys = Object.entries(envRes.env || {}).map(([k, v]) => `${k}=${v}`).join(", ");
+            const secKeys = Object.entries(envRes.secrets || {}).map(([k, v]) => `${k}: ${v}`).join(", ");
+            infraContext += `\n[ENV VARS] ${envKeys}\n[SECRETS] ${secKeys}`;
+          }
+        } catch {}
+        body = { message: infraContext ? `${currentPrompt}\n\n---\n${infraContext}` : currentPrompt, projectId: "general" };
       } else if (selectedAgent.agentKey === "infra_sysadmin") {
         endpoint = `${BASE}api/infra/director-stream`;
         body = { message: currentPrompt };
@@ -630,6 +646,32 @@ function FloatingChatInner() {
           })}
         </div>
 
+        {selectedAgent?.agentKey === "strategic" && (
+          <div className="border-t border-[#1c2333] px-2 py-1 flex items-center gap-1 flex-shrink-0 overflow-x-auto">
+            {[
+              { icon: <HardDrive className="w-3 h-3" />, label: isRTL ? "حالة النظام" : "Status", cmd: isRTL ? "اعرض حالة النظام الكاملة — قاعدة البيانات، السيرفر، الذاكرة" : "Show full system status — database, server, memory" },
+              { icon: <Database className="w-3 h-3" />, label: isRTL ? "جداول" : "Tables", cmd: isRTL ? "اعرض جميع جداول قاعدة البيانات مع تفاصيل الأعمدة" : "Show all database tables with column details" },
+              { icon: <FolderOpen className="w-3 h-3" />, label: isRTL ? "ملفات" : "Files", cmd: isRTL ? "اعرض قائمة ملفات البنية التحتية ومحتوياتها" : "List infrastructure files and their status" },
+              { icon: <Settings className="w-3 h-3" />, label: isRTL ? "متغيرات" : "ENV", cmd: isRTL ? "اعرض جميع المتغيرات البيئية والأسرار" : "Show all environment variables and secrets status" },
+              { icon: <Shield className="w-3 h-3" />, label: isRTL ? "أمان" : "Security", cmd: isRTL ? "فحص أمان شامل — الأسرار، الصلاحيات، نقاط الضعف" : "Full security audit — secrets, permissions, vulnerabilities" },
+              { icon: <Terminal className="w-3 h-3" />, label: isRTL ? "أمر" : "Exec", cmd: isRTL ? "نفذ أمر: " : "Execute command: " },
+            ].map((btn, i) => (
+              <button
+                key={i}
+                onClick={() => {
+                  if (btn.cmd.endsWith(": ")) { setPrompt(btn.cmd); textareaRef.current?.focus(); }
+                  else { doSend(btn.cmd); }
+                }}
+                className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#161b22] hover:bg-[#1c2333] border border-[#30363d] text-[10px] text-[#8b949e] hover:text-cyan-400 transition-colors whitespace-nowrap"
+                title={btn.cmd}
+              >
+                {btn.icon}
+                {btn.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="border-t border-[#1c2333] px-3 py-2 flex-shrink-0">
           <div className="relative">
             <textarea
@@ -639,14 +681,14 @@ function FloatingChatInner() {
               placeholder={isRTL ? "اكتب أمرك..." : "Type command..."}
               className="w-full bg-[#161b22] border border-[#30363d] rounded-xl px-4 py-2.5 pe-12 text-[13px] text-[#e1e4e8] placeholder-[#484f58] resize-none focus:outline-none focus:border-cyan-500/50 transition-colors"
               rows={prompt.split("\n").length > 3 ? 4 : prompt.includes("\n") ? 3 : 1}
-              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doSend(); } }}
             />
             {loading ? (
               <button onClick={handleStop} className="absolute end-2 bottom-2 p-2 bg-red-500 hover:bg-red-400 text-white rounded-lg transition-colors">
                 <X className="w-3.5 h-3.5" />
               </button>
             ) : (
-              <button onClick={handleSend} disabled={!prompt.trim()} className="absolute end-2 bottom-2 p-2 bg-cyan-500 hover:bg-cyan-400 text-black rounded-lg disabled:opacity-40 transition-colors">
+              <button onClick={() => doSend()} disabled={!prompt.trim()} className="absolute end-2 bottom-2 p-2 bg-cyan-500 hover:bg-cyan-400 text-black rounded-lg disabled:opacity-40 transition-colors">
                 <Send className={`w-3.5 h-3.5 ${isRTL ? "rotate-180" : ""}`} />
               </button>
             )}

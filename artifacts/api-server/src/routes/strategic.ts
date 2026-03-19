@@ -5,6 +5,9 @@ import { db } from "@workspace/db";
 import { agentConfigsTable, usersTable, strategicThreadsTable, strategicMessagesTable } from "@workspace/db/schema";
 import { eq, sql, desc, and, gte } from "drizzle-orm";
 import { startSurgicalFix, checkBuildLimits } from "../lib/agents/execution-engine";
+import * as fs from "fs";
+import * as path from "path";
+import { execSync } from "child_process";
 
 function translateErrorReason(reason: string): string {
   if (reason.includes("Timeout after")) {
@@ -783,6 +786,285 @@ router.post("/strategic/threads/:threadId/messages", async (req, res) => {
     res.json({ message: msg });
   } catch (error: any) {
     res.status(500).json({ error: { message: error?.message || "Failed to save message" } });
+  }
+});
+
+async function requireAdmin(req: any, res: any): Promise<boolean> {
+  const userId = getUserId(req);
+  const [user] = await db.select({ role: usersTable.role }).from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  if (user?.role !== "admin") {
+    res.status(403).json({ error: { code: "FORBIDDEN", message: "Admin access required" } });
+    return false;
+  }
+  return true;
+}
+
+const PROJECT_ROOT = process.cwd();
+
+const INFRA_FILES = [
+  "Dockerfile",
+  ".github/workflows/deploy-cloud-run.yml",
+  "docker-compose.yml",
+  "package.json",
+  "pnpm-workspace.yaml",
+  "tsconfig.json",
+  ".env",
+  ".env.production",
+  "artifacts/api-server/package.json",
+  "artifacts/api-server/tsconfig.json",
+  "artifacts/api-server/src/app.ts",
+  "artifacts/api-server/src/routes/index.ts",
+  "artifacts/api-server/src/routes/strategic.ts",
+  "artifacts/api-server/src/routes/chat.ts",
+  "artifacts/api-server/src/routes/infra.ts",
+  "artifacts/api-server/src/routes/auth.ts",
+  "artifacts/api-server/src/routes/admin.ts",
+  "artifacts/api-server/src/routes/billing.ts",
+  "artifacts/api-server/src/routes/projects.ts",
+  "artifacts/api-server/src/routes/build.ts",
+  "artifacts/api-server/src/routes/sandbox.ts",
+  "artifacts/api-server/src/routes/monitoring.ts",
+  "artifacts/api-server/src/lib/agents/strategic-agent.ts",
+  "artifacts/api-server/src/lib/agents/ai-clients.ts",
+  "artifacts/api-server/src/middlewares/authSession.ts",
+  "artifacts/api-server/src/middlewares/permissions.ts",
+  "artifacts/website-builder/package.json",
+  "artifacts/website-builder/src/App.tsx",
+  "artifacts/website-builder/vite.config.ts",
+  "lib/db/src/schema/index.ts",
+  "lib/db/src/schema/users.ts",
+  "lib/db/src/schema/projects.ts",
+  "lib/db/src/schema/agent-configs.ts",
+];
+
+router.get("/strategic/infra/files", async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  try {
+    const filePath = req.query.path as string | undefined;
+
+    if (filePath) {
+      const resolved = path.resolve(PROJECT_ROOT, filePath);
+      if (!resolved.startsWith(PROJECT_ROOT)) {
+        res.status(400).json({ error: "Path traversal not allowed" });
+        return;
+      }
+      if (!fs.existsSync(resolved)) {
+        res.status(404).json({ error: "File not found", path: filePath });
+        return;
+      }
+      const stat = fs.statSync(resolved);
+      if (stat.isDirectory()) {
+        const entries = fs.readdirSync(resolved, { withFileTypes: true }).map(d => ({
+          name: d.name,
+          type: d.isDirectory() ? "directory" : "file",
+          size: d.isFile() ? fs.statSync(path.join(resolved, d.name)).size : null,
+        }));
+        res.json({ path: filePath, type: "directory", entries });
+        return;
+      }
+      const content = fs.readFileSync(resolved, "utf-8").slice(0, 200000);
+      res.json({ path: filePath, type: "file", size: stat.size, content });
+      return;
+    }
+
+    const files = INFRA_FILES.map(f => {
+      const full = path.resolve(PROJECT_ROOT, f);
+      const exists = fs.existsSync(full);
+      return { path: f, exists, size: exists ? fs.statSync(full).size : 0 };
+    });
+    res.json({ root: PROJECT_ROOT, files });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || "Failed to list files" });
+  }
+});
+
+router.post("/strategic/infra/file-write", async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  try {
+    const { filePath, content } = req.body as { filePath: string; content: string };
+    if (!filePath || content === undefined) {
+      res.status(400).json({ error: "filePath and content required" });
+      return;
+    }
+    const resolved = path.resolve(PROJECT_ROOT, filePath);
+    if (!resolved.startsWith(PROJECT_ROOT)) {
+      res.status(400).json({ error: "Path traversal not allowed" });
+      return;
+    }
+    const dir = path.dirname(resolved);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(resolved, content, "utf-8");
+    res.json({ success: true, path: filePath, size: Buffer.byteLength(content) });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || "Failed to write file" });
+  }
+});
+
+router.get("/strategic/infra/env", async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  try {
+    const safeKeys = [
+      "NODE_ENV", "PORT", "DATABASE_URL", "AUTH_PROVIDER", "CLOUD_SQL_INSTANCE",
+      "GCP_PROJECT_ID", "GCP_REGION", "CLOUD_RUN_SERVICE",
+      "GITHUB_REPOSITORY", "npm_package_name", "npm_package_version",
+    ];
+    const sensitiveKeys = [
+      "SESSION_SECRET", "CUSTOM_ANTHROPIC_API_KEY", "CUSTOM_OPENAI_API_KEY",
+      "GITHUB_TOKEN", "GCP_SA_KEY",
+    ];
+    const env: Record<string, string> = {};
+    for (const k of safeKeys) {
+      if (process.env[k]) env[k] = process.env[k]!;
+    }
+    const secrets: Record<string, string> = {};
+    for (const k of sensitiveKeys) {
+      secrets[k] = process.env[k] ? `SET (${process.env[k]!.length} chars)` : "NOT SET";
+    }
+    const showSecrets = req.query.reveal === "true";
+    if (showSecrets) {
+      for (const k of sensitiveKeys) {
+        if (process.env[k]) secrets[k] = process.env[k]!;
+      }
+    }
+    res.json({ env, secrets, allKeys: Object.keys(process.env).sort() });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || "Failed to read env" });
+  }
+});
+
+router.post("/strategic/infra/env", async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  try {
+    const { key, value } = req.body as { key: string; value: string };
+    if (!key) {
+      res.status(400).json({ error: "key is required" });
+      return;
+    }
+    if (value === null || value === undefined) {
+      delete process.env[key];
+      res.json({ success: true, action: "deleted", key });
+    } else {
+      process.env[key] = value;
+      res.json({ success: true, action: "set", key, length: value.length });
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || "Failed to set env" });
+  }
+});
+
+router.post("/strategic/infra/db-query", async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  try {
+    const { query: sqlQuery } = req.body as { query: string };
+    if (!sqlQuery?.trim()) {
+      res.status(400).json({ error: "query is required" });
+      return;
+    }
+    const result = await db.execute(sql.raw(sqlQuery));
+    res.json({ success: true, rows: result.rows || result, rowCount: (result as any).rowCount ?? null });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || "Query failed" });
+  }
+});
+
+router.get("/strategic/infra/db-tables", async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  try {
+    const tables = await db.execute(sql.raw(`
+      SELECT table_name, 
+             (SELECT count(*) FROM information_schema.columns c WHERE c.table_name = t.table_name AND c.table_schema = 'public') as column_count
+      FROM information_schema.tables t 
+      WHERE table_schema = 'public' 
+      ORDER BY table_name
+    `));
+    const detailed = req.query.detailed === "true";
+    let columns: any[] = [];
+    if (detailed) {
+      const cols = await db.execute(sql.raw(`
+        SELECT table_name, column_name, data_type, is_nullable, column_default
+        FROM information_schema.columns 
+        WHERE table_schema = 'public' 
+        ORDER BY table_name, ordinal_position
+      `));
+      columns = cols.rows || cols;
+    }
+    res.json({ tables: tables.rows || tables, columns });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || "Failed to list tables" });
+  }
+});
+
+router.post("/strategic/infra/exec", async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  try {
+    const { command } = req.body as { command: string };
+    if (!command?.trim()) {
+      res.status(400).json({ error: "command is required" });
+      return;
+    }
+    const blocked = ["rm -rf /", "mkfs", "dd if=", ":(){", "fork bomb"];
+    for (const b of blocked) {
+      if (command.includes(b)) {
+        res.status(400).json({ error: "Dangerous command blocked" });
+        return;
+      }
+    }
+    const output = execSync(command, {
+      cwd: PROJECT_ROOT,
+      timeout: 30000,
+      maxBuffer: 5 * 1024 * 1024,
+      encoding: "utf-8",
+      env: { ...process.env },
+    });
+    res.json({ success: true, output: output.slice(0, 100000) });
+  } catch (error: any) {
+    res.json({
+      success: false,
+      exitCode: error?.status || 1,
+      output: (error?.stdout || "").slice(0, 50000),
+      error: (error?.stderr || error?.message || "").slice(0, 50000),
+    });
+  }
+});
+
+router.get("/strategic/infra/status", async (req, res) => {
+  if (!(await requireAdmin(req, res))) return;
+  try {
+    let dbStatus = "unknown";
+    try {
+      await db.execute(sql.raw("SELECT 1"));
+      dbStatus = "connected";
+    } catch { dbStatus = "disconnected"; }
+
+    const userCount = await db.execute(sql.raw("SELECT count(*) as cnt FROM users"));
+    const projectCount = await db.execute(sql.raw("SELECT count(*) as cnt FROM projects"));
+    const agentCount = await db.execute(sql.raw("SELECT count(*) as cnt FROM agent_configs"));
+
+    const memUsage = process.memoryUsage();
+    const uptime = process.uptime();
+
+    res.json({
+      database: dbStatus,
+      counts: {
+        users: (userCount.rows || userCount)[0]?.cnt,
+        projects: (projectCount.rows || projectCount)[0]?.cnt,
+        agents: (agentCount.rows || agentCount)[0]?.cnt,
+      },
+      server: {
+        uptime: `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m`,
+        memoryMB: Math.round(memUsage.heapUsed / 1024 / 1024),
+        nodeVersion: process.version,
+        pid: process.pid,
+      },
+      env: process.env.NODE_ENV || "development",
+      platform: {
+        gcpProject: process.env.GCP_PROJECT_ID || "N/A",
+        region: process.env.GCP_REGION || "N/A",
+        cloudRunService: process.env.CLOUD_RUN_SERVICE || "N/A",
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || "Failed to get status" });
   }
 });
 
