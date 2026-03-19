@@ -372,6 +372,85 @@ export default function FloatingInfraChat() {
     setMessages([]);
   };
 
+  const extractFilesFromContent = (content: string): { name: string; files: { path: string; content: string }[] } => {
+    const files: { path: string; content: string }[] = [];
+    let projectName = "";
+
+    const titleMatch = content.match(/(?:المشروع|Project)[:\s]*\**([^\n*]+)\**/i);
+    if (titleMatch) projectName = titleMatch[1].trim().replace(/[—–\-]+\s*/, "");
+    if (!projectName) {
+      const h2Match = content.match(/##\s*[🚀📋]*\s*(?:بدء التنفيذ|المشروع|Project)[:\s]*([^\n]+)/);
+      if (h2Match) projectName = h2Match[1].trim().replace(/\*\*/g, "").replace(/[—–\-]+\s*/, "");
+    }
+
+    const headerPattern = /###\s+([^\n]+)\n\s*```\w*\n([\s\S]*?)```/g;
+    let match;
+    while ((match = headerPattern.exec(content)) !== null) {
+      let filePath = match[1].trim().replace(/\*\*/g, "");
+      const fileContent = match[2].trim();
+
+      if (filePath.match(/\.(jsx?|tsx?|css|html|json|js|ts|config\.\w+)$/i)) {
+        files.push({ path: filePath, content: fileContent });
+      }
+    }
+
+    if (files.length === 0) {
+      const codeBlockPattern = /```(\w+)\n([\s\S]*?)```/g;
+      const fileExtMap: Record<string, string> = { json: "file.json", html: "index.html", jsx: "App.jsx", tsx: "App.tsx", css: "styles.css", js: "script.js", ts: "script.ts" };
+      let blockIdx = 0;
+      while ((match = codeBlockPattern.exec(content)) !== null) {
+        const lang = match[1];
+        const code = match[2].trim();
+        if (code.length > 30 && fileExtMap[lang]) {
+          files.push({ path: fileExtMap[lang] + (blockIdx > 0 ? `_${blockIdx}` : ""), content: code });
+          blockIdx++;
+        }
+      }
+    }
+
+    return { name: projectName || (isRTL ? "مشروع اختبار" : "Test Project"), files };
+  };
+
+  const handleCreateFromResponse = async (content: string) => {
+    const { name, files } = extractFilesFromContent(content);
+    setCreatingProject(true);
+    try {
+      const res = await fetch(`${import.meta.env.BASE_URL}api/infra/create-project`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name,
+          description: isRTL ? `مشروع تم إنشاؤه بواسطة وكيل ${selectedAgent?.displayNameAr || "البنية التحتية"}` : `Project created by ${selectedAgent?.displayNameEn || "infra"} agent`,
+          files,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(prev => [...prev, {
+          id: crypto.randomUUID(),
+          role: "status",
+          content: isRTL
+            ? `✅ تم إنشاء مشروع "${data.name}" — ${data.filesCount} ملفات`
+            : `✅ Project "${data.name}" created — ${data.filesCount} files`,
+          timestamp: new Date(),
+        }]);
+        window.open(`${import.meta.env.BASE_URL}project/${data.id}`, "_blank");
+      } else {
+        const err = await res.json();
+        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "status", content: `❌ ${err?.error?.message || "Failed"}`, timestamp: new Date() }]);
+      }
+    } catch (err: any) {
+      setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "status", content: `❌ ${err.message}`, timestamp: new Date() }]);
+    }
+    setCreatingProject(false);
+  };
+
+  const contentHasProjectFiles = (content: string): boolean => {
+    const headerPattern = /###\s+[^\n]*\.(jsx?|tsx?|css|html|json|config\.\w+)\s*\n\s*```/;
+    return headerPattern.test(content);
+  };
+
   const handleDiagnoseProject = async () => {
     const pid = diagProjectId.trim();
     if (!pid) return;
@@ -689,6 +768,16 @@ ${sandboxInfo}`;
                       <div className="text-[9px] text-[#484f58] mt-1">
                         {msg.models ? msg.models.join(" + ") : msg.model} · {msg.tokensUsed.toLocaleString()} tokens{msg.cost ? ` · $${msg.cost.toFixed(4)}` : ""}
                       </div>
+                    )}
+                    {msg.role === "assistant" && msg.content && !loading && contentHasProjectFiles(msg.content) && (
+                      <button
+                        onClick={() => handleCreateFromResponse(msg.content)}
+                        disabled={creatingProject}
+                        className="mt-2 flex items-center gap-2 w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg px-3 py-2 text-xs font-medium disabled:opacity-40 transition-all"
+                      >
+                        {creatingProject ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderPlus className="w-4 h-4" />}
+                        {isRTL ? "📦 إنشاء هذا المشروع فعلياً" : "📦 Create this project"}
+                      </button>
                     )}
                   </div>
                 </div>
