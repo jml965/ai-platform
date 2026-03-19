@@ -147,7 +147,7 @@ function FloatingChatInner() {
   const [editTitle, setEditTitle] = useState("");
   const [threadMenuId, setThreadMenuId] = useState<string | null>(null);
 
-  const [screenshotMode, setScreenshotMode] = useState<"off" | "full" | "crop">("off");
+  const [screenshotMode, setScreenshotMode] = useState<"off" | "full" | "crop" | "capturing">("off");
   const [cropRect, setCropRect] = useState<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
   const [pendingImages, setPendingImages] = useState<{ data: string; name: string }[]>([]);
   const [showScreenshotMenu, setShowScreenshotMenu] = useState(false);
@@ -396,15 +396,10 @@ function FloatingChatInner() {
   };
 
   const captureFullScreen = useCallback(async () => {
-    setScreenshotMode("off");
     setShowScreenshotMenu(false);
+    setScreenshotMode("capturing");
+    await new Promise(r => setTimeout(r, 100));
     try {
-      const canvas = document.createElement("canvas");
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      const ctx = canvas.getContext("2d")!;
-      const chatEl = document.querySelector("[data-floating-chat]") as HTMLElement | null;
-      if (chatEl) chatEl.style.display = "none";
       const html2canvasMod = await import("html2canvas");
       const html2canvas = html2canvasMod.default;
       const rendered = await html2canvas(document.body, {
@@ -415,26 +410,15 @@ function FloatingChatInner() {
         height: window.innerHeight,
         windowWidth: window.innerWidth,
         windowHeight: window.innerHeight,
+        ignoreElements: (el: Element) => el.hasAttribute("data-floating-chat") || el.hasAttribute("data-crop-overlay"),
       });
-      if (chatEl) chatEl.style.display = "";
-      ctx.drawImage(rendered, 0, 0);
-      const dataUrl = canvas.toDataURL("image/png");
+      const dataUrl = rendered.toDataURL("image/png");
       const name = `screenshot_${new Date().toISOString().slice(0,19).replace(/[T:]/g, "-")}.png`;
       setPendingImages(prev => [...prev, { data: dataUrl, name }]);
     } catch (err) {
       console.error("Screenshot failed:", err);
-      const fallbackCanvas = document.createElement("canvas");
-      fallbackCanvas.width = window.innerWidth;
-      fallbackCanvas.height = window.innerHeight;
-      const ctx = fallbackCanvas.getContext("2d")!;
-      ctx.fillStyle = "#0d1117";
-      ctx.fillRect(0, 0, fallbackCanvas.width, fallbackCanvas.height);
-      ctx.fillStyle = "#e1e4e8";
-      ctx.font = "16px sans-serif";
-      ctx.fillText("Screenshot capture failed - try uploading an image instead", 50, 50);
-      const dataUrl = fallbackCanvas.toDataURL("image/png");
-      setPendingImages(prev => [...prev, { data: dataUrl, name: "screenshot_error.png" }]);
     }
+    setScreenshotMode("off");
   }, []);
 
   const startCropMode = useCallback(() => {
@@ -460,13 +444,10 @@ function FloatingChatInner() {
     const h = Math.abs(cropRect.endY - cropRect.startY);
     cropStartRef.current = null;
     setCropRect(null);
-    setScreenshotMode("off");
-    if (w < 10 || h < 10) return;
+    setScreenshotMode("capturing");
+    if (w < 10 || h < 10) { setScreenshotMode("off"); return; }
+    await new Promise(r => setTimeout(r, 100));
     try {
-      const chatEl = document.querySelector("[data-floating-chat]") as HTMLElement | null;
-      if (chatEl) chatEl.style.display = "none";
-      const overlay = document.querySelector("[data-crop-overlay]") as HTMLElement | null;
-      if (overlay) overlay.style.display = "none";
       const html2canvasMod = await import("html2canvas");
       const html2canvas = html2canvasMod.default;
       const rendered = await html2canvas(document.body, {
@@ -478,14 +459,15 @@ function FloatingChatInner() {
         height: h,
         windowWidth: window.innerWidth,
         windowHeight: window.innerHeight,
+        ignoreElements: (el: Element) => el.hasAttribute("data-floating-chat") || el.hasAttribute("data-crop-overlay"),
       });
-      if (chatEl) chatEl.style.display = "";
       const dataUrl = rendered.toDataURL("image/png");
       const name = `crop_${new Date().toISOString().slice(0,19).replace(/[T:]/g, "-")}.png`;
       setPendingImages(prev => [...prev, { data: dataUrl, name }]);
     } catch (err) {
       console.error("Crop screenshot failed:", err);
     }
+    setScreenshotMode("off");
   }, [cropRect]);
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
