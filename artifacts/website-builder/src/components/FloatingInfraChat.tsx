@@ -25,10 +25,6 @@ import {
   FolderPlus,
   ExternalLink,
   Loader2,
-  Stethoscope,
-  Wrench,
-  AlertTriangle,
-  RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -185,9 +181,6 @@ export default function FloatingInfraChat() {
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [projectDesc, setProjectDesc] = useState("");
-  const [showDiagForm, setShowDiagForm] = useState(false);
-  const [diagProjectId, setDiagProjectId] = useState("");
-  const [diagLoading, setDiagLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -331,17 +324,6 @@ export default function FloatingInfraChat() {
               setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "status", content: event.message || event.messageEn, timestamp: new Date() }]);
               scrollToBottomIfNeeded();
             }
-            else if (event.type === "project_created") {
-              setMessages(prev => [...prev, {
-                id: crypto.randomUUID(), role: "status",
-                content: isRTL
-                  ? `🎉 تم إنشاء المشروع "${event.projectName}" — ${event.filesCount} ملفات`
-                  : `🎉 Project "${event.projectName}" created — ${event.filesCount} files`,
-                timestamp: new Date(),
-              }]);
-              scrollToBottomIfNeeded();
-              window.open(`${import.meta.env.BASE_URL}project/${event.projectId}`, "_blank");
-            }
             else if (event.type === "done") { streamMeta = { tokensUsed: event.tokensUsed, cost: event.cost, model: event.model, models: event.models }; }
             else if (event.type === "error") { streamedContent += event.message; typewriterFlush(); }
           } catch {}
@@ -381,183 +363,6 @@ export default function FloatingInfraChat() {
       body: JSON.stringify({ agentKey: selectedAgent.agentKey }),
     });
     setMessages([]);
-  };
-
-  const extractFilesFromContent = (content: string): { name: string; files: { path: string; content: string }[] } => {
-    const files: { path: string; content: string }[] = [];
-    let projectName = "";
-
-    const titleMatch = content.match(/(?:المشروع|Project)[:\s]*\**([^\n*]+)\**/i);
-    if (titleMatch) projectName = titleMatch[1].trim().replace(/[—–\-]+\s*/, "");
-    if (!projectName) {
-      const h2Match = content.match(/##\s*[🚀📋]*\s*(?:بدء التنفيذ|المشروع|Project)[:\s]*([^\n]+)/);
-      if (h2Match) projectName = h2Match[1].trim().replace(/\*\*/g, "").replace(/[—–\-]+\s*/, "");
-    }
-
-    const headerPattern = /###\s+([^\n]+)\n\s*```\w*\n([\s\S]*?)```/g;
-    let match;
-    while ((match = headerPattern.exec(content)) !== null) {
-      let filePath = match[1].trim().replace(/\*\*/g, "");
-      const fileContent = match[2].trim();
-
-      if (filePath.match(/\.(jsx?|tsx?|css|html|json|js|ts|config\.\w+)$/i)) {
-        files.push({ path: filePath, content: fileContent });
-      }
-    }
-
-    if (files.length === 0) {
-      const codeBlockPattern = /```(\w+)\n([\s\S]*?)```/g;
-      const fileExtMap: Record<string, string> = { json: "file.json", html: "index.html", jsx: "App.jsx", tsx: "App.tsx", css: "styles.css", js: "script.js", ts: "script.ts" };
-      let blockIdx = 0;
-      while ((match = codeBlockPattern.exec(content)) !== null) {
-        const lang = match[1];
-        const code = match[2].trim();
-        if (code.length > 30 && fileExtMap[lang]) {
-          files.push({ path: fileExtMap[lang] + (blockIdx > 0 ? `_${blockIdx}` : ""), content: code });
-          blockIdx++;
-        }
-      }
-    }
-
-    return { name: projectName || (isRTL ? "مشروع اختبار" : "Test Project"), files };
-  };
-
-  const handleCreateFromResponse = async (content: string) => {
-    const { name, files } = extractFilesFromContent(content);
-    setCreatingProject(true);
-    try {
-      const res = await fetch(`${import.meta.env.BASE_URL}api/infra/create-project`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          name,
-          description: isRTL ? `مشروع تم إنشاؤه بواسطة وكيل ${selectedAgent?.displayNameAr || "البنية التحتية"}` : `Project created by ${selectedAgent?.displayNameEn || "infra"} agent`,
-          files,
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setMessages(prev => [...prev, {
-          id: crypto.randomUUID(),
-          role: "status",
-          content: isRTL
-            ? `✅ تم إنشاء مشروع "${data.name}" — ${data.filesCount} ملفات`
-            : `✅ Project "${data.name}" created — ${data.filesCount} files`,
-          timestamp: new Date(),
-        }]);
-        window.open(`${import.meta.env.BASE_URL}project/${data.id}`, "_blank");
-      } else {
-        const err = await res.json();
-        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "status", content: `❌ ${err?.error?.message || "Failed"}`, timestamp: new Date() }]);
-      }
-    } catch (err: any) {
-      setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "status", content: `❌ ${err.message}`, timestamp: new Date() }]);
-    }
-    setCreatingProject(false);
-  };
-
-  const contentHasProjectFiles = (content: string): boolean => {
-    const headerPattern = /###\s+[^\n]*\.(jsx?|tsx?|css|html|json|config\.\w+)\s*\n\s*```/;
-    return headerPattern.test(content);
-  };
-
-  const handleDiagnoseProject = async () => {
-    const pid = diagProjectId.trim();
-    if (!pid) return;
-    setDiagLoading(true);
-    try {
-      const res = await fetch(`${import.meta.env.BASE_URL}api/infra/diagnostics/project/${pid}`, {
-        credentials: "include",
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const s = data.summary;
-        const issuesList = s.issues.length > 0 ? s.issues.join("\n  - ") : (isRTL ? "لا توجد مشاكل" : "No issues found");
-        const failedInfo = data.failedTasks.length > 0
-          ? data.failedTasks.map((t: any) => `  ${t.agentType}: ${t.errorMessage || t.status}`).join("\n")
-          : "";
-        const sandboxInfo = data.sandboxes.length > 0
-          ? data.sandboxes.map((s: any) => `  ${s.status} (port: ${s.port || "N/A"})`).join("\n")
-          : (isRTL ? "  لا يوجد sandbox" : "  No sandboxes");
-
-        const report = `## ${isRTL ? "تقرير تشخيص" : "Diagnostic Report"}: ${data.project.name}
-**${isRTL ? "الحالة" : "Status"}:** ${data.project.status}
-**${isRTL ? "الملفات" : "Files"}:** ${s.totalFiles} | **${isRTL ? "مهام البناء" : "Build Tasks"}:** ${s.totalBuildTasks} (${s.failedBuildTasks} ${isRTL ? "فاشلة" : "failed"})
-
-### ${isRTL ? "المشاكل" : "Issues"}:
-  - ${issuesList}
-${failedInfo ? `\n### ${isRTL ? "تفاصيل الفشل" : "Failure Details"}:\n${failedInfo}` : ""}
-### Sandbox:
-${sandboxInfo}`;
-
-        setMessages(prev => [...prev, {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: report,
-          timestamp: new Date(),
-        }]);
-        setShowDiagForm(false);
-        setDiagProjectId("");
-      } else {
-        const err = await res.json();
-        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "status", content: `Error: ${err?.error?.message || res.status}`, timestamp: new Date() }]);
-      }
-    } catch (err: any) {
-      setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "status", content: `Error: ${err.message}`, timestamp: new Date() }]);
-    }
-    setDiagLoading(false);
-  };
-
-  const handleCheckRecentFailures = async () => {
-    setDiagLoading(true);
-    try {
-      const res = await fetch(`${import.meta.env.BASE_URL}api/infra/diagnostics/recent-failures`, { credentials: "include" });
-      if (res.ok) {
-        const data = await res.json();
-        let report = `## ${isRTL ? "آخر الأخطاء في المنصة" : "Recent Platform Failures"}\n`;
-        report += `**${isRTL ? "إجمالي المشاكل" : "Total Issues"}:** ${data.totalIssues}\n\n`;
-
-        if (data.stuckProjects.length > 0) {
-          report += `### ${isRTL ? "مشاريع عالقة" : "Stuck Projects"} (${data.stuckProjects.length}):\n`;
-          data.stuckProjects.forEach((p: any) => { report += `- **${p.name}** — ${p.status} (${p.id.slice(0, 8)}...)\n`; });
-        }
-        if (data.failedBuildTasks.length > 0) {
-          report += `\n### ${isRTL ? "مهام بناء فاشلة" : "Failed Build Tasks"} (${data.failedBuildTasks.length}):\n`;
-          data.failedBuildTasks.slice(0, 5).forEach((t: any) => { report += `- ${t.agentType}: ${t.errorMessage || t.status}\n`; });
-        }
-        if (data.totalIssues === 0) {
-          report += isRTL ? "✅ لا توجد مشاكل حالياً!" : "✅ No issues found!";
-        }
-
-        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "assistant", content: report, timestamp: new Date() }]);
-      }
-    } catch (err: any) {
-      setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "status", content: `Error: ${err.message}`, timestamp: new Date() }]);
-    }
-    setDiagLoading(false);
-    setShowDiagForm(false);
-  };
-
-  const handleRetryBuild = async () => {
-    const pid = diagProjectId.trim();
-    if (!pid) return;
-    setDiagLoading(true);
-    try {
-      const res = await fetch(`${import.meta.env.BASE_URL}api/infra/repair/retry-build/${pid}`, {
-        method: "POST",
-        credentials: "include",
-      });
-      if (res.ok) {
-        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "status", content: isRTL ? "✅ تم إعادة تعيين المهام الفاشلة — سيُعاد البناء" : "✅ Failed tasks reset — rebuild queued", timestamp: new Date() }]);
-      } else {
-        const err = await res.json();
-        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "status", content: `Error: ${err?.error?.message}`, timestamp: new Date() }]);
-      }
-    } catch (err: any) {
-      setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "status", content: `Error: ${err.message}`, timestamp: new Date() }]);
-    }
-    setDiagLoading(false);
   };
 
   const handleCreateProject = async () => {
@@ -609,6 +414,9 @@ ${sandboxInfo}`;
 
   if (agents.length === 0) return null;
 
+  const panelWidth = isExpanded ? "w-[700px]" : "w-[420px]";
+  const panelHeight = isExpanded ? "h-[85vh]" : "h-[550px]";
+
   return (
     <>
       {!isOpen && (
@@ -633,9 +441,9 @@ ${sandboxInfo}`;
       {isOpen && (
         <div
           className={cn(
-            "fixed z-50 top-0 bottom-0 flex flex-col overflow-hidden shadow-2xl border-s border-[#1c2333] bg-[#0a0e14] transition-all duration-300",
-            isExpanded ? "w-[600px]" : "w-[380px]",
-            isRTL ? "left-0" : "right-0"
+            "fixed z-50 bottom-6 flex flex-col rounded-2xl overflow-hidden shadow-2xl border border-[#1c2333] bg-[#0a0e14] transition-all duration-300",
+            panelWidth, panelHeight,
+            isRTL ? "left-6" : "right-6"
           )}
           dir={isRTL ? "rtl" : "ltr"}
         >
@@ -692,10 +500,7 @@ ${sandboxInfo}`;
             </div>
 
             <div className="flex items-center gap-1">
-              <button onClick={() => { setShowDiagForm(!showDiagForm); setShowProjectForm(false); }} className="p-1.5 text-[#484f58] hover:text-orange-400 hover:bg-[#1c2333] rounded-lg transition-colors" title={isRTL ? "تشخيص وإصلاح" : "Diagnose & Repair"}>
-                <Stethoscope className="w-3.5 h-3.5" />
-              </button>
-              <button onClick={() => { setShowProjectForm(!showProjectForm); setShowDiagForm(false); }} className="p-1.5 text-[#484f58] hover:text-green-400 hover:bg-[#1c2333] rounded-lg transition-colors" title={isRTL ? "إنشاء مشروع" : "Create Project"}>
+              <button onClick={() => setShowProjectForm(!showProjectForm)} className="p-1.5 text-[#484f58] hover:text-green-400 hover:bg-[#1c2333] rounded-lg transition-colors" title={isRTL ? "إنشاء مشروع" : "Create Project"}>
                 <FolderPlus className="w-3.5 h-3.5" />
               </button>
               <button onClick={clearSession} className="p-1.5 text-[#484f58] hover:text-red-400 hover:bg-[#1c2333] rounded-lg transition-colors" title={isRTL ? "مسح المحادثة" : "Clear"}>
@@ -777,69 +582,12 @@ ${sandboxInfo}`;
                         {msg.models ? msg.models.join(" + ") : msg.model} · {msg.tokensUsed.toLocaleString()} tokens{msg.cost ? ` · $${msg.cost.toFixed(4)}` : ""}
                       </div>
                     )}
-                    {msg.role === "assistant" && msg.content && !loading && contentHasProjectFiles(msg.content) && (
-                      <button
-                        onClick={() => handleCreateFromResponse(msg.content)}
-                        disabled={creatingProject}
-                        className="mt-2 flex items-center gap-2 w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg px-3 py-2 text-xs font-medium disabled:opacity-40 transition-all"
-                      >
-                        {creatingProject ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderPlus className="w-4 h-4" />}
-                        {isRTL ? "📦 إنشاء هذا المشروع فعلياً" : "📦 Create this project"}
-                      </button>
-                    )}
                   </div>
                 </div>
               );
             })}
             <div ref={chatEndRef} />
           </div>
-
-          {showDiagForm && (
-            <div className="border-t border-[#1c2333] bg-[#161b22] p-3 space-y-2">
-              <div className="flex items-center gap-2 mb-1">
-                <Stethoscope className="w-4 h-4 text-orange-400" />
-                <span className="text-xs font-medium text-[#e1e4e8]">{isRTL ? "تشخيص وإصلاح المشاريع" : "Diagnose & Repair Projects"}</span>
-              </div>
-              <input
-                value={diagProjectId}
-                onChange={e => setDiagProjectId(e.target.value)}
-                placeholder={isRTL ? "رقم المشروع (Project ID)..." : "Project ID..."}
-                className="w-full bg-[#0d1117] border border-[#30363d] rounded-lg px-3 py-2 text-sm text-[#e1e4e8] placeholder-[#484f58] focus:outline-none focus:border-orange-500/50 font-mono"
-              />
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={handleDiagnoseProject}
-                  disabled={!diagProjectId.trim() || diagLoading}
-                  className="flex items-center gap-1.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-40 transition-colors"
-                >
-                  {diagLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Stethoscope className="w-3.5 h-3.5" />}
-                  {isRTL ? "تشخيص" : "Diagnose"}
-                </button>
-                <button
-                  onClick={handleRetryBuild}
-                  disabled={!diagProjectId.trim() || diagLoading}
-                  className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-40 transition-colors"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  {isRTL ? "إعادة البناء" : "Retry Build"}
-                </button>
-                <button
-                  onClick={handleCheckRecentFailures}
-                  disabled={diagLoading}
-                  className="flex items-center gap-1.5 bg-red-600/80 hover:bg-red-500 text-white rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-40 transition-colors"
-                >
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  {isRTL ? "كل الأخطاء" : "All Failures"}
-                </button>
-              </div>
-              <button
-                onClick={() => setShowDiagForm(false)}
-                className="w-full text-center py-1 text-xs text-[#8b949e] hover:text-[#e1e4e8] transition-colors"
-              >
-                {isRTL ? "إغلاق" : "Close"}
-              </button>
-            </div>
-          )}
 
           {showProjectForm && (
             <div className="border-t border-[#1c2333] bg-[#161b22] p-3 space-y-2">

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { agentConfigsTable, projectsTable, projectFilesTable, buildTasksTable, executionLogsTable, sandboxInstancesTable } from "@workspace/db/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { agentConfigsTable, projectsTable, projectFilesTable } from "@workspace/db/schema";
+import { eq, and } from "drizzle-orm";
 import { getSystemBlueprint } from "../lib/system-blueprint";
 const router = Router();
 
@@ -24,21 +24,40 @@ const DEFAULT_INFRA_AGENTS = [
     governorEnabled: true,
     autoGovernor: true,
     governorModel: { provider: "anthropic", model: "claude-sonnet-4-6", creativity: 0.5, timeoutSeconds: 300, maxTokens: 16000 },
-    systemPrompt: `أنت مدير النظام (System Director) لمنصة Mr Code AI — mrcodeai.com.
-مهمتك: تنفيذ طلبات المالك بسرعة ودقة.
+    systemPrompt: `أنت مدير النظام الأعلى (System Director) لمنصة Mr Code AI — mrcodeai.com.
 
-قواعد صارمة:
-- ردودك قصيرة ومباشرة — لا تقارير طويلة ولا جداول مفصلة
-- رد بنفس لغة المالك
-- عند إنشاء مشروع: اكتب الملفات بصيغة "### path/file.ext" متبوعة بكود — النظام سينشئ المشروع تلقائياً
-- لا تشرح ما ستفعله — نفذ مباشرة
-- كل رد أقصى حد 10 أسطر نص + الكود المطلوب`,
-    instructions: `عند إنشاء مشروع: اكتب كل ملف بصيغة ### path/file.ext ثم code block. النظام يكتشف الملفات وينشئ المشروع تلقائياً.
+أنت القائد الأول لكل الوكلاء في البنية التحتية. مهمتك:
+1. تحليل طلبات المالك وتوزيعها على الوكلاء المناسبين
+2. مراقبة حالة النظام وكفاءة كل وكيل
+3. اتخاذ قرارات معمارية للمنصة
+4. التنسيق بين الوكلاء لإنجاز المهام المعقدة
 
-أدوات التشخيص: GET /api/infra/diagnostics/project/:id — GET /api/infra/diagnostics/recent-failures
-أدوات الإصلاح: POST /api/infra/repair/retry-build/:id — POST /api/infra/repair/fix-file — POST /api/infra/repair/reset-project-status
+أنت تستخدم 3 نماذج ذكاء اصطناعي بالتوازي (Claude + Gemini + o3-mini) مع نظام حاكم يدمج أفضل الأفكار من كل نموذج.
 
-لا تكتب تقارير طويلة. لا جداول. كلامك مختصر ومباشر.`,
+قواعدك:
+- رد بلغة المالك (عربي/إنجليزي)
+- كن مختصراً ومباشراً ودقيقاً
+- اذكر المسارات والملفات بدقة من خريطة النظام
+- لا تخترع ملفات غير موجودة
+- استخدم markdown code blocks لأي كود`,
+    instructions: `## أنت مدير النظام الأعلى لمنصة Mr Code AI
+
+أنت القائد الأول والمسؤول عن كامل البنية التحتية.
+عند استقبال أي طلب، حلّله أولاً ثم وجّهه للوكيل المناسب أو نفّذه مباشرة.
+
+### الوكلاء تحت إمرتك:
+- وكيل المراقبة (infra_monitor): مراقبة الأداء والصحة
+- المصلح الجراحي (infra_bugfixer): إصلاح الأخطاء بدقة
+- وكيل التطوير (infra_builder): بناء ميزات جديدة
+- وكيل التصميم (infra_ui): تحسين الواجهات
+- وكيل قاعدة البيانات (infra_db): إدارة البيانات والجداول
+- وكيل الأمان (infra_security): فحص وتعزيز الأمان
+- وكيل النشر (infra_deploy): النشر والتحديثات
+
+### قدرة إنشاء المشاريع:
+يمكنك إنشاء مشروع موقع فعلي لمتابعة المشاكل وحلها.
+عندما يطلب المالك إنشاء موقع أو مشروع، أخبره أنه يمكنك إنشاؤه فوراً وأعطه الكود الكامل.
+المالك يستطيع الضغط على زر "إنشاء مشروع" في نافذة المحادثة لإنشاء المشروع مباشرة.`,
     permissions: ["manage_agents", "read_all_files", "write_files", "restart_services", "database_read", "database_write", "deploy", "security_scan", "full_system_access"],
     pipelineOrder: 1,
     receivesFrom: "owner_input",
@@ -129,25 +148,8 @@ const DEFAULT_INFRA_AGENTS = [
 - لا axios (استخدم fetch)
 - لا framer-motion في ملفات جديدة
 - لا radix-ui/shadcn/mui
-- استخدم Tailwind CSS
-
-### أدوات التشخيص والإصلاح:
-**للتشخيص:**
-- GET /api/infra/diagnostics/project/:projectId — فحص مشروع (أخطاء بناء، سجلات، sandbox)
-- GET /api/infra/diagnostics/recent-failures — آخر الأخطاء في كل المشاريع
-
-**للإصلاح:**
-- POST /api/infra/repair/fix-file — إصلاح ملف مباشرة (body: {projectId, filePath, content})
-- POST /api/infra/repair/retry-build/:projectId — إعادة بناء المهام الفاشلة
-- POST /api/infra/repair/reset-project-status — تغيير حالة مشروع
-
-**أسلوب التشخيص:**
-1. افحص المشروع بـ diagnostics/project/:id
-2. حلل failedTasks و recentErrors لفهم السبب
-3. إذا الخطأ في ملف معين: أصلحه بـ repair/fix-file
-4. إذا البناء فشل: أعد المحاولة بـ repair/retry-build
-5. إذا المشروع عالق: غيّر حالته بـ repair/reset-project-status`,
-    permissions: ["read_all_files", "write_files", "fix_bugs", "patch_code", "analyze_errors", "diagnose_projects", "repair_projects"],
+- استخدم Tailwind CSS`,
+    permissions: ["read_all_files", "write_files", "fix_bugs", "patch_code", "analyze_errors"],
     pipelineOrder: 3,
     receivesFrom: "infra_sysadmin",
     sendsTo: "infra_sysadmin",
@@ -484,26 +486,8 @@ const DEFAULT_INFRA_AGENTS = [
 - [ ] هل النماذج ترسل البيانات صحيحياً؟
 - [ ] هل RTL يعمل في العربية؟
 - [ ] هل التصميم متجاوب مع الجوال؟
-- [ ] هل رسائل الخطأ واضحة ومفيدة؟
-
-### أدوات التشخيص المتقدمة:
-**لفحص مشاكل المشاريع:**
-- GET /api/infra/diagnostics/project/:projectId — تقرير شامل عن مشروع (أخطاء البناء، سجلات التنفيذ، حالة Sandbox، الملفات)
-- GET /api/infra/diagnostics/recent-failures — كل الأخطاء الحديثة عبر كل المشاريع
-
-**لإصلاح المشاكل:**
-- POST /api/infra/repair/retry-build/:projectId — إعادة بناء المهام الفاشلة
-- POST /api/infra/repair/fix-file — إصلاح ملف معين {projectId, filePath, content}
-- POST /api/infra/repair/reset-project-status — إعادة تعيين حالة مشروع {projectId, status}
-
-**عملية فحص مشكلة معاينة:**
-1. اجمع الـ projectId من المالك
-2. افحص بـ diagnostics/project/:id
-3. تحقق من حالة sandbox (هل تعمل؟ هل البورت موجود؟)
-4. تحقق من الملفات (هل index.html موجود؟ هل هناك أخطاء JavaScript؟)
-5. تحقق من أخطاء البناء في failedTasks
-6. إذا وجدت مشكلة: استخدم أدوات الإصلاح لحلها مباشرة`,
-    permissions: ["read_all_files", "test_endpoints", "check_ui", "validate_forms", "test_responsive", "check_accessibility", "diagnose_projects", "repair_projects"],
+- [ ] هل رسائل الخطأ واضحة ومفيدة؟`,
+    permissions: ["read_all_files", "test_endpoints", "check_ui", "validate_forms", "test_responsive", "check_accessibility"],
     pipelineOrder: 9,
     receivesFrom: "infra_sysadmin",
     sendsTo: "infra_sysadmin",
@@ -586,69 +570,6 @@ async function seedInfraAgents() {
 }
 
 seedInfraAgents();
-
-function extractProjectFilesFromReply(reply: string): { name: string; files: { path: string; content: string }[] } {
-  const files: { path: string; content: string }[] = [];
-  let projectName = "";
-
-  const titlePatterns = [
-    /(?:اسم المشروع|المشروع|Project(?:\s*Name)?)[:\s]*\**([^\n*]+)\**/i,
-    /##\s*[🚀📋]*\s*(?:بدء التنفيذ|المشروع|Project)[:\s]*([^\n]+)/,
-    /^#\s+(.+)/m,
-  ];
-  for (const pat of titlePatterns) {
-    const m = reply.match(pat);
-    if (m) { projectName = m[1].trim().replace(/\*\*/g, "").replace(/^[—–\-]+\s*/, ""); break; }
-  }
-
-  const headerPattern = /###\s+([^\n]+)\n\s*```\w*\n([\s\S]*?)```/g;
-  let match;
-  while ((match = headerPattern.exec(reply)) !== null) {
-    let filePath = match[1].trim().replace(/\*\*/g, "").replace(/[`]/g, "");
-    const fileContent = match[2].trim();
-    if (filePath.match(/\.(jsx?|tsx?|css|html|json|js|ts|vue|svelte|py|config\.\w+)$/i) && fileContent.length > 10) {
-      files.push({ path: filePath, content: fileContent });
-    }
-  }
-
-  return { name: projectName || "New Project", files };
-}
-
-async function autoCreateProjectFromReply(reply: string, userId: string, res: any): Promise<{ id: string; name: string; filesCount: number } | null> {
-  const { name, files } = extractProjectFilesFromReply(reply);
-  if (files.length < 1) return null;
-
-  try {
-    res.write(`data: ${JSON.stringify({ type: "status", message: `📦 جاري إنشاء المشروع "${name}"...`, messageEn: `📦 Creating project "${name}"...` })}\n\n`);
-
-    const [project] = await db.insert(projectsTable).values({
-      userId,
-      name: name.trim(),
-      description: `Auto-created from agent response — ${files.length} files`,
-    }).returning();
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const ext = file.path.split(".").pop() || "txt";
-      const typeMap: Record<string, string> = { html: "html", css: "css", js: "javascript", ts: "typescript", tsx: "tsx", jsx: "jsx", json: "json", md: "markdown", vue: "vue", svelte: "svelte", py: "python" };
-      await db.insert(projectFilesTable).values({
-        projectId: project.id,
-        filePath: file.path,
-        content: file.content,
-        fileType: typeMap[ext] || ext,
-      });
-      res.write(`data: ${JSON.stringify({ type: "status", message: `✅ ${file.path}`, messageEn: `✅ ${file.path}` })}\n\n`);
-    }
-
-    res.write(`data: ${JSON.stringify({ type: "project_created", projectId: project.id, projectName: project.name, filesCount: files.length, url: `/project/${project.id}` })}\n\n`);
-
-    return { id: project.id, name: project.name, filesCount: files.length };
-  } catch (err: any) {
-    console.error("[Auto Create Project Error]", err.message);
-    res.write(`data: ${JSON.stringify({ type: "status", message: `❌ فشل إنشاء المشروع: ${err.message}`, messageEn: `❌ Failed to create project: ${err.message}` })}\n\n`);
-    return null;
-  }
-}
 
 const infraSessions = new Map<string, { role: "user" | "assistant"; content: string }[]>();
 
@@ -806,10 +727,8 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
     if (history.length > 40) history.splice(0, history.length - 40);
     infraSessions.set(sKey, history);
 
-    const autoProject = await autoCreateProjectFromReply(fullReply, userId, res);
-
     const cost = tokensUsed * 0.000015;
-    res.write(`data: ${JSON.stringify({ type: "done", tokensUsed, cost, model: slot.model, ...(autoProject ? { projectCreated: autoProject } : {}) })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: "done", tokensUsed, cost, model: slot.model })}\n\n`);
     res.end();
   } catch (err: any) {
     console.error("[Infra Chat Error]", err.message);
@@ -992,12 +911,17 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
         `=== تحليل ${i + 1} (من ${r.model}, ${r.durationMs}ms) ===\n${r.content}`
       ).join("\n\n");
 
-      const governorPrompt = `ادمج أفضل التحليلات في رد واحد مختصر ومباشر.
-- رد بنفس لغة المستخدم
-- لا تذكر إنك حاكم
-- كلامك قصير — بدون جداول أو تقارير طويلة
-- إذا فيه ملفات مشروع، اكتبها بصيغة ### path/file.ext ثم code block
-- أقصى حد: 10 أسطر نص + الكود المطلوب`;
+      const governorPrompt = `أنت الحاكم (Governor) — المقيّم النهائي. استلمت تحليلات من ${successResults.length} نماذج ذكاء اصطناعي درسوا نفس الطلب.
+
+مهمتك:
+1. قيّم كل تحليل من حيث الصحة والعمق والعملية
+2. حدد أفضل تشخيص وحل من كل المقترحات
+3. ادمج أقوى العناصر في رد واحد نهائي موحّد
+4. إذا التحليلات تختلف، اختر الأصح تقنياً
+5. رد بنفس لغة المستخدم الأصلية (عربي أو إنجليزي)
+6. النتيجة النهائية يجب تكون واضحة ومحددة وقابلة للتنفيذ
+
+لا تذكر إنك حاكم أو إنك تدمج — قدّم الإجابة كأنها من مدير النظام مباشرة.`;
 
       const govModelConfig = config.governorModel as any;
       const govProvider = govModelConfig?.provider ?? "anthropic";
@@ -1099,10 +1023,8 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
     if (history.length > 40) history.splice(0, history.length - 40);
     infraSessions.set(sKey, history);
 
-    const autoProject = await autoCreateProjectFromReply(finalContent, userId, res);
-
     const cost = totalTokens * 0.000015;
-    res.write(`data: ${JSON.stringify({ type: "done", tokensUsed: totalTokens, cost, models: modelsUsed, ...(autoProject ? { projectCreated: autoProject } : {}) })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: "done", tokensUsed: totalTokens, cost, models: modelsUsed })}\n\n`);
     res.end();
   } catch (err: any) {
     console.error("[Director Error]", err.message);
@@ -1273,238 +1195,6 @@ router.post("/infra/create-project", requireInfraAdmin, async (req, res) => {
     });
   } catch (err: any) {
     console.error("[Infra Create Project Error]", err.message);
-    res.status(500).json({ error: { message: err.message } });
-  }
-});
-
-router.get("/infra/diagnostics/project/:projectId", requireInfraAdmin, async (req, res) => {
-  try {
-    const { projectId } = req.params;
-
-    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
-    if (!project) {
-      res.status(404).json({ error: { message: "Project not found" } });
-      return;
-    }
-
-    const buildTasks = await db.select().from(buildTasksTable)
-      .where(eq(buildTasksTable.projectId, projectId))
-      .orderBy(desc(buildTasksTable.createdAt))
-      .limit(20);
-
-    const execLogs = await db.select().from(executionLogsTable)
-      .where(eq(executionLogsTable.projectId, projectId))
-      .orderBy(desc(executionLogsTable.createdAt))
-      .limit(30);
-
-    const sandboxes = await db.select().from(sandboxInstancesTable)
-      .where(eq(sandboxInstancesTable.projectId, projectId))
-      .orderBy(desc(sandboxInstancesTable.createdAt))
-      .limit(5);
-
-    const files = await db.select({
-      id: projectFilesTable.id,
-      filePath: projectFilesTable.filePath,
-      fileType: projectFilesTable.fileType,
-      version: projectFilesTable.version,
-    }).from(projectFilesTable)
-      .where(eq(projectFilesTable.projectId, projectId));
-
-    const failedTasks = buildTasks.filter(t => t.status === "failed" || t.status === "error");
-    const failedLogs = execLogs.filter(l => l.status === "error" || l.status === "failed");
-    const stoppedSandboxes = sandboxes.filter(s => s.status === "stopped" || s.status === "error");
-
-    const issues: string[] = [];
-    if (failedTasks.length > 0) issues.push(`${failedTasks.length} failed build tasks`);
-    if (failedLogs.length > 0) issues.push(`${failedLogs.length} error logs`);
-    if (stoppedSandboxes.length > 0) issues.push(`${stoppedSandboxes.length} stopped/error sandboxes`);
-    if (files.length === 0) issues.push("No files generated");
-
-    res.json({
-      project: { id: project.id, name: project.name, status: project.status, createdAt: project.createdAt },
-      summary: {
-        totalBuildTasks: buildTasks.length,
-        failedBuildTasks: failedTasks.length,
-        totalExecLogs: execLogs.length,
-        errorLogs: failedLogs.length,
-        totalFiles: files.length,
-        activeSandboxes: sandboxes.filter(s => s.status === "running").length,
-        issues,
-      },
-      failedTasks: failedTasks.map(t => ({
-        id: t.id,
-        agentType: t.agentType,
-        status: t.status,
-        errorMessage: t.errorMessage,
-        targetFile: t.targetFile,
-        createdAt: t.createdAt,
-      })),
-      recentErrors: failedLogs.map(l => ({
-        id: l.id,
-        agentType: l.agentType,
-        action: l.action,
-        status: l.status,
-        details: l.details,
-        createdAt: l.createdAt,
-      })),
-      sandboxes: sandboxes.map(s => ({
-        id: s.id,
-        status: s.status,
-        port: s.port,
-        runtime: s.runtime,
-        startedAt: s.startedAt,
-        stoppedAt: s.stoppedAt,
-      })),
-      files: files.map(f => ({ path: f.filePath, type: f.fileType, version: f.version })),
-    });
-  } catch (err: any) {
-    console.error("[Infra Diagnostics Error]", err.message);
-    res.status(500).json({ error: { message: err.message } });
-  }
-});
-
-router.get("/infra/diagnostics/recent-failures", requireInfraAdmin, async (_req, res) => {
-  try {
-    const recentFailedTasks = await db.select({
-      id: buildTasksTable.id,
-      projectId: buildTasksTable.projectId,
-      agentType: buildTasksTable.agentType,
-      status: buildTasksTable.status,
-      errorMessage: buildTasksTable.errorMessage,
-      targetFile: buildTasksTable.targetFile,
-      createdAt: buildTasksTable.createdAt,
-    }).from(buildTasksTable)
-      .where(sql`${buildTasksTable.status} IN ('failed', 'error')`)
-      .orderBy(desc(buildTasksTable.createdAt))
-      .limit(20);
-
-    const recentErrors = await db.select({
-      id: executionLogsTable.id,
-      projectId: executionLogsTable.projectId,
-      agentType: executionLogsTable.agentType,
-      action: executionLogsTable.action,
-      status: executionLogsTable.status,
-      details: executionLogsTable.details,
-      createdAt: executionLogsTable.createdAt,
-    }).from(executionLogsTable)
-      .where(sql`${executionLogsTable.status} IN ('error', 'failed')`)
-      .orderBy(desc(executionLogsTable.createdAt))
-      .limit(20);
-
-    const stuckProjects = await db.select({
-      id: projectsTable.id,
-      name: projectsTable.name,
-      status: projectsTable.status,
-      createdAt: projectsTable.createdAt,
-    }).from(projectsTable)
-      .where(sql`${projectsTable.status} IN ('building', 'pending', 'error')`)
-      .orderBy(desc(projectsTable.createdAt))
-      .limit(10);
-
-    res.json({
-      failedBuildTasks: recentFailedTasks,
-      errorLogs: recentErrors,
-      stuckProjects,
-      totalIssues: recentFailedTasks.length + recentErrors.length + stuckProjects.length,
-    });
-  } catch (err: any) {
-    console.error("[Infra Recent Failures Error]", err.message);
-    res.status(500).json({ error: { message: err.message } });
-  }
-});
-
-router.post("/infra/repair/retry-build/:projectId", requireInfraAdmin, async (req, res) => {
-  try {
-    const { projectId } = req.params;
-
-    const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, projectId));
-    if (!project) {
-      res.status(404).json({ error: { message: "Project not found" } });
-      return;
-    }
-
-    await db.update(buildTasksTable)
-      .set({ status: "pending", errorMessage: null, retryCount: sql`${buildTasksTable.retryCount} + 1` })
-      .where(and(
-        eq(buildTasksTable.projectId, projectId),
-        sql`${buildTasksTable.status} IN ('failed', 'error')`
-      ));
-
-    await db.update(projectsTable)
-      .set({ status: "building", updatedAt: new Date() })
-      .where(eq(projectsTable.id, projectId));
-
-    res.json({ success: true, message: "Failed tasks reset to pending, project status set to building" });
-  } catch (err: any) {
-    console.error("[Infra Retry Build Error]", err.message);
-    res.status(500).json({ error: { message: err.message } });
-  }
-});
-
-router.post("/infra/repair/fix-file", requireInfraAdmin, async (req, res) => {
-  try {
-    const { projectId, filePath, content, fileType } = req.body as {
-      projectId: string;
-      filePath: string;
-      content: string;
-      fileType?: string;
-    };
-
-    if (!projectId || !filePath || !content) {
-      res.status(400).json({ error: { message: "projectId, filePath, and content are required" } });
-      return;
-    }
-
-    const existing = await db.select().from(projectFilesTable)
-      .where(and(
-        eq(projectFilesTable.projectId, projectId),
-        eq(projectFilesTable.filePath, filePath),
-      ));
-
-    if (existing.length > 0) {
-      await db.update(projectFilesTable)
-        .set({
-          content,
-          version: sql`${projectFilesTable.version} + 1`,
-          updatedAt: new Date(),
-        })
-        .where(eq(projectFilesTable.id, existing[0].id));
-      res.json({ action: "updated", filePath, version: (existing[0].version || 1) + 1 });
-    } else {
-      const ext = filePath.split(".").pop() || "txt";
-      const typeMap: Record<string, string> = { html: "html", css: "css", js: "javascript", ts: "typescript", tsx: "tsx", jsx: "jsx", json: "json", md: "markdown" };
-      await db.insert(projectFilesTable).values({
-        projectId,
-        filePath,
-        content,
-        fileType: fileType || typeMap[ext] || ext,
-      });
-      res.json({ action: "created", filePath, version: 1 });
-    }
-  } catch (err: any) {
-    console.error("[Infra Fix File Error]", err.message);
-    res.status(500).json({ error: { message: err.message } });
-  }
-});
-
-router.post("/infra/repair/reset-project-status", requireInfraAdmin, async (req, res) => {
-  try {
-    const { projectId, status } = req.body as { projectId: string; status?: string };
-    if (!projectId) {
-      res.status(400).json({ error: { message: "projectId is required" } });
-      return;
-    }
-
-    const validStatuses = ["draft", "building", "ready", "published", "error"];
-    const newStatus = status && validStatuses.includes(status) ? status : "draft";
-
-    await db.update(projectsTable)
-      .set({ status: newStatus, updatedAt: new Date() })
-      .where(eq(projectsTable.id, projectId));
-
-    res.json({ success: true, projectId, status: newStatus });
-  } catch (err: any) {
-    console.error("[Infra Reset Status Error]", err.message);
     res.status(500).json({ error: { message: err.message } });
   }
 });
