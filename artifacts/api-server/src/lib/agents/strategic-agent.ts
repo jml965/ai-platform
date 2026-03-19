@@ -1,8 +1,11 @@
 import { getAnthropicClient, getOpenAIClient, getGoogleClient } from "./ai-clients";
 import { db } from "@workspace/db";
 import { agentConfigsTable, projectFilesTable, agentLogsTable } from "@workspace/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { AgentConfig } from "@workspace/db/schema";
+import * as fs from "fs";
+import * as path from "path";
+import { execSync } from "child_process";
 
 interface ModelSlot {
   provider: string;
@@ -247,12 +250,14 @@ You have FULL access to the platform infrastructure. When the admin asks about i
 7. POST /api/strategic/infra/db-query — Execute ANY SQL query. Body: { query: "SELECT..." } — supports SELECT, INSERT, UPDATE, DELETE, ALTER, CREATE
 8. POST /api/strategic/infra/exec — Execute shell commands on the server. Body: { command: "ls -la" }
 
-When the admin asks about infrastructure, database, files, secrets, or system health:
-- Proactively suggest using these endpoints
-- Provide the exact API call or curl command they can use
-- If they ask you to make changes, tell them the exact endpoint and payload to use
+CRITICAL — You have TOOLS. USE THEM DIRECTLY:
+- You have infrastructure tools (read_file, write_file, db_query, db_tables, exec_command, get_env, set_env, system_status)
+- When the admin asks about files, database, system, env, or anything infrastructure — CALL THE TOOLS YOURSELF and return the results
+- NEVER tell the admin to "execute this API call" or "run this curl command" — YOU execute it using your tools
+- NEVER say "I can't make HTTP requests" — you have direct tool access
 - You have UNRESTRICTED access — no operation is off limits for the admin
 - You can read, modify, delete, create anything in the system
+- Always execute first, then explain the results to the admin
 
 Key infrastructure info:
 - GCP Project: oktamam-ai-platform, Region: me-central1
@@ -800,6 +805,200 @@ export async function addToMemory(
   }).where(eq(agentConfigsTable.agentKey, agentKey));
 }
 
+const INFRA_TOOLS = [
+  {
+    name: "read_file",
+    description: "Read a file's content from the server filesystem. Can also list directory contents.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        path: { type: "string", description: "File or directory path relative to project root" },
+      },
+      required: ["path"],
+    },
+  },
+  {
+    name: "write_file",
+    description: "Write or modify a file on the server filesystem.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        path: { type: "string", description: "File path relative to project root" },
+        content: { type: "string", description: "File content to write" },
+      },
+      required: ["path", "content"],
+    },
+  },
+  {
+    name: "db_query",
+    description: "Execute any SQL query on the database (SELECT, INSERT, UPDATE, DELETE, ALTER, CREATE).",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "SQL query to execute" },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "db_tables",
+    description: "List all database tables with column details.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        detailed: { type: "boolean", description: "Include column details (default: true)" },
+      },
+    },
+  },
+  {
+    name: "exec_command",
+    description: "Execute a shell command on the server and return output.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        command: { type: "string", description: "Shell command to execute" },
+      },
+      required: ["command"],
+    },
+  },
+  {
+    name: "get_env",
+    description: "Get environment variables and secrets. Set reveal=true to show secret values.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        reveal: { type: "boolean", description: "Show actual secret values (default: false)" },
+      },
+    },
+  },
+  {
+    name: "set_env",
+    description: "Set or delete an environment variable.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        key: { type: "string", description: "Environment variable name" },
+        value: { type: "string", description: "Value to set (omit to delete)" },
+      },
+      required: ["key"],
+    },
+  },
+  {
+    name: "system_status",
+    description: "Get full system status: database connection, user/project/agent counts, memory usage, uptime.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+];
+
+const PROJECT_ROOT = process.cwd();
+
+async function executeInfraTool(toolName: string, input: any): Promise<string> {
+  try {
+    switch (toolName) {
+      case "read_file": {
+        const filePath = input.path;
+        const resolved = path.resolve(PROJECT_ROOT, filePath);
+        if (!resolved.startsWith(PROJECT_ROOT)) return JSON.stringify({ error: "Path traversal not allowed" });
+        if (!fs.existsSync(resolved)) return JSON.stringify({ error: "File not found", path: filePath });
+        const stat = fs.statSync(resolved);
+        if (stat.isDirectory()) {
+          const entries = fs.readdirSync(resolved, { withFileTypes: true }).map(d => ({
+            name: d.name,
+            type: d.isDirectory() ? "directory" : "file",
+            size: d.isFile() ? fs.statSync(path.join(resolved, d.name)).size : null,
+          }));
+          return JSON.stringify({ path: filePath, type: "directory", entries });
+        }
+        const content = fs.readFileSync(resolved, "utf-8").slice(0, 100000);
+        return JSON.stringify({ path: filePath, type: "file", size: stat.size, content });
+      }
+      case "write_file": {
+        const resolved = path.resolve(PROJECT_ROOT, input.path);
+        if (!resolved.startsWith(PROJECT_ROOT)) return JSON.stringify({ error: "Path traversal not allowed" });
+        const dir = path.dirname(resolved);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(resolved, input.content, "utf-8");
+        return JSON.stringify({ success: true, path: input.path, size: Buffer.byteLength(input.content) });
+      }
+      case "db_query": {
+        const result = await db.execute(sql.raw(input.query));
+        const rows = result.rows || result;
+        return JSON.stringify({ success: true, rows: (rows as any[]).slice(0, 200), rowCount: (result as any).rowCount ?? (rows as any[]).length });
+      }
+      case "db_tables": {
+        const tables = await db.execute(sql.raw(`
+          SELECT table_name,
+                 (SELECT count(*) FROM information_schema.columns c WHERE c.table_name = t.table_name AND c.table_schema = 'public') as column_count
+          FROM information_schema.tables t WHERE table_schema = 'public' ORDER BY table_name
+        `));
+        let columns: any[] = [];
+        if (input.detailed !== false) {
+          const cols = await db.execute(sql.raw(`
+            SELECT table_name, column_name, data_type, is_nullable, column_default
+            FROM information_schema.columns WHERE table_schema = 'public' ORDER BY table_name, ordinal_position
+          `));
+          columns = (cols.rows || cols) as any[];
+        }
+        return JSON.stringify({ tables: tables.rows || tables, columns });
+      }
+      case "exec_command": {
+        const blocked = ["rm -rf /", "mkfs", "dd if=", ":(){", "fork bomb"];
+        for (const b of blocked) { if (input.command.includes(b)) return JSON.stringify({ error: "Dangerous command blocked" }); }
+        try {
+          const output = execSync(input.command, { cwd: PROJECT_ROOT, timeout: 30000, maxBuffer: 5 * 1024 * 1024, encoding: "utf-8" });
+          return JSON.stringify({ success: true, output: output.slice(0, 50000) });
+        } catch (e: any) {
+          return JSON.stringify({ success: false, exitCode: e?.status || 1, output: (e?.stdout || "").slice(0, 20000), error: (e?.stderr || e?.message || "").slice(0, 20000) });
+        }
+      }
+      case "get_env": {
+        const safeKeys = ["NODE_ENV", "PORT", "DATABASE_URL", "AUTH_PROVIDER", "CLOUD_SQL_INSTANCE", "GCP_PROJECT_ID", "GCP_REGION", "CLOUD_RUN_SERVICE", "GITHUB_REPOSITORY"];
+        const sensitiveKeys = ["SESSION_SECRET", "CUSTOM_ANTHROPIC_API_KEY", "CUSTOM_OPENAI_API_KEY", "GITHUB_TOKEN", "GCP_SA_KEY"];
+        const env: Record<string, string> = {};
+        for (const k of safeKeys) { if (process.env[k]) env[k] = process.env[k]!; }
+        const secrets: Record<string, string> = {};
+        for (const k of sensitiveKeys) {
+          if (input.reveal) {
+            secrets[k] = process.env[k] || "NOT SET";
+          } else {
+            secrets[k] = process.env[k] ? `SET (${process.env[k]!.length} chars)` : "NOT SET";
+          }
+        }
+        return JSON.stringify({ env, secrets, allKeys: Object.keys(process.env).sort() });
+      }
+      case "set_env": {
+        if (input.value === null || input.value === undefined) {
+          delete process.env[input.key];
+          return JSON.stringify({ success: true, action: "deleted", key: input.key });
+        }
+        process.env[input.key] = input.value;
+        return JSON.stringify({ success: true, action: "set", key: input.key });
+      }
+      case "system_status": {
+        let dbStatus = "unknown";
+        try { await db.execute(sql.raw("SELECT 1")); dbStatus = "connected"; } catch { dbStatus = "disconnected"; }
+        const userCount = await db.execute(sql.raw("SELECT count(*) as cnt FROM users"));
+        const projectCount = await db.execute(sql.raw("SELECT count(*) as cnt FROM projects"));
+        const agentCount = await db.execute(sql.raw("SELECT count(*) as cnt FROM agent_configs"));
+        const mem = process.memoryUsage();
+        return JSON.stringify({
+          database: dbStatus,
+          counts: { users: ((userCount.rows || userCount) as any[])[0]?.cnt, projects: ((projectCount.rows || projectCount) as any[])[0]?.cnt, agents: ((agentCount.rows || agentCount) as any[])[0]?.cnt },
+          server: { uptime: `${Math.floor(process.uptime() / 3600)}h ${Math.floor((process.uptime() % 3600) / 60)}m`, memoryMB: Math.round(mem.heapUsed / 1024 / 1024), nodeVersion: process.version, pid: process.pid },
+          env: process.env.NODE_ENV || "development",
+        });
+      }
+      default:
+        return JSON.stringify({ error: `Unknown tool: ${toolName}` });
+    }
+  } catch (e: any) {
+    return JSON.stringify({ error: e?.message || "Tool execution failed" });
+  }
+}
+
 export async function streamStrategicAgent(
   projectId: string,
   userMessage: string,
@@ -916,25 +1115,63 @@ export async function streamStrategicAgent(
 
   if (slot.provider === "anthropic") {
     const client = await getAnthropicClient();
-    const chatMsgs = conversationMessages
+    let chatMsgs: any[] = conversationMessages
       .filter(m => m.role !== "system")
       .map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
-    const streamParams: any = {
+    const baseParams: any = {
       model: slot.model,
       max_tokens: Math.min(maxTok, 64000),
       system: enrichedPrompt,
-      messages: chatMsgs,
+      tools: INFRA_TOOLS,
     };
     if (effectiveCreativity !== undefined && effectiveCreativity >= 0) {
-      streamParams.temperature = Math.min(effectiveCreativity, 1.0);
+      baseParams.temperature = Math.min(effectiveCreativity, 1.0);
     }
-    const stream = client.messages.stream(streamParams);
-    stream.on("text", (text: string) => { fullReply += text; onChunk(text); });
-    const response = await Promise.race([
-      stream.finalMessage(),
-      new Promise<never>((_, reject) => setTimeout(() => { stream.abort(); reject(new Error("Timeout")); }, timeoutMs)),
-    ]);
-    tokensUsed = (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0);
+
+    let loopCount = 0;
+    const maxLoops = 10;
+
+    while (loopCount < maxLoops) {
+      loopCount++;
+      const streamParams = { ...baseParams, messages: chatMsgs };
+      const stream = client.messages.stream(streamParams);
+
+      let currentText = "";
+      let toolUseBlocks: { id: string; name: string; input: any }[] = [];
+      let stopReason = "";
+
+      stream.on("text", (text: string) => { currentText += text; fullReply += text; onChunk(text); });
+
+      const response = await Promise.race([
+        stream.finalMessage(),
+        new Promise<never>((_, reject) => setTimeout(() => { stream.abort(); reject(new Error("Timeout")); }, timeoutMs)),
+      ]);
+
+      tokensUsed += (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0);
+      stopReason = response.stop_reason || "";
+
+      if (response.content) {
+        for (const block of response.content) {
+          if (block.type === "tool_use") {
+            toolUseBlocks.push({ id: block.id, name: block.name, input: block.input });
+          }
+        }
+      }
+
+      if (stopReason !== "tool_use" || toolUseBlocks.length === 0) break;
+
+      chatMsgs.push({ role: "assistant", content: response.content });
+
+      const toolResults: any[] = [];
+      for (const tool of toolUseBlocks) {
+        onChunk(`\n\n⚡ *${tool.name}*...\n`);
+        fullReply += `\n\n⚡ *${tool.name}*...\n`;
+        const result = await executeInfraTool(tool.name, tool.input);
+        toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: result });
+      }
+
+      chatMsgs.push({ role: "user", content: toolResults });
+    }
   } else if (slot.provider === "openai") {
     const client = await getOpenAIClient();
     const msgs: any[] = [
