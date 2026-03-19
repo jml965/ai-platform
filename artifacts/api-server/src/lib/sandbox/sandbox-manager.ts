@@ -119,10 +119,16 @@ function buildSafeEnv(sandbox: SandboxProcess): Record<string, string> {
 
   env.PORT = String(sandbox.port);
   env.SANDBOX_ID = sandbox.id;
-  env.HOME = sandbox.workDir;
+  env.HOME = process.env.HOME || "/home/runner";
   env.TMPDIR = join(sandbox.workDir, ".tmp");
   env.SANDBOX_PROJECT_ID = sandbox.projectId;
   env.NODE_ENV = "development";
+
+  const nodeModulesBin = join(sandbox.workDir, "node_modules", ".bin");
+  env.PATH = `${nodeModulesBin}:${env.PATH || "/usr/bin:/bin"}`;
+
+  env.npm_config_cache = join(sandbox.workDir, ".tmp", ".npm");
+  env.npm_config_prefix = sandbox.workDir;
 
   if (sandbox.runtime === "node") {
     env.NODE_OPTIONS = `--max-old-space-size=${sandbox.memoryLimitMb}`;
@@ -639,11 +645,17 @@ export async function recoverSandboxForProject(projectId: string): Promise<strin
     const hasPackageJson = files.some(f => f.filePath === "package.json");
     if (hasPackageJson) {
       console.log(`[Sandbox Recovery] Installing dependencies for ${projectId}...`);
-      const installCmd = "npm install --legacy-peer-deps 2>&1 | tail -10";
-      await executeCommand(id, installCmd);
+      const installCmd = "npm install --legacy-peer-deps 2>&1";
+      const installResult = await executeCommand(id, installCmd);
+      if (installResult.exitCode !== 0) {
+        console.warn(`[Sandbox Recovery] npm install exited with code ${installResult.exitCode} for ${projectId}`);
+        console.warn(`[Sandbox Recovery] npm output: ${installResult.output.slice(-500)}`);
+      } else {
+        console.log(`[Sandbox Recovery] Dependencies installed successfully for ${projectId}`);
+      }
 
       console.log(`[Sandbox Recovery] Starting dev server for ${projectId}...`);
-      const devCmd = "npx vite --port $PORT --host 0.0.0.0 --strictPort";
+      const devCmd = "vite --port $PORT --host 0.0.0.0 --strictPort";
       await startServer(id, devCmd);
 
       const ready = await waitForServerReady(port, 30000);
