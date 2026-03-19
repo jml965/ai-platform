@@ -259,10 +259,31 @@ CRITICAL — You have TOOLS. USE THEM DIRECTLY:
 - You can read, modify, delete, create anything in the system
 - Always execute first, then explain the results to the admin
 
+FRONTEND DESIGN & CODE TOOLS:
+- list_components: Browse all frontend components and pages in the project
+- view_page_source: Read the FULL source code of any component/page to understand its current design, layout, and styles
+- edit_component: Apply targeted surgical edits to any component (find old text, replace with new text)
+- create_component: Create entirely new components or pages
+
+DESIGN WORKFLOW:
+1. When the admin asks about design or UI changes, FIRST use view_page_source to read the current code and understand the design
+2. Describe what you see and propose specific changes with code previews in the chat
+3. Wait for admin approval before executing changes
+4. When approved, use edit_component for precise edits or create_component for new files
+5. Changes take effect IMMEDIATELY via Vite HMR — the admin will see them in real-time
+6. NEVER fake or mock changes — every edit you make is REAL and live
+
 DEPLOYMENT TOOLS:
 - trigger_deploy: Trigger GitHub Actions deployment workflow to deploy to Cloud Run
 - deploy_status: Check status of recent deployment runs
 - github_api: Make ANY GitHub API call — manage secrets, repos, workflows, branches, etc.
+
+CRITICAL BEHAVIOR RULES:
+- You are a REAL executor, not a pretender. Every action you take must produce REAL, verifiable results.
+- NEVER pretend to do something. If you can't do it, say so honestly.
+- NEVER generate fake output or mock results. Every tool call must be genuine.
+- When you make a change, the proof is in the live running application — the admin can verify immediately.
+- You work with REAL files, REAL database, REAL environment. Nothing is simulated.
 
 Key infrastructure info:
 - GCP Project: oktamam-ai-platform, Region: me-central1
@@ -898,6 +919,52 @@ const INFRA_TOOLS = [
     },
   },
   {
+    name: "list_components",
+    description: "List all frontend React components and pages in the website-builder. Returns file names and paths for navigation.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        directory: { type: "string", description: "Subdirectory to list (default: src). Examples: src/components, src/pages" },
+      },
+    },
+  },
+  {
+    name: "view_page_source",
+    description: "Read the full source code of a frontend component or page to understand its current design, layout, styles, and structure. Use this to 'see' any page before proposing design changes.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        componentPath: { type: "string", description: "Path to the component file relative to website-builder/, e.g. src/pages/DashboardPage.tsx or src/components/Sidebar.tsx" },
+      },
+      required: ["componentPath"],
+    },
+  },
+  {
+    name: "edit_component",
+    description: "Apply a targeted edit to a frontend component file. Finds old_text in the file and replaces it with new_text. Use this for precise surgical edits instead of rewriting entire files.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        componentPath: { type: "string", description: "Path relative to website-builder/, e.g. src/components/Sidebar.tsx" },
+        old_text: { type: "string", description: "Exact text to find in the file (must match exactly including whitespace)" },
+        new_text: { type: "string", description: "Replacement text" },
+      },
+      required: ["componentPath", "old_text", "new_text"],
+    },
+  },
+  {
+    name: "create_component",
+    description: "Create a new frontend component file in the website-builder project. Use for adding new components, pages, or utility files.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        componentPath: { type: "string", description: "Path relative to website-builder/, e.g. src/components/NewFeature.tsx" },
+        content: { type: "string", description: "Full file content for the new component" },
+      },
+      required: ["componentPath", "content"],
+    },
+  },
+  {
     name: "trigger_deploy",
     description: "Trigger a GitHub Actions deployment workflow to deploy the latest code to Cloud Run.",
     input_schema: {
@@ -1029,6 +1096,63 @@ async function executeInfraTool(toolName: string, input: any): Promise<string> {
           server: { uptime: `${Math.floor(process.uptime() / 3600)}h ${Math.floor((process.uptime() % 3600) / 60)}m`, memoryMB: Math.round(mem.heapUsed / 1024 / 1024), nodeVersion: process.version, pid: process.pid },
           env: process.env.NODE_ENV || "development",
         });
+      }
+      case "list_components": {
+        const webBuilderRoot = path.resolve(PROJECT_ROOT, "artifacts/website-builder");
+        const subDir = input.directory || "src";
+        const targetDir = path.resolve(webBuilderRoot, subDir);
+        if (!targetDir.startsWith(webBuilderRoot)) return JSON.stringify({ error: "Path outside website-builder" });
+        if (!fs.existsSync(targetDir)) return JSON.stringify({ error: "Directory not found", path: subDir });
+        const walk = (dir: string, prefix: string = ""): { path: string; type: string; size: number }[] => {
+          const results: { path: string; type: string; size: number }[] = [];
+          const entries = fs.readdirSync(dir, { withFileTypes: true });
+          for (const e of entries) {
+            if (e.name.startsWith(".") || e.name === "node_modules") continue;
+            const relPath = prefix ? `${prefix}/${e.name}` : e.name;
+            if (e.isDirectory()) {
+              results.push({ path: relPath, type: "directory", size: 0 });
+              results.push(...walk(path.join(dir, e.name), relPath));
+            } else if (e.name.match(/\.(tsx?|jsx?|css|html)$/)) {
+              results.push({ path: relPath, type: "file", size: fs.statSync(path.join(dir, e.name)).size });
+            }
+          }
+          return results;
+        };
+        const files = walk(targetDir);
+        return JSON.stringify({ directory: subDir, files, total: files.filter(f => f.type === "file").length });
+      }
+      case "view_page_source": {
+        const webBuilderRoot = path.resolve(PROJECT_ROOT, "artifacts/website-builder");
+        const componentPath = input.componentPath;
+        const resolved = path.resolve(webBuilderRoot, componentPath);
+        if (!resolved.startsWith(webBuilderRoot)) return JSON.stringify({ error: "Path outside website-builder" });
+        if (!fs.existsSync(resolved)) return JSON.stringify({ error: "Component not found", path: componentPath });
+        const content = fs.readFileSync(resolved, "utf-8");
+        const lines = content.split("\n");
+        return JSON.stringify({ path: componentPath, lines: lines.length, size: Buffer.byteLength(content), content: content.slice(0, 150000) });
+      }
+      case "edit_component": {
+        const webBuilderRoot = path.resolve(PROJECT_ROOT, "artifacts/website-builder");
+        const resolved = path.resolve(webBuilderRoot, input.componentPath);
+        if (!resolved.startsWith(webBuilderRoot)) return JSON.stringify({ error: "Path outside website-builder" });
+        if (!fs.existsSync(resolved)) return JSON.stringify({ error: "Component not found", path: input.componentPath });
+        const currentContent = fs.readFileSync(resolved, "utf-8");
+        if (!currentContent.includes(input.old_text)) {
+          return JSON.stringify({ error: "old_text not found in file. Make sure the text matches exactly including whitespace.", path: input.componentPath, fileLines: currentContent.split("\n").length });
+        }
+        const count = currentContent.split(input.old_text).length - 1;
+        const newContent = currentContent.replace(input.old_text, input.new_text);
+        fs.writeFileSync(resolved, newContent, "utf-8");
+        return JSON.stringify({ success: true, path: input.componentPath, matchesReplaced: count, newSize: Buffer.byteLength(newContent) });
+      }
+      case "create_component": {
+        const webBuilderRoot = path.resolve(PROJECT_ROOT, "artifacts/website-builder");
+        const resolved = path.resolve(webBuilderRoot, input.componentPath);
+        if (!resolved.startsWith(webBuilderRoot)) return JSON.stringify({ error: "Path outside website-builder" });
+        const dir = path.dirname(resolved);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(resolved, input.content, "utf-8");
+        return JSON.stringify({ success: true, path: input.componentPath, size: Buffer.byteLength(input.content) });
       }
       case "trigger_deploy": {
 
