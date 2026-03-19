@@ -1,0 +1,220 @@
+import { useMemo, useState, useRef, useEffect } from "react";
+import { devices } from "../workspace/device-switcher";
+import { Monitor, Smartphone, Tablet, Laptop, ChevronDown } from "lucide-react";
+
+type PreviewFile = {
+  path: string;
+  content: string;
+  language?: string;
+};
+
+type Props = {
+  previewUrl?: string;
+  files?: PreviewFile[];
+  refreshTrigger?: number;
+};
+
+function normalizePath(path?: string) {
+  return String(path || "").trim().toLowerCase();
+}
+
+function findHtmlFile(files?: PreviewFile[]) {
+  if (!Array.isArray(files)) return null;
+  const normalized = files.filter(Boolean);
+  const exactIndex = normalized.find((file) => normalizePath(file.path) === "index.html");
+  if (exactIndex) return exactIndex;
+  const anyHtml = normalized.find((file) => {
+    const path = normalizePath(file.path);
+    return path.endsWith(".html") || path.endsWith(".htm");
+  });
+  return anyHtml ?? null;
+}
+
+function injectAllAssetsIntoHtml(html: string, allCss: string[], allJs: string[]) {
+  let output = html;
+  output = output.replace(/<link[^>]*rel=["']stylesheet["'][^>]*>/gi, "");
+  output = output.replace(/<script[^>]*src=["'][^"']*["'][^>]*><\/script>/gi, "");
+  if (allCss.length > 0) {
+    const cssBlock = allCss.map(c => `<style>${c}</style>`).join("\n");
+    if (/<\/head>/i.test(output)) {
+      output = output.replace(/<\/head>/i, `${cssBlock}\n</head>`);
+    } else {
+      output = `${cssBlock}\n${output}`;
+    }
+  }
+  if (allJs.length > 0) {
+    const jsBlock = allJs.map(j => `<script>${j}<\/script>`).join("\n");
+    if (/<\/body>/i.test(output)) {
+      output = output.replace(/<\/body>/i, `${jsBlock}\n</body>`);
+    } else {
+      output = `${output}\n${jsBlock}`;
+    }
+  }
+  return output;
+}
+
+function getDeviceIcon(key: string) {
+  if (key === "full" || key === "16:9" || key.startsWith("desktop") || key.startsWith("macbook")) return Monitor;
+  if (key.startsWith("ipad")) return Tablet;
+  if (key.startsWith("laptop")) return Laptop;
+  return Smartphone;
+}
+
+export function PreviewPanel({ previewUrl, files, refreshTrigger }: Props) {
+  const [selected, setSelected] = useState("full");
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (refreshTrigger && refreshTrigger > 0) {
+      setRefreshKey((k) => k + 1);
+    }
+  }, [refreshTrigger]);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false);
+      }
+    }
+    if (showMenu) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showMenu]);
+
+  const currentDevice = useMemo(
+    () => devices.find((d) => d.key === selected) || devices[0],
+    [selected]
+  );
+
+  const srcDoc = useMemo(() => {
+    if (previewUrl) return undefined;
+    const htmlFile = findHtmlFile(files);
+    if (!htmlFile?.content) return undefined;
+    const allCss = (files || [])
+      .filter(f => normalizePath(f.path).endsWith(".css") && f.content)
+      .map(f => f.content);
+    const allJs = (files || [])
+      .filter(f => {
+        const p = normalizePath(f.path);
+        return (p.endsWith(".js") || p.endsWith(".mjs")) && f.content;
+      })
+      .map(f => f.content);
+    return injectAllAssetsIntoHtml(htmlFile.content, allCss, allJs);
+  }, [previewUrl, files]);
+
+  const hasContent = previewUrl || srcDoc;
+  const DeviceIcon = getDeviceIcon(selected);
+
+  const frameStyle =
+    currentDevice.key === "full"
+      ? { width: "100%", height: "100%" }
+      : { width: `${currentDevice.width}px`, height: `${currentDevice.height}px`, maxWidth: "100%" };
+
+  const groups: { label: string; keys: string[] }[] = [
+    { label: "", keys: ["full", "16:9"] },
+    { label: "iPhone", keys: devices.filter(d => d.group === "phone" && d.key.startsWith("iphone")).map(d => d.key) },
+    { label: "Pixel", keys: devices.filter(d => d.group === "phone" && d.key.startsWith("pixel")).map(d => d.key) },
+    { label: "Samsung", keys: devices.filter(d => d.group === "phone" && d.key.startsWith("s2")).map(d => d.key) },
+    { label: "Tablet", keys: devices.filter(d => d.group === "tablet").map(d => d.key) },
+    { label: "Desktop", keys: devices.filter(d => d.group === "desktop").map(d => d.key) },
+  ];
+
+  return (
+    <div className="h-full flex flex-col">
+      <div className="h-10 border-b border-zinc-800/50 bg-[#0c1018] flex items-center px-3 shrink-0">
+        <div className="relative" ref={menuRef}>
+          <button
+            data-testid="btn-device-switcher"
+            onClick={() => setShowMenu(!showMenu)}
+            className="h-8 px-2.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 flex items-center gap-2 text-[12px] transition-colors"
+          >
+            <DeviceIcon size={15} strokeWidth={1.5} />
+            <span>{currentDevice.label}</span>
+            {typeof currentDevice.width === "number" && (
+              <span className="text-zinc-600 text-[10px]">{currentDevice.width} x {currentDevice.height}</span>
+            )}
+            <ChevronDown size={12} className="text-zinc-600" />
+          </button>
+
+          {showMenu && (
+            <div className="absolute top-full mt-1 right-0 z-50 w-[240px] bg-[#141a28] border border-zinc-700/70 rounded-lg shadow-2xl py-1 text-[12px] max-h-[420px] overflow-y-auto">
+              {groups.map((group, gi) => {
+                const groupDevices = group.keys.map(k => devices.find(d => d.key === k)!).filter(Boolean);
+                if (groupDevices.length === 0) return null;
+                return (
+                  <div key={gi}>
+                    {gi > 0 && <div className="h-px bg-zinc-700/40 my-1" />}
+                    {group.label && (
+                      <div className="px-3 py-1.5 text-[10px] text-zinc-600 font-medium uppercase tracking-wider">
+                        {group.label}
+                      </div>
+                    )}
+                    {groupDevices.map((d) => {
+                      const Icon = getDeviceIcon(d.key);
+                      return (
+                        <button
+                          key={d.key}
+                          data-testid={`device-${d.key}`}
+                          onClick={() => { setSelected(d.key); setShowMenu(false); }}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 text-right transition-colors ${
+                            selected === d.key
+                              ? "text-blue-400 bg-blue-500/10"
+                              : "text-zinc-300 hover:bg-zinc-700/30"
+                          }`}
+                        >
+                          <Icon size={14} strokeWidth={1.5} className="shrink-0 text-zinc-500" />
+                          <span className="flex-1">{d.label}</span>
+                          {typeof d.width === "number" && (
+                            <span className="text-zinc-600 text-[10px]">{d.width}x{d.height}</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-auto bg-[#0d1320] flex items-start justify-center p-2">
+        {hasContent ? (
+          <div
+            className="overflow-hidden bg-white mx-auto"
+            style={{
+              ...frameStyle,
+              ...(currentDevice.key !== "full" ? { border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px" } : {}),
+            }}
+          >
+            {previewUrl ? (
+              <iframe
+                ref={iframeRef}
+                key={refreshKey}
+                data-testid="preview-iframe"
+                title="preview"
+                src={previewUrl}
+                className="w-full h-full border-0"
+              />
+            ) : (
+              <iframe
+                ref={iframeRef}
+                data-testid="preview-iframe"
+                title="preview"
+                srcDoc={srcDoc}
+                sandbox="allow-scripts allow-forms allow-modals allow-same-origin"
+                className="w-full h-full border-0"
+              />
+            )}
+          </div>
+        ) : (
+          <div className="text-zinc-600 text-xs mt-20">
+            لا توجد معاينة بعد
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
