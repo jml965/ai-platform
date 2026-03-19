@@ -259,12 +259,18 @@ CRITICAL — You have TOOLS. USE THEM DIRECTLY:
 - You can read, modify, delete, create anything in the system
 - Always execute first, then explain the results to the admin
 
+DEPLOYMENT TOOLS:
+- trigger_deploy: Trigger GitHub Actions deployment workflow to deploy to Cloud Run
+- deploy_status: Check status of recent deployment runs
+- github_api: Make ANY GitHub API call — manage secrets, repos, workflows, branches, etc.
+
 Key infrastructure info:
 - GCP Project: oktamam-ai-platform, Region: me-central1
 - Cloud Run Service: mrcodeai
 - Cloud SQL: mrcodeai-db (34.18.137.40), DB: mrcodeai, User: postgres
 - Domain: mrcodeai.com, Load Balancer IP: 34.8.145.55
-- CI/CD: GitHub Actions → Cloud Run auto-deploy on push to main`;
+- CI/CD: GitHub Actions → Cloud Run auto-deploy on push to main
+- GitHub Repo: jml965/ai-platform`;
 
 const STRATEGIC_JSON_PROMPT_SUFFIX = `
 
@@ -891,6 +897,39 @@ const INFRA_TOOLS = [
       properties: {},
     },
   },
+  {
+    name: "trigger_deploy",
+    description: "Trigger a GitHub Actions deployment workflow to deploy the latest code to Cloud Run.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        branch: { type: "string", description: "Branch to deploy (default: main)" },
+      },
+    },
+  },
+  {
+    name: "deploy_status",
+    description: "Check the status of recent GitHub Actions deployment runs.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        limit: { type: "number", description: "Number of recent runs to show (default: 5)" },
+      },
+    },
+  },
+  {
+    name: "github_api",
+    description: "Make any GitHub API call. Use for managing secrets, checking repos, workflows, etc.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        method: { type: "string", description: "HTTP method: GET, POST, PUT, DELETE, PATCH" },
+        endpoint: { type: "string", description: "GitHub API endpoint path (e.g., /repos/owner/repo/actions/runs)" },
+        body: { type: "object", description: "Request body for POST/PUT/PATCH (optional)" },
+      },
+      required: ["method", "endpoint"],
+    },
+  },
 ];
 
 const PROJECT_ROOT = process.cwd();
@@ -991,12 +1030,88 @@ async function executeInfraTool(toolName: string, input: any): Promise<string> {
           env: process.env.NODE_ENV || "development",
         });
       }
+      case "trigger_deploy": {
+
+        const ghToken = await getGitHubToken();
+        if (!ghToken) return JSON.stringify({ error: "GitHub token not available" });
+        const repo = process.env.GITHUB_REPOSITORY || "jml965/ai-platform";
+        const branch = input.branch || "main";
+        const res = await fetch(`https://api.github.com/repos/${repo}/actions/workflows`, {
+          headers: { Authorization: `token ${ghToken}`, Accept: "application/vnd.github.v3+json" },
+        });
+        const workflows = await res.json();
+        const deployWf = workflows.workflows?.find((w: any) => w.name?.toLowerCase().includes("deploy") || w.path?.includes("deploy"));
+        if (!deployWf) return JSON.stringify({ error: "No deploy workflow found", available: workflows.workflows?.map((w: any) => w.name) });
+        const triggerRes = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/${deployWf.id}/dispatches`, {
+          method: "POST",
+          headers: { Authorization: `token ${ghToken}`, Accept: "application/vnd.github.v3+json", "Content-Type": "application/json" },
+          body: JSON.stringify({ ref: branch }),
+        });
+        if (triggerRes.status === 204) return JSON.stringify({ success: true, message: `Deployment triggered on branch '${branch}'`, workflow: deployWf.name });
+        const errBody = await triggerRes.text();
+        return JSON.stringify({ success: false, status: triggerRes.status, error: errBody });
+      }
+      case "deploy_status": {
+        const ghToken = await getGitHubToken();
+        if (!ghToken) return JSON.stringify({ error: "GitHub token not available" });
+        const repo = process.env.GITHUB_REPOSITORY || "jml965/ai-platform";
+        const limit = input.limit || 5;
+        const res = await fetch(`https://api.github.com/repos/${repo}/actions/runs?per_page=${limit}`, {
+          headers: { Authorization: `token ${ghToken}`, Accept: "application/vnd.github.v3+json" },
+        });
+        const data = await res.json();
+        const runs = (data.workflow_runs || []).map((r: any) => ({
+          id: r.id, name: r.name, status: r.status, conclusion: r.conclusion,
+          branch: r.head_branch, event: r.event,
+          created: r.created_at, updated: r.updated_at,
+          url: r.html_url,
+        }));
+        return JSON.stringify({ runs });
+      }
+      case "github_api": {
+        const ghToken = await getGitHubToken();
+        if (!ghToken) return JSON.stringify({ error: "GitHub token not available" });
+        const url = input.endpoint.startsWith("https://") ? input.endpoint : `https://api.github.com${input.endpoint}`;
+        const opts: any = {
+          method: input.method || "GET",
+          headers: { Authorization: `token ${ghToken}`, Accept: "application/vnd.github.v3+json", "Content-Type": "application/json" },
+        };
+        if (input.body && ["POST", "PUT", "PATCH"].includes(opts.method)) {
+          opts.body = JSON.stringify(input.body);
+        }
+        const res = await fetch(url, opts);
+        const text = await res.text();
+        let body;
+        try { body = JSON.parse(text); } catch { body = text; }
+        return JSON.stringify({ status: res.status, body: typeof body === "object" ? JSON.stringify(body).slice(0, 50000) : (body as string).slice(0, 50000) });
+      }
       default:
         return JSON.stringify({ error: `Unknown tool: ${toolName}` });
     }
   } catch (e: any) {
     return JSON.stringify({ error: e?.message || "Tool execution failed" });
   }
+}
+
+async function getGitHubToken(): Promise<string | null> {
+  if (process.env.GITHUB_TOKEN) return process.env.GITHUB_TOKEN;
+  try {
+    const connectorHostname = process.env.REPLIT_CONNECTORS_HOSTNAME || process.env.CONNECTORS_HOSTNAME;
+    if (connectorHostname) {
+      const res = await fetch(`http://${connectorHostname}/proxy/github`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.access_token) return data.access_token;
+      }
+    }
+  } catch {}
+  try {
+    const { execSync: ex } = require("child_process");
+    const token = ex("git remote get-url github 2>/dev/null || git remote get-url origin 2>/dev/null", { encoding: "utf-8" }).trim();
+    const match = token.match(/https:\/\/([^@]+)@github\.com/);
+    if (match && match[1] && match[1].length > 10) return match[1];
+  } catch {}
+  return null;
 }
 
 export async function streamStrategicAgent(
