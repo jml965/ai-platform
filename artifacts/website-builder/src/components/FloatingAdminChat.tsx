@@ -4,7 +4,8 @@ import {
   Crown, Activity, Crosshair, Server, Palette, Database, Lock, Rocket,
   FlaskConical, Bot, Wand2, Trash2, X, Send, Minimize2, Maximize2,
   ChevronDown, GripHorizontal, MessageSquare, Terminal, FileText, HardDrive,
-  Settings, FolderOpen, Shield,
+  Settings, FolderOpen, Shield, PanelLeftOpen, PanelLeftClose, Plus, MoreHorizontal,
+  Pencil, Check,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useGetMe } from "@workspace/api-client-react";
@@ -55,6 +56,44 @@ interface ChatMsg {
   models?: string[];
 }
 
+interface ChatThread {
+  id: string;
+  title: string;
+  agentKey: string;
+  messages: ChatMsg[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+const THREADS_KEY = "floating-chat-threads";
+
+function loadThreads(): ChatThread[] {
+  try {
+    const raw = localStorage.getItem(THREADS_KEY);
+    if (raw) {
+      const threads = JSON.parse(raw);
+      return threads.map((t: any) => ({
+        ...t,
+        messages: t.messages.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) })),
+      }));
+    }
+  } catch {}
+  return [];
+}
+
+function saveThreads(threads: ChatThread[]) {
+  try {
+    localStorage.setItem(THREADS_KEY, JSON.stringify(threads.slice(0, 50)));
+  } catch {}
+}
+
+function generateTitle(msgs: ChatMsg[]): string {
+  const first = msgs.find(m => m.role === "user");
+  if (!first) return "محادثة جديدة";
+  const text = first.content.replace(/\[.*?\]/g, "").replace(/\n.*/s, "").trim();
+  return text.length > 40 ? text.slice(0, 40) + "..." : text || "محادثة جديدة";
+}
+
 interface WandTarget {
   tag: string;
   id?: string;
@@ -101,6 +140,13 @@ function FloatingChatInner() {
   const [wandMode, setWandMode] = useState(false);
   const [wandHighlight, setWandHighlight] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
 
+  const [threads, setThreads] = useState<ChatThread[]>(() => loadThreads());
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [threadMenuId, setThreadMenuId] = useState<string | null>(null);
+
   const [pos, setPos] = useState(saved?.pos || { x: window.innerWidth - 420, y: window.innerHeight - 580 });
   const [size, setSize] = useState(saved?.size || { w: 380, h: 520 });
 
@@ -109,6 +155,67 @@ function FloatingChatInner() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ pos, size, agentKey: selectedAgent?.agentKey }));
     } catch {}
   }, [pos, size, selectedAgent]);
+
+  useEffect(() => { saveThreads(threads); }, [threads]);
+
+  useEffect(() => {
+    if (activeThreadId) {
+      const thread = threads.find(t => t.id === activeThreadId);
+      if (thread) setMessages(thread.messages);
+    }
+  }, [activeThreadId]);
+
+  const syncMessagesToThread = useCallback((msgs: ChatMsg[]) => {
+    if (!activeThreadId || msgs.length === 0) return;
+    setThreads(prev => prev.map(t =>
+      t.id === activeThreadId
+        ? { ...t, messages: msgs, updatedAt: Date.now(), title: t.title === "محادثة جديدة" || t.title === "New Chat" ? generateTitle(msgs) : t.title }
+        : t
+    ));
+  }, [activeThreadId]);
+
+  useEffect(() => {
+    if (messages.length > 0 && activeThreadId) syncMessagesToThread(messages);
+  }, [messages, activeThreadId, syncMessagesToThread]);
+
+  const startNewThread = () => {
+    const id = crypto.randomUUID();
+    const agentKey = selectedAgent?.agentKey || "strategic";
+    const newThread: ChatThread = { id, title: isRTL ? "محادثة جديدة" : "New Chat", agentKey, messages: [], createdAt: Date.now(), updatedAt: Date.now() };
+    setThreads(prev => [newThread, ...prev]);
+    setActiveThreadId(id);
+    setMessages([]);
+    setShowSidebar(false);
+  };
+
+  const switchThread = (threadId: string) => {
+    if (loading) return;
+    const thread = threads.find(t => t.id === threadId);
+    if (!thread) return;
+    setActiveThreadId(threadId);
+    setMessages(thread.messages);
+    if (agents.length > 0) {
+      const ag = agents.find(a => a.agentKey === thread.agentKey);
+      if (ag) setSelectedAgent(ag);
+    }
+    setShowSidebar(false);
+  };
+
+  const deleteThread = (threadId: string) => {
+    setThreads(prev => prev.filter(t => t.id !== threadId));
+    if (activeThreadId === threadId) {
+      setActiveThreadId(null);
+      setMessages([]);
+    }
+    setThreadMenuId(null);
+  };
+
+  const renameThread = (threadId: string, newTitle: string) => {
+    if (!newTitle.trim()) return;
+    setThreads(prev => prev.map(t => t.id === threadId ? { ...t, title: newTitle.trim() } : t));
+    setEditingThreadId(null);
+    setEditTitle("");
+  };
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -292,6 +399,13 @@ function FloatingChatInner() {
     setPrompt("");
     setLoading(true);
     userScrolledUpRef.current = false;
+
+    if (!activeThreadId) {
+      const id = crypto.randomUUID();
+      const newThread: ChatThread = { id, title: isRTL ? "محادثة جديدة" : "New Chat", agentKey: selectedAgent.agentKey, messages: [], createdAt: Date.now(), updatedAt: Date.now() };
+      setThreads(prev => [newThread, ...prev]);
+      setActiveThreadId(id);
+    }
 
     setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "user", content: currentPrompt, timestamp: new Date() }]);
 
@@ -563,13 +677,20 @@ function FloatingChatInner() {
           </div>
 
           <button
+            onClick={() => setShowSidebar(!showSidebar)}
+            className={`p-1.5 transition-colors rounded-md ${showSidebar ? "text-[#58a6ff] bg-[#58a6ff]/10" : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-white/5"}`}
+            title={isRTL ? "المحادثات" : "Conversations"}
+          >
+            {showSidebar ? <PanelLeftClose className="w-3.5 h-3.5" /> : <PanelLeftOpen className="w-3.5 h-3.5" />}
+          </button>
+          <button
             onClick={() => { setWandMode(!wandMode); setWandHighlight(null); }}
             className={`p-1.5 transition-colors rounded-md ${wandMode ? "text-amber-400 bg-amber-500/15" : "text-[#8b949e] hover:text-amber-400 hover:bg-white/5"}`}
             title={isRTL ? "عصا سحرية" : "Magic Wand"}
           >
             <Wand2 className="w-3.5 h-3.5" />
           </button>
-          <button onClick={() => setMessages([])} className="p-1.5 text-[#8b949e] hover:text-red-400 rounded-md hover:bg-white/5" title={isRTL ? "مسح" : "Clear"}>
+          <button onClick={() => { setMessages([]); setActiveThreadId(null); }} className="p-1.5 text-[#8b949e] hover:text-red-400 rounded-md hover:bg-white/5" title={isRTL ? "مسح" : "Clear"}>
             <Trash2 className="w-3.5 h-3.5" />
           </button>
           <button onClick={() => setMinimized(true)} className="p-1.5 text-[#8b949e] hover:text-[#e1e4e8] rounded-md hover:bg-white/5">
@@ -589,109 +710,196 @@ function FloatingChatInner() {
           </div>
         )}
 
-        <div
-          ref={chatContainerRef}
-          className="flex-1 overflow-y-auto p-3 space-y-3"
-          onWheel={(e) => {
-            if (e.deltaY < 0) userScrolledUpRef.current = true;
-            else {
-              const el = chatContainerRef.current;
-              if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 40) userScrolledUpRef.current = false;
-            }
-          }}
-        >
-          {messages.length === 0 && (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                <div className={`w-12 h-12 mx-auto rounded-xl flex items-center justify-center mb-3 bg-[#161b22] border border-[#30363d] ${agentColor}`}>
-                  {agentIcon}
-                </div>
-                <p className="text-[12px] text-[#484f58] max-w-[220px]">
-                  {isRTL ? "اكتب أمرك أو استخدم العصا السحرية لتحديد عنصر" : "Type a command or use the magic wand to select an element"}
-                </p>
+        <div className="flex-1 flex overflow-hidden min-h-0">
+          {showSidebar && (
+            <div className={`w-[200px] flex-shrink-0 bg-[#0a0e14] ${isRTL ? "border-l" : "border-r"} border-[#1c2333] flex flex-col`}>
+              <div className="p-2 flex items-center justify-between border-b border-[#1c2333]">
+                <span className="text-[11px] font-semibold text-[#8b949e]">{isRTL ? "المحادثات" : "Chats"}</span>
+                <button
+                  onClick={startNewThread}
+                  className="p-1 rounded-md hover:bg-white/5 text-[#8b949e] hover:text-cyan-400 transition-colors"
+                  title={isRTL ? "محادثة جديدة" : "New chat"}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                {threads.length === 0 ? (
+                  <div className="p-3 text-center">
+                    <MessageSquare className="w-5 h-5 mx-auto text-[#30363d] mb-2" />
+                    <p className="text-[10px] text-[#484f58]">{isRTL ? "لا توجد محادثات" : "No conversations"}</p>
+                  </div>
+                ) : (
+                  <div className="py-1">
+                    {threads.map(thread => {
+                      const isActive = thread.id === activeThreadId;
+                      const isEditing = editingThreadId === thread.id;
+                      const threadAgent = AGENT_ICONS[thread.agentKey];
+                      const threadColor = AGENT_COLORS[thread.agentKey] || "text-[#8b949e]";
+                      return (
+                        <div
+                          key={thread.id}
+                          className={`group relative px-2 py-1.5 mx-1 rounded-lg cursor-pointer transition-colors ${isActive ? "bg-white/8" : "hover:bg-white/5"}`}
+                          onClick={() => !isEditing && switchThread(thread.id)}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <div className={`flex-shrink-0 ${threadColor}`}>
+                              {threadAgent || <Bot className="w-3 h-3" />}
+                            </div>
+                            {isEditing ? (
+                              <div className="flex items-center gap-1 flex-1 min-w-0">
+                                <input
+                                  autoFocus
+                                  value={editTitle}
+                                  onChange={e => setEditTitle(e.target.value)}
+                                  onKeyDown={e => { if (e.key === "Enter") renameThread(thread.id, editTitle); if (e.key === "Escape") setEditingThreadId(null); }}
+                                  onClick={e => e.stopPropagation()}
+                                  className="flex-1 min-w-0 bg-[#161b22] border border-[#30363d] rounded px-1.5 py-0.5 text-[10px] text-[#e1e4e8] focus:outline-none focus:border-cyan-500/50"
+                                />
+                                <button onClick={(e) => { e.stopPropagation(); renameThread(thread.id, editTitle); }} className="p-0.5 text-green-400 hover:text-green-300">
+                                  <Check className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="flex-1 min-w-0 text-[11px] text-[#c9d1d9] truncate">
+                                {thread.title}
+                              </span>
+                            )}
+                            {!isEditing && (
+                              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setEditingThreadId(thread.id); setEditTitle(thread.title); }}
+                                  className="p-0.5 text-[#484f58] hover:text-[#e1e4e8] rounded"
+                                >
+                                  <Pencil className="w-2.5 h-2.5" />
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); deleteThread(thread.id); }}
+                                  className="p-0.5 text-[#484f58] hover:text-red-400 rounded"
+                                >
+                                  <Trash2 className="w-2.5 h-2.5" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-[9px] text-[#484f58] mt-0.5 truncate" style={{ paddingInlineStart: "18px" }}>
+                            {thread.messages.length > 0 ? `${thread.messages.length} ${isRTL ? "رسالة" : "msgs"}` : ""} · {new Date(thread.updatedAt).toLocaleDateString(isRTL ? "ar" : "en", { month: "short", day: "numeric" })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {messages.map(msg => {
-            if (msg.role === "status") {
-              return (
-                <div key={msg.id} className="flex items-center justify-center py-0.5">
-                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#161b22] border border-[#30363d]">
-                    <div className="w-1 h-1 bg-yellow-400 rounded-full animate-pulse" />
-                    <span className="text-[10px] text-[#8b949e]">{msg.content}</span>
+          <div className="flex-1 flex flex-col min-w-0">
+            <div
+              ref={chatContainerRef}
+              className="flex-1 overflow-y-auto p-3 space-y-3"
+              onWheel={(e) => {
+                if (e.deltaY < 0) userScrolledUpRef.current = true;
+                else {
+                  const el = chatContainerRef.current;
+                  if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 40) userScrolledUpRef.current = false;
+                }
+              }}
+            >
+              {messages.length === 0 && (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <div className={`w-12 h-12 mx-auto rounded-xl flex items-center justify-center mb-3 bg-[#161b22] border border-[#30363d] ${agentColor}`}>
+                      {agentIcon}
+                    </div>
+                    <p className="text-[12px] text-[#484f58] max-w-[220px]">
+                      {isRTL ? "اكتب أمرك أو استخدم العصا السحرية لتحديد عنصر" : "Type a command or use the magic wand to select an element"}
+                    </p>
                   </div>
                 </div>
-              );
-            }
-            return (
-              <div key={msg.id} className={msg.role === "user" ? "text-end" : ""}>
-                <div className={`inline-block text-start max-w-full ${msg.role === "user" ? "bg-cyan-500/10 border border-cyan-500/20 rounded-xl px-3 py-2 text-cyan-300 text-[13px]" : "text-[#c9d1d9]"}`}>
-                  {msg.role === "assistant" && !msg.content && loading ? (
-                    <div className="flex items-center gap-1.5 py-1">
-                      <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                      <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                      <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                      <span className="text-[10px] text-[#8b949e]">{isRTL ? "يحلل..." : "Analyzing..."}</span>
+              )}
+
+              {messages.map(msg => {
+                if (msg.role === "status") {
+                  return (
+                    <div key={msg.id} className="flex items-center justify-center py-0.5">
+                      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#161b22] border border-[#30363d]">
+                        <div className="w-1 h-1 bg-yellow-400 rounded-full animate-pulse" />
+                        <span className="text-[10px] text-[#8b949e]">{msg.content}</span>
+                      </div>
                     </div>
-                  ) : renderMessageContent(msg.content)}
-                  {msg.tokensUsed && (
-                    <div className="text-[9px] text-[#484f58] mt-0.5">
-                      {msg.models ? msg.models.join(" + ") : msg.model} · {msg.tokensUsed.toLocaleString()} tokens
+                  );
+                }
+                return (
+                  <div key={msg.id} className={msg.role === "user" ? "text-end" : ""}>
+                    <div className={`inline-block text-start max-w-full ${msg.role === "user" ? "bg-cyan-500/10 border border-cyan-500/20 rounded-xl px-3 py-2 text-cyan-300 text-[13px]" : "text-[#c9d1d9]"}`}>
+                      {msg.role === "assistant" && !msg.content && loading ? (
+                        <div className="flex items-center gap-1.5 py-1">
+                          <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                          <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                          <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                          <span className="text-[10px] text-[#8b949e]">{isRTL ? "يحلل..." : "Analyzing..."}</span>
+                        </div>
+                      ) : renderMessageContent(msg.content)}
+                      {msg.tokensUsed && (
+                        <div className="text-[9px] text-[#484f58] mt-0.5">
+                          {msg.models ? msg.models.join(" + ") : msg.model} · {msg.tokensUsed.toLocaleString()} tokens
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {selectedAgent?.agentKey === "strategic" && (
+              <div className="border-t border-[#1c2333] px-2 py-1 flex items-center gap-1 flex-shrink-0 overflow-x-auto">
+                {[
+                  { icon: <HardDrive className="w-3 h-3" />, label: isRTL ? "حالة النظام" : "Status", cmd: isRTL ? "اعرض حالة النظام الكاملة — قاعدة البيانات، السيرفر، الذاكرة" : "Show full system status — database, server, memory" },
+                  { icon: <Database className="w-3 h-3" />, label: isRTL ? "جداول" : "Tables", cmd: isRTL ? "اعرض جميع جداول قاعدة البيانات مع تفاصيل الأعمدة" : "Show all database tables with column details" },
+                  { icon: <FolderOpen className="w-3 h-3" />, label: isRTL ? "ملفات" : "Files", cmd: isRTL ? "اعرض قائمة ملفات البنية التحتية ومحتوياتها" : "List infrastructure files and their status" },
+                  { icon: <Settings className="w-3 h-3" />, label: isRTL ? "متغيرات" : "ENV", cmd: isRTL ? "اعرض جميع المتغيرات البيئية والأسرار" : "Show all environment variables and secrets status" },
+                  { icon: <Shield className="w-3 h-3" />, label: isRTL ? "أمان" : "Security", cmd: isRTL ? "فحص أمان شامل — الأسرار، الصلاحيات، نقاط الضعف" : "Full security audit — secrets, permissions, vulnerabilities" },
+                  { icon: <Terminal className="w-3 h-3" />, label: isRTL ? "أمر" : "Exec", cmd: isRTL ? "نفذ أمر: " : "Execute command: " },
+                ].map((btn, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      if (btn.cmd.endsWith(": ")) { setPrompt(btn.cmd); textareaRef.current?.focus(); }
+                      else { doSend(btn.cmd); }
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#161b22] hover:bg-[#1c2333] border border-[#30363d] text-[10px] text-[#8b949e] hover:text-cyan-400 transition-colors whitespace-nowrap"
+                    title={btn.cmd}
+                  >
+                    {btn.icon}
+                    {btn.label}
+                  </button>
+                ))}
               </div>
-            );
-          })}
-        </div>
-
-        {selectedAgent?.agentKey === "strategic" && (
-          <div className="border-t border-[#1c2333] px-2 py-1 flex items-center gap-1 flex-shrink-0 overflow-x-auto">
-            {[
-              { icon: <HardDrive className="w-3 h-3" />, label: isRTL ? "حالة النظام" : "Status", cmd: isRTL ? "اعرض حالة النظام الكاملة — قاعدة البيانات، السيرفر، الذاكرة" : "Show full system status — database, server, memory" },
-              { icon: <Database className="w-3 h-3" />, label: isRTL ? "جداول" : "Tables", cmd: isRTL ? "اعرض جميع جداول قاعدة البيانات مع تفاصيل الأعمدة" : "Show all database tables with column details" },
-              { icon: <FolderOpen className="w-3 h-3" />, label: isRTL ? "ملفات" : "Files", cmd: isRTL ? "اعرض قائمة ملفات البنية التحتية ومحتوياتها" : "List infrastructure files and their status" },
-              { icon: <Settings className="w-3 h-3" />, label: isRTL ? "متغيرات" : "ENV", cmd: isRTL ? "اعرض جميع المتغيرات البيئية والأسرار" : "Show all environment variables and secrets status" },
-              { icon: <Shield className="w-3 h-3" />, label: isRTL ? "أمان" : "Security", cmd: isRTL ? "فحص أمان شامل — الأسرار، الصلاحيات، نقاط الضعف" : "Full security audit — secrets, permissions, vulnerabilities" },
-              { icon: <Terminal className="w-3 h-3" />, label: isRTL ? "أمر" : "Exec", cmd: isRTL ? "نفذ أمر: " : "Execute command: " },
-            ].map((btn, i) => (
-              <button
-                key={i}
-                onClick={() => {
-                  if (btn.cmd.endsWith(": ")) { setPrompt(btn.cmd); textareaRef.current?.focus(); }
-                  else { doSend(btn.cmd); }
-                }}
-                className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#161b22] hover:bg-[#1c2333] border border-[#30363d] text-[10px] text-[#8b949e] hover:text-cyan-400 transition-colors whitespace-nowrap"
-                title={btn.cmd}
-              >
-                {btn.icon}
-                {btn.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="border-t border-[#1c2333] px-3 py-2 flex-shrink-0">
-          <div className="relative">
-            <textarea
-              ref={textareaRef}
-              value={prompt}
-              onChange={e => setPrompt(e.target.value)}
-              placeholder={isRTL ? "اكتب أمرك..." : "Type command..."}
-              className="w-full bg-[#161b22] border border-[#30363d] rounded-xl px-4 py-2.5 pe-12 text-[13px] text-[#e1e4e8] placeholder-[#484f58] resize-none focus:outline-none focus:border-cyan-500/50 transition-colors"
-              rows={prompt.split("\n").length > 3 ? 4 : prompt.includes("\n") ? 3 : 1}
-              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doSend(); } }}
-            />
-            {loading ? (
-              <button onClick={handleStop} className="absolute end-2 bottom-2 p-2 bg-red-500 hover:bg-red-400 text-white rounded-lg transition-colors">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            ) : (
-              <button onClick={() => doSend()} disabled={!prompt.trim()} className="absolute end-2 bottom-2 p-2 bg-cyan-500 hover:bg-cyan-400 text-black rounded-lg disabled:opacity-40 transition-colors">
-                <Send className={`w-3.5 h-3.5 ${isRTL ? "rotate-180" : ""}`} />
-              </button>
             )}
+
+            <div className="border-t border-[#1c2333] px-3 py-2 flex-shrink-0">
+              <div className="relative">
+                <textarea
+                  ref={textareaRef}
+                  value={prompt}
+                  onChange={e => setPrompt(e.target.value)}
+                  placeholder={isRTL ? "اكتب أمرك..." : "Type command..."}
+                  className="w-full bg-[#161b22] border border-[#30363d] rounded-xl px-4 py-2.5 pe-12 text-[13px] text-[#e1e4e8] placeholder-[#484f58] resize-none focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  rows={prompt.split("\n").length > 3 ? 4 : prompt.includes("\n") ? 3 : 1}
+                  onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doSend(); } }}
+                />
+                {loading ? (
+                  <button onClick={handleStop} className="absolute end-2 bottom-2 p-2 bg-red-500 hover:bg-red-400 text-white rounded-lg transition-colors">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                ) : (
+                  <button onClick={() => doSend()} disabled={!prompt.trim()} className="absolute end-2 bottom-2 p-2 bg-cyan-500 hover:bg-cyan-400 text-black rounded-lg disabled:opacity-40 transition-colors">
+                    <Send className={`w-3.5 h-3.5 ${isRTL ? "rotate-180" : ""}`} />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
