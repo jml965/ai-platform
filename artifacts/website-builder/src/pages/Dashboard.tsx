@@ -275,6 +275,8 @@ function InfraInlineChat({ agent, lang, onClose }: { agent: SidebarInfraAgent; l
   const [expanded, setExpanded] = useState(false);
   const [wandMode, setWandMode] = useState(false);
   const [wandHighlight, setWandHighlight] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [wandInfo, setWandInfo] = useState<WandTarget | null>(null);
+  const [wandInfoExpanded, setWandInfoExpanded] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -325,11 +327,8 @@ function InfraInlineChat({ agent, lang, onClose }: { agent: SidebarInfraAgent; l
       path: getElementPath(target),
     };
 
-    const desc = isRTL
-      ? `[عصا سحرية] العنصر المحدد:\n• النوع: <${info.tag}>${info.id ? ` id="${info.id}"` : ""}\n• المسار: ${info.path}\n• النص: "${info.text}"\n• الحجم: ${info.rect.width}×${info.rect.height}px\n• الموقع: (${info.rect.x}, ${info.rect.y})\n• اللون: ${info.styles.color}\n• الخلفية: ${info.styles.backgroundColor}\n• الخط: ${info.styles.fontSize} ${info.styles.fontWeight}\n\nما التعديل المطلوب على هذا العنصر؟`
-      : `[Magic Wand] Selected element:\n• Tag: <${info.tag}>${info.id ? ` id="${info.id}"` : ""}\n• Path: ${info.path}\n• Text: "${info.text}"\n• Size: ${info.rect.width}×${info.rect.height}px\n• Position: (${info.rect.x}, ${info.rect.y})\n• Color: ${info.styles.color}\n• Background: ${info.styles.backgroundColor}\n• Font: ${info.styles.fontSize} ${info.styles.fontWeight}\n\nWhat change do you want on this element?`;
-
-    setPrompt(desc);
+    setWandInfo(info);
+    setWandInfoExpanded(false);
     setWandMode(false);
     setWandHighlight(null);
     textareaRef.current?.focus();
@@ -386,7 +385,12 @@ function InfraInlineChat({ agent, lang, onClose }: { agent: SidebarInfraAgent; l
 
   const handleSend = async () => {
     if (!prompt.trim() || loading) return;
-    const currentPrompt = prompt;
+    let currentPrompt = prompt;
+    if (wandInfo) {
+      const wandCtx = `[عنصر محدد بالعصا: <${wandInfo.tag}> | المسار: ${wandInfo.path} | النص: "${wandInfo.text?.slice(0, 60) || ""}" | الحجم: ${wandInfo.rect.width}×${wandInfo.rect.height} | اللون: ${wandInfo.styles.color} | الخلفية: ${wandInfo.styles.backgroundColor} | الخط: ${wandInfo.styles.fontSize} ${wandInfo.styles.fontWeight}]\n\n`;
+      currentPrompt = wandCtx + currentPrompt;
+      setWandInfo(null);
+    }
     setPrompt("");
     setLoading(true);
     userScrolledUpRef.current = false;
@@ -654,13 +658,44 @@ function InfraInlineChat({ agent, lang, onClose }: { agent: SidebarInfraAgent; l
         <div ref={chatEndRef} />
       </div>
 
+      {wandInfo && (
+        <div className="border-t border-[#1c2333] bg-[#161b22] px-3 py-1.5 flex-shrink-0">
+          <div
+            className="flex items-center gap-2 cursor-pointer select-none"
+            onClick={() => setWandInfoExpanded(!wandInfoExpanded)}
+          >
+            <Wand2 className="w-3 h-3 text-amber-400 flex-shrink-0" />
+            <span className="text-[11px] text-amber-300 truncate flex-1">
+              {isRTL ? `عنصر محدد: <${wandInfo.tag}> ${wandInfo.text ? `"${wandInfo.text.slice(0, 30)}..."` : ""}` : `Selected: <${wandInfo.tag}> ${wandInfo.text ? `"${wandInfo.text.slice(0, 30)}..."` : ""}`}
+            </span>
+            <ChevronDown className={`w-3 h-3 text-[#484f58] transition-transform ${wandInfoExpanded ? "rotate-180" : ""}`} />
+            <button
+              onClick={e => { e.stopPropagation(); setWandInfo(null); }}
+              className="p-0.5 text-[#484f58] hover:text-red-400"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+          {wandInfoExpanded && (
+            <div className="mt-1.5 text-[10px] text-[#8b949e] space-y-0.5 bg-[#0d1117] rounded-lg p-2 border border-[#30363d]">
+              <div>{isRTL ? "النوع" : "Tag"}: <span className="text-cyan-400">&lt;{wandInfo.tag}&gt;</span>{wandInfo.id ? ` id="${wandInfo.id}"` : ""}</div>
+              <div>{isRTL ? "المسار" : "Path"}: <span className="text-[#7d8590]">{wandInfo.path}</span></div>
+              {wandInfo.text && <div>{isRTL ? "النص" : "Text"}: <span className="text-[#e1e4e8]">"{wandInfo.text.slice(0, 80)}"</span></div>}
+              <div>{isRTL ? "الحجم" : "Size"}: {wandInfo.rect.width}×{wandInfo.rect.height}px | {isRTL ? "الموقع" : "Pos"}: ({wandInfo.rect.x}, {wandInfo.rect.y})</div>
+              <div>{isRTL ? "اللون" : "Color"}: {wandInfo.styles.color} | {isRTL ? "الخلفية" : "BG"}: {wandInfo.styles.backgroundColor}</div>
+              <div>{isRTL ? "الخط" : "Font"}: {wandInfo.styles.fontSize} {wandInfo.styles.fontWeight}</div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="border-t border-[#1c2333] px-3 py-2 flex-shrink-0">
         <div className="relative">
           <textarea
             ref={textareaRef}
             value={prompt}
             onChange={e => setPrompt(e.target.value)}
-            placeholder={isRTL ? "اكتب أمرك..." : "Type command..."}
+            placeholder={wandInfo ? (isRTL ? "ما التعديل المطلوب على هذا العنصر؟" : "What change do you want on this element?") : (isRTL ? "اكتب أمرك..." : "Type command...")}
             className="w-full bg-[#161b22] border border-[#30363d] rounded-xl px-4 py-2.5 pe-12 text-[13px] text-[#e1e4e8] placeholder-[#484f58] resize-none focus:outline-none focus:border-cyan-500/50 transition-colors"
             rows={prompt.includes("\n") ? 4 : 1}
             onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
