@@ -93,6 +93,12 @@ export default function Dashboard() {
               <span className="text-sm font-medium">{tokenSummary.monthTokens.toLocaleString()} {t.tokens}</span>
             </div>
           )}
+          {isAdmin && (
+            <Link href="/infra" className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-sm text-cyan-400 hover:text-cyan-300 hover:border-cyan-400/40 transition-all">
+              <Server className="w-4 h-4" />
+              {t.home_nav_infrastructure}
+            </Link>
+          )}
           <Link href="/teams" className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 text-sm text-muted-foreground hover:text-foreground hover:border-white/20 transition-all">
             <Users className="w-4 h-4" />
             {t.team_management}
