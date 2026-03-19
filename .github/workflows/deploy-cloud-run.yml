@@ -31,8 +31,8 @@ jobs:
           service: ${{ env.SERVICE_NAME }}
           region: ${{ env.REGION }}
           image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/mrcodeai/${{ env.IMAGE_NAME }}:${{ github.sha }}
-          flags: --allow-unauthenticated --port=8080 --memory=1Gi --cpu=1 --min-instances=1 --max-instances=3 --timeout=600 --concurrency=80 --cpu-boost
-          env_vars: NODE_ENV=production,DATABASE_URL=${{ secrets.DATABASE_URL }},CUSTOM_ANTHROPIC_API_KEY=${{ secrets.CUSTOM_ANTHROPIC_API_KEY }},CUSTOM_OPENAI_API_KEY=${{ secrets.CUSTOM_OPENAI_API_KEY }},AUTH_PROVIDER=local,SESSION_SECRET=${{ secrets.SESSION_SECRET }}
+          flags: --allow-unauthenticated --port=8080 --memory=512Mi --cpu=1 --min-instances=0 --max-instances=3
+          env_vars: NODE_ENV=production,DATABASE_URL=${{ secrets.DATABASE_URL }},CUSTOM_ANTHROPIC_API_KEY=${{ secrets.CUSTOM_ANTHROPIC_API_KEY }}
       - run: |
           URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region=${{ env.REGION }} --format='value(status.url)')
           echo "Deployed to: $URL"
