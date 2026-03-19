@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { buildTasksTable, executionLogsTable, projectsTable, usersTable, teamMembersTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 import { StartBuildBody } from "@workspace/api-zod";
-import { startBuild, cancelBuild, getActiveBuild, checkBuildLimits, getRunner } from "../lib/agents";
+import { startBuild, cancelBuild, resumeBuild, getBuildWaitingStatus, getActiveBuild, checkBuildLimits, getRunner } from "../lib/agents";
 import type { RunnerOutput } from "../lib/agents";
 import { getUserId, getUserTeamRole, hasPermission } from "../middlewares/permissions";
 
@@ -193,6 +193,33 @@ router.post("/build/:buildId/cancel", async (req, res) => {
     res.json({ success: true, message: "Build cancellation requested" });
   } catch (error) {
     res.status(500).json({ error: { code: "INTERNAL", message: "Failed to cancel build" } });
+  }
+});
+
+router.post("/build/:buildId/resume", async (req, res) => {
+  try {
+    const { buildId } = req.params;
+    const userId = getUserId(req);
+    if (!userId) { res.status(401).json({ error: { code: "UNAUTHORIZED" } }); return; }
+
+    const resumed = resumeBuild(buildId);
+    if (!resumed) {
+      res.status(404).json({ error: { code: "NOT_FOUND", message: "Build is not waiting for a decision" } });
+      return;
+    }
+    res.json({ success: true, message: "Build resumed" });
+  } catch (error) {
+    res.status(500).json({ error: { code: "INTERNAL", message: "Failed to resume build" } });
+  }
+});
+
+router.get("/build/:buildId/timeout-status", async (req, res) => {
+  try {
+    const { buildId } = req.params;
+    const status = getBuildWaitingStatus(buildId);
+    res.json(status);
+  } catch (error) {
+    res.status(500).json({ error: { code: "INTERNAL", message: "Failed to get status" } });
   }
 });
 

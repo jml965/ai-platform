@@ -37,6 +37,9 @@ interface ActiveBuild {
   userId: string;
   status: BuildStatus;
   cancelRequested: boolean;
+  timeoutExtended: boolean;
+  waitingForUserDecision: boolean;
+  resumeResolver: (() => void) | null;
 }
 
 const activeBuilds = new Map<string, ActiveBuild>();
@@ -81,7 +84,28 @@ export function cancelBuild(buildId: string): boolean {
   const build = activeBuilds.get(buildId);
   if (!build || build.status !== "in_progress") return false;
   build.cancelRequested = true;
+  if (build.resumeResolver) {
+    build.resumeResolver();
+    build.resumeResolver = null;
+  }
   return true;
+}
+
+export function resumeBuild(buildId: string): boolean {
+  const build = activeBuilds.get(buildId);
+  if (!build || !build.waitingForUserDecision) return false;
+  build.waitingForUserDecision = false;
+  if (build.resumeResolver) {
+    build.resumeResolver();
+    build.resumeResolver = null;
+  }
+  return true;
+}
+
+export function getBuildWaitingStatus(buildId: string): { waiting: boolean; extended: boolean } {
+  const build = activeBuilds.get(buildId);
+  if (!build) return { waiting: false, extended: false };
+  return { waiting: build.waitingForUserDecision, extended: build.timeoutExtended };
 }
 
 function logExecution(
@@ -229,6 +253,9 @@ export async function startBuild(
     userId,
     status: "pending",
     cancelRequested: false,
+    timeoutExtended: false,
+    waitingForUserDecision: false,
+    resumeResolver: null,
   };
   activeBuilds.set(buildId, activeBuild);
 
@@ -261,6 +288,9 @@ export async function startBuildWithPlan(
     userId,
     status: "pending",
     cancelRequested: false,
+    timeoutExtended: false,
+    waitingForUserDecision: false,
+    resumeResolver: null,
   };
   activeBuilds.set(buildId, activeBuild);
 
@@ -966,7 +996,7 @@ async function executeBatchedBuildPipeline(
         message: lang === "ar" ? "فشل التخطيط — أرجع للتوليد العادي" : "Planning failed — falling back to normal generation",
       });
       activeBuilds.delete(buildId);
-      const newBuild: ActiveBuild = { buildId, projectId, userId, status: "in_progress", cancelRequested: false };
+      const newBuild: ActiveBuild = { buildId, projectId, userId, status: "in_progress", cancelRequested: false, timeoutExtended: false, waitingForUserDecision: false, resumeResolver: null };
       activeBuilds.set(buildId, newBuild);
       await executeBuildPipeline(buildId, projectId, userId, prompt + "\n[FORCE_SINGLE_SHOT]", constitution);
       return;
@@ -997,7 +1027,8 @@ async function executeBatchedBuildPipeline(
     const allModuleNames = modules.map(m => m.name);
 
     const buildTimeout = getBuildTimeoutMs(totalPlannedFiles);
-    const buildDeadline = Date.now() + buildTimeout;
+    const extensionTime = Math.round(buildTimeout * 0.25);
+    let buildDeadline = Date.now() + buildTimeout;
     const isTimedOut = () => Date.now() > buildDeadline;
 
     logExecution(buildId, projectId, null, "planner", "planning_modules", "completed", {
@@ -1273,12 +1304,41 @@ async function executeBatchedBuildPipeline(
       let globalIdx = 0;
       for (const batch of batches) {
         if (Date.now() > buildDeadline) {
-          logExecution(buildId, projectId, null, "system", "build_timeout", "completed", {
-            message: lang === "ar"
-              ? `⏱️ انتهى الوقت المحدد — سأكمل بالملفات المتوفرة (${allGeneratedFiles.length} ملف)`
-              : `⏱️ Build timeout reached — finalizing with ${allGeneratedFiles.length} files generated so far`,
-          });
-          break;
+          if (!build.timeoutExtended) {
+            build.timeoutExtended = true;
+            buildDeadline = Date.now() + extensionTime;
+            logExecution(buildId, projectId, null, "system", "build_timeout_extension", "completed", {
+              extensionMinutes: Math.round(extensionTime / 60000),
+              message: lang === "ar"
+                ? `⏱️ انتهى الوقت الأساسي — تمديد تلقائي ${Math.round(extensionTime / 60000)} دقائق إضافية (25%)`
+                : `⏱️ Base timeout reached — auto-extending by ${Math.round(extensionTime / 60000)} min (25%)`,
+            });
+          } else {
+            logExecution(buildId, projectId, null, "system", "build_timeout_final", "completed", {
+              filesGenerated: allGeneratedFiles.length,
+              message: lang === "ar"
+                ? `⏱️ انتهى الوقت الإضافي — في انتظار قرارك: إكمال أو إلغاء المشروع (${allGeneratedFiles.length} ملف جاهز)`
+                : `⏱️ Extended timeout reached — waiting for your decision: continue or cancel (${allGeneratedFiles.length} files ready)`,
+            });
+            build.waitingForUserDecision = true;
+            await new Promise<void>((resolve) => {
+              build.resumeResolver = resolve;
+              setTimeout(() => {
+                if (build.waitingForUserDecision) {
+                  build.waitingForUserDecision = false;
+                  build.cancelRequested = true;
+                  resolve();
+                }
+              }, 10 * 60 * 1000);
+            });
+            if (build.cancelRequested) break;
+            buildDeadline = Date.now() + extensionTime;
+            logExecution(buildId, projectId, null, "system", "build_resumed", "completed", {
+              message: lang === "ar"
+                ? `▶️ تم استئناف البناء — وقت إضافي ${Math.round(extensionTime / 60000)} دقائق`
+                : `▶️ Build resumed — additional ${Math.round(extensionTime / 60000)} min`,
+            });
+          }
         }
         if (build.cancelRequested) break;
 
@@ -1939,6 +1999,9 @@ export async function startSurgicalFix(
       userId,
       status: "in_progress",
       cancelRequested: false,
+      timeoutExtended: false,
+      waitingForUserDecision: false,
+      resumeResolver: null,
     });
 
     await db.update(projectsTable).set({ status: "building" }).where(eq(projectsTable.id, projectId));
