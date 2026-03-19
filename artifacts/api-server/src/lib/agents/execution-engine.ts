@@ -821,8 +821,21 @@ async function executeBuildPipeline(
   }
 }
 
-const MODULE_CONCURRENCY = 10;
+const MODULE_CONCURRENCY = 15;
 const BATCHED_BUILD_THRESHOLD = 15;
+const MAX_FILES_PER_MODULE = 12;
+
+const BUILD_TIMEOUT_MS: Record<string, number> = {
+  small: 10 * 60 * 1000,
+  medium: 15 * 60 * 1000,
+  large: 20 * 60 * 1000,
+};
+
+function getBuildTimeoutMs(totalFiles: number): number {
+  if (totalFiles < 250) return BUILD_TIMEOUT_MS.small;
+  if (totalFiles < 400) return BUILD_TIMEOUT_MS.medium;
+  return BUILD_TIMEOUT_MS.large;
+}
 
 function shouldUseBatchedBuild(prompt: string, existingFileCount: number): boolean {
   if (existingFileCount > 0) return false;
@@ -955,19 +968,42 @@ async function executeBatchedBuildPipeline(
       return;
     }
 
-    const modules = modulePlan.modules;
+    const rawModules = modulePlan.modules;
+    const modules: PlannedModule[] = [];
+    for (const mod of rawModules) {
+      if (mod.files.length > MAX_FILES_PER_MODULE) {
+        const chunks: string[][] = [];
+        for (let i = 0; i < mod.files.length; i += MAX_FILES_PER_MODULE) {
+          chunks.push(mod.files.slice(i, i + MAX_FILES_PER_MODULE));
+        }
+        chunks.forEach((chunk, ci) => {
+          modules.push({
+            name: `${mod.name}-part${ci + 1}`,
+            nameAr: mod.nameAr ? `${mod.nameAr}-${ci + 1}` : "",
+            description: `${mod.description} (part ${ci + 1})`,
+            files: chunk,
+          });
+        });
+      } else {
+        modules.push(mod);
+      }
+    }
     const totalModules = modules.length;
     const totalPlannedFiles = modulePlan.files.length;
     const allModuleNames = modules.map(m => m.name);
+
+    const buildTimeout = getBuildTimeoutMs(totalPlannedFiles);
+    const buildDeadline = Date.now() + buildTimeout;
 
     logExecution(buildId, projectId, null, "planner", "planning_modules", "completed", {
       framework: modulePlan.framework,
       totalFiles: totalPlannedFiles,
       totalModules,
+      timeoutMinutes: Math.round(buildTimeout / 60000),
       modules: modules.map(m => ({ name: m.name, nameAr: m.nameAr, files: m.files.length })),
       message: lang === "ar"
-        ? `خطة المشروع: ${totalPlannedFiles} ملف في ${totalModules} قسم (${modulePlan.framework}) — ${modules.map(m => `${m.nameAr || m.name}(${m.files.length})`).join(", ")}`
-        : `Project plan: ${totalPlannedFiles} files in ${totalModules} modules (${modulePlan.framework}) — ${modules.map(m => `${m.name}(${m.files.length})`).join(", ")}`,
+        ? `خطة المشروع: ${totalPlannedFiles} ملف في ${totalModules} حزمة (${modulePlan.framework}) — الحد الزمني: ${Math.round(buildTimeout / 60000)} دقيقة`
+        : `Project plan: ${totalPlannedFiles} files in ${totalModules} chunks (${modulePlan.framework}) — timeout: ${Math.round(buildTimeout / 60000)} min`,
     });
 
     const { getProjectTemplate } = await import("./project-templates");
@@ -1219,13 +1255,24 @@ async function executeBatchedBuildPipeline(
         return { result, moduleTaskId, mod };
       };
 
+      const effectiveConcurrency = Math.max(concurrencyLimit, Math.min(remainingModules.length, MODULE_CONCURRENCY));
       const batches: PlannedModule[][] = [];
-      for (let i = 0; i < remainingModules.length; i += concurrencyLimit) {
-        batches.push(remainingModules.slice(i, i + concurrencyLimit));
+      for (let i = 0; i < remainingModules.length; i += effectiveConcurrency) {
+        batches.push(remainingModules.slice(i, i + effectiveConcurrency));
       }
 
       let globalIdx = 0;
       for (const batch of batches) {
+        if (Date.now() > buildDeadline) {
+          logExecution(buildId, projectId, null, "system", "build_timeout", "completed", {
+            message: lang === "ar"
+              ? `⏱️ انتهى الوقت المحدد — سأكمل بالملفات المتوفرة (${allGeneratedFiles.length} ملف)`
+              : `⏱️ Build timeout reached — finalizing with ${allGeneratedFiles.length} files generated so far`,
+          });
+          break;
+        }
+        if (build.cancelRequested) break;
+
         const batchPromises = batch.map((mod, localIdx) => processModule(mod, globalIdx + localIdx));
         await Promise.allSettled(batchPromises);
         globalIdx += batch.length;
