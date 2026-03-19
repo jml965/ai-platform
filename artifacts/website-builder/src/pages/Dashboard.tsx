@@ -507,9 +507,33 @@ function InfraInlineChat({ agent, lang, onClose }: { agent: SidebarInfraAgent; l
   const agentColor = SIDEBAR_AGENT_COLORS[agent.agentKey] || "text-[#8b949e]";
   const agentIcon = SIDEBAR_AGENT_ICONS[agent.agentKey] || <Bot className="w-4 h-4" />;
 
+  const WandInfoBlock = ({ text }: { text: string }) => {
+    const [open, setOpen] = useState(false);
+    const tagMatch = text.match(/<(\w+)>/);
+    const tag = tagMatch ? tagMatch[1] : "element";
+    return (
+      <div className="mb-1.5 rounded-lg border border-amber-500/20 bg-amber-500/5 overflow-hidden">
+        <div className="flex items-center gap-1.5 px-2 py-1 cursor-pointer select-none" onClick={() => setOpen(!open)}>
+          <Wand2 className="w-3 h-3 text-amber-400 flex-shrink-0" />
+          <span className="text-[10px] text-amber-300 flex-1 truncate">{isRTL ? `عنصر محدد: <${tag}>` : `Selected: <${tag}>`}</span>
+          <ChevronDown className={`w-3 h-3 text-amber-400/60 transition-transform ${open ? "rotate-180" : ""}`} />
+        </div>
+        {open && <div className="px-2 pb-1.5 text-[10px] text-[#8b949e] whitespace-pre-wrap border-t border-amber-500/10">{text}</div>}
+      </div>
+    );
+  };
+
   const renderMessageContent = (content: string) => {
+    const wandMatch = content.match(/^\[عنصر محدد بالعصا:([^\]]+)\]\n\n/);
+    let wandBlock: string | null = null;
+    let rest = content;
+    if (wandMatch) {
+      wandBlock = wandMatch[1].trim();
+      rest = content.slice(wandMatch[0].length);
+    }
+
     const segments: Array<{ type: "text" | "code"; lang?: string; value: string }> = [];
-    let remaining = content;
+    let remaining = rest;
     while (remaining.length > 0) {
       const openIdx = remaining.indexOf("```");
       if (openIdx === -1) { segments.push({ type: "text", value: remaining }); break; }
@@ -524,6 +548,7 @@ function InfraInlineChat({ agent, lang, onClose }: { agent: SidebarInfraAgent; l
     }
     return (
       <div className="text-[13px] leading-relaxed break-words">
+        {wandBlock && <WandInfoBlock text={wandBlock} />}
         {segments.map((seg, i) => {
           if (seg.type === "code") {
             return (
