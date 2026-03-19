@@ -5,7 +5,7 @@ import {
   FlaskConical, Bot, Wand2, Trash2, X, Send, Minimize2, Maximize2,
   ChevronDown, GripHorizontal, MessageSquare, Terminal, FileText, HardDrive,
   Settings, FolderOpen, Shield, PanelLeftOpen, PanelLeftClose, Plus, MoreHorizontal,
-  Pencil, Check,
+  Pencil, Check, Camera, Crop, Image as ImageIcon, Scissors,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useGetMe } from "@workspace/api-client-react";
@@ -146,6 +146,13 @@ function FloatingChatInner() {
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [threadMenuId, setThreadMenuId] = useState<string | null>(null);
+
+  const [screenshotMode, setScreenshotMode] = useState<"off" | "full" | "crop">("off");
+  const [cropRect, setCropRect] = useState<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
+  const [pendingImages, setPendingImages] = useState<{ data: string; name: string }[]>([]);
+  const [showScreenshotMenu, setShowScreenshotMenu] = useState(false);
+  const cropStartRef = useRef<{ x: number; y: number } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [pos, setPos] = useState(saved?.pos || { x: window.innerWidth - 420, y: window.innerHeight - 580 });
   const [size, setSize] = useState(saved?.size || { w: 380, h: 520 });
@@ -362,7 +369,7 @@ function FloatingChatInner() {
     if (!wandMode) return;
     const onClick = (e: MouseEvent) => handleWandClick(e);
     const onMove = (e: MouseEvent) => handleWandMove(e);
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { setWandMode(false); setWandHighlight(null); } };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { setWandMode(false); setWandHighlight(null); setScreenshotMode("off"); setCropRect(null); cropStartRef.current = null; } };
     document.addEventListener("click", onClick, true);
     document.addEventListener("mousemove", onMove, true);
     document.addEventListener("keydown", onKey);
@@ -388,6 +395,118 @@ function FloatingChatInner() {
     requestAnimationFrame(() => { programmaticScrollRef.current = false; });
   };
 
+  const captureFullScreen = useCallback(async () => {
+    setScreenshotMode("off");
+    setShowScreenshotMenu(false);
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const ctx = canvas.getContext("2d")!;
+      const chatEl = document.querySelector("[data-floating-chat]") as HTMLElement | null;
+      if (chatEl) chatEl.style.display = "none";
+      const html2canvasMod = await import("html2canvas");
+      const html2canvas = html2canvasMod.default;
+      const rendered = await html2canvas(document.body, {
+        useCORS: true,
+        allowTaint: true,
+        scale: 1,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        windowWidth: window.innerWidth,
+        windowHeight: window.innerHeight,
+      });
+      if (chatEl) chatEl.style.display = "";
+      ctx.drawImage(rendered, 0, 0);
+      const dataUrl = canvas.toDataURL("image/png");
+      const name = `screenshot_${new Date().toISOString().slice(0,19).replace(/[T:]/g, "-")}.png`;
+      setPendingImages(prev => [...prev, { data: dataUrl, name }]);
+    } catch (err) {
+      console.error("Screenshot failed:", err);
+      const fallbackCanvas = document.createElement("canvas");
+      fallbackCanvas.width = window.innerWidth;
+      fallbackCanvas.height = window.innerHeight;
+      const ctx = fallbackCanvas.getContext("2d")!;
+      ctx.fillStyle = "#0d1117";
+      ctx.fillRect(0, 0, fallbackCanvas.width, fallbackCanvas.height);
+      ctx.fillStyle = "#e1e4e8";
+      ctx.font = "16px sans-serif";
+      ctx.fillText("Screenshot capture failed - try uploading an image instead", 50, 50);
+      const dataUrl = fallbackCanvas.toDataURL("image/png");
+      setPendingImages(prev => [...prev, { data: dataUrl, name: "screenshot_error.png" }]);
+    }
+  }, []);
+
+  const startCropMode = useCallback(() => {
+    setShowScreenshotMenu(false);
+    setScreenshotMode("crop");
+  }, []);
+
+  const handleCropMouseDown = useCallback((e: React.MouseEvent) => {
+    cropStartRef.current = { x: e.clientX, y: e.clientY };
+    setCropRect({ startX: e.clientX, startY: e.clientY, endX: e.clientX, endY: e.clientY });
+  }, []);
+
+  const handleCropMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!cropStartRef.current) return;
+    setCropRect(prev => prev ? { ...prev, endX: e.clientX, endY: e.clientY } : null);
+  }, []);
+
+  const handleCropMouseUp = useCallback(async () => {
+    if (!cropStartRef.current || !cropRect) { cropStartRef.current = null; setCropRect(null); setScreenshotMode("off"); return; }
+    const x = Math.min(cropRect.startX, cropRect.endX);
+    const y = Math.min(cropRect.startY, cropRect.endY);
+    const w = Math.abs(cropRect.endX - cropRect.startX);
+    const h = Math.abs(cropRect.endY - cropRect.startY);
+    cropStartRef.current = null;
+    setCropRect(null);
+    setScreenshotMode("off");
+    if (w < 10 || h < 10) return;
+    try {
+      const chatEl = document.querySelector("[data-floating-chat]") as HTMLElement | null;
+      if (chatEl) chatEl.style.display = "none";
+      const overlay = document.querySelector("[data-crop-overlay]") as HTMLElement | null;
+      if (overlay) overlay.style.display = "none";
+      const html2canvasMod = await import("html2canvas");
+      const html2canvas = html2canvasMod.default;
+      const rendered = await html2canvas(document.body, {
+        useCORS: true,
+        allowTaint: true,
+        scale: 1,
+        x, y,
+        width: w,
+        height: h,
+        windowWidth: window.innerWidth,
+        windowHeight: window.innerHeight,
+      });
+      if (chatEl) chatEl.style.display = "";
+      const dataUrl = rendered.toDataURL("image/png");
+      const name = `crop_${new Date().toISOString().slice(0,19).replace(/[T:]/g, "-")}.png`;
+      setPendingImages(prev => [...prev, { data: dataUrl, name }]);
+    } catch (err) {
+      console.error("Crop screenshot failed:", err);
+    }
+  }, [cropRect]);
+
+  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    Array.from(files).forEach(file => {
+      if (!file.type.startsWith("image/")) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        setPendingImages(prev => [...prev, { data: dataUrl, name: file.name }]);
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = "";
+  }, []);
+
+  const removePendingImage = useCallback((idx: number) => {
+    setPendingImages(prev => prev.filter((_, i) => i !== idx));
+  }, []);
+
   const handleStop = () => {
     if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
     setLoading(false);
@@ -395,10 +514,17 @@ function FloatingChatInner() {
 
   const doSend = async (directMsg?: string) => {
     const currentPrompt = directMsg || prompt;
-    if (!currentPrompt.trim() || loading || !selectedAgent) return;
+    if ((!currentPrompt.trim() && pendingImages.length === 0) || loading || !selectedAgent) return;
+    if (!currentPrompt.trim() && pendingImages.length > 0) {
+      const defaultPrompt = isRTL ? "ما رأيك في هذا؟" : "What do you think about this?";
+      return doSend(defaultPrompt);
+    }
     setPrompt("");
     setLoading(true);
     userScrolledUpRef.current = false;
+
+    const imagesToSend = [...pendingImages];
+    setPendingImages([]);
 
     if (!activeThreadId) {
       const id = crypto.randomUUID();
@@ -407,7 +533,10 @@ function FloatingChatInner() {
       setActiveThreadId(id);
     }
 
-    setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "user", content: currentPrompt, timestamp: new Date() }]);
+    const userMsgContent = imagesToSend.length > 0
+      ? `${currentPrompt}\n\n${imagesToSend.map(img => `![${img.name}](${img.data.slice(0, 60)}...)`).join("\n")}`
+      : currentPrompt;
+    setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "user", content: userMsgContent, timestamp: new Date(), images: imagesToSend.map(i => i.data) } as any]);
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -475,7 +604,12 @@ function FloatingChatInner() {
             infraContext += `\n[ENV VARS] ${envKeys}\n[SECRETS] ${secKeys}`;
           }
         } catch {}
-        body = { message: infraContext ? `${currentPrompt}\n\n---\n${infraContext}` : currentPrompt, projectId: "general" };
+        const attachments = imagesToSend.map(img => ({ name: img.name, type: "image/png", content: img.data }));
+        body = {
+          message: infraContext ? `${currentPrompt}\n\n---\n${infraContext}` : currentPrompt,
+          projectId: "general",
+          ...(attachments.length > 0 ? { attachments } : {}),
+        };
       } else if (selectedAgent.agentKey === "infra_sysadmin") {
         endpoint = `${BASE}api/infra/director-stream`;
         body = { message: currentPrompt };
@@ -830,6 +964,8 @@ function FloatingChatInner() {
                     </div>
                   );
                 }
+                const msgImages = (msg as any).images as string[] | undefined;
+                const textContent = msg.content.replace(/\n\n!\[.*?\]\(data:image.*?\.\.\.\)/g, "").trim();
                 return (
                   <div key={msg.id} className={msg.role === "user" ? "text-end" : ""}>
                     <div className={`inline-block text-start max-w-full ${msg.role === "user" ? "bg-cyan-500/10 border border-cyan-500/20 rounded-xl px-3 py-2 text-cyan-300 text-[13px]" : "text-[#c9d1d9]"}`}>
@@ -840,7 +976,14 @@ function FloatingChatInner() {
                           <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                           <span className="text-[10px] text-[#8b949e]">{isRTL ? "يحلل..." : "Analyzing..."}</span>
                         </div>
-                      ) : renderMessageContent(msg.content)}
+                      ) : renderMessageContent(textContent || msg.content)}
+                      {msgImages && msgImages.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {msgImages.map((imgSrc, i) => (
+                            <img key={i} src={imgSrc} alt="attached" className="max-w-[200px] max-h-[140px] rounded-lg border border-cyan-500/20 object-cover cursor-pointer hover:opacity-80 transition-opacity" onClick={() => window.open(imgSrc, "_blank")} />
+                          ))}
+                        </div>
+                      )}
                       {msg.tokensUsed && (
                         <div className="text-[9px] text-[#484f58] mt-0.5">
                           {msg.models ? msg.models.join(" + ") : msg.model} · {msg.tokensUsed.toLocaleString()} tokens
@@ -879,22 +1022,77 @@ function FloatingChatInner() {
             )}
 
             <div className="border-t border-[#1c2333] px-3 py-2 flex-shrink-0">
+              {pendingImages.length > 0 && (
+                <div className="flex gap-2 mb-2 overflow-x-auto pb-1">
+                  {pendingImages.map((img, idx) => (
+                    <div key={idx} className="relative flex-shrink-0 group">
+                      <img src={img.data} alt={img.name} className="h-16 w-auto rounded-lg border border-[#30363d] object-cover" />
+                      <button
+                        onClick={() => removePendingImage(idx)}
+                        className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="w-2.5 h-2.5 text-white" />
+                      </button>
+                      <div className="absolute bottom-0 inset-x-0 bg-black/60 text-[8px] text-white text-center py-0.5 rounded-b-lg truncate px-1">
+                        {img.name.length > 12 ? img.name.slice(0, 12) + "…" : img.name}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="relative">
                 <textarea
                   ref={textareaRef}
                   value={prompt}
                   onChange={e => setPrompt(e.target.value)}
                   placeholder={isRTL ? "اكتب أمرك..." : "Type command..."}
-                  className="w-full bg-[#161b22] border border-[#30363d] rounded-xl px-4 py-2.5 pe-12 text-[13px] text-[#e1e4e8] placeholder-[#484f58] resize-none focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full bg-[#161b22] border border-[#30363d] rounded-xl px-10 py-2.5 pe-12 text-[13px] text-[#e1e4e8] placeholder-[#484f58] resize-none focus:outline-none focus:border-cyan-500/50 transition-colors"
                   rows={prompt.split("\n").length > 3 ? 4 : prompt.includes("\n") ? 3 : 1}
                   onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doSend(); } }}
                 />
+                <div className="absolute start-1.5 bottom-1.5 flex items-center">
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowScreenshotMenu(!showScreenshotMenu)}
+                      className={`p-1.5 rounded-lg transition-colors ${pendingImages.length > 0 ? "text-cyan-400 bg-cyan-500/10" : "text-[#484f58] hover:text-[#8b949e] hover:bg-white/5"}`}
+                      title={isRTL ? "التقاط صورة" : "Screenshot"}
+                    >
+                      <Camera className="w-4 h-4" />
+                    </button>
+                    {showScreenshotMenu && (
+                      <div className={`absolute bottom-full ${isRTL ? "end-0" : "start-0"} mb-1 w-44 bg-[#161b22] border border-[#30363d] rounded-lg shadow-2xl z-50 py-1`}>
+                        <button
+                          onClick={captureFullScreen}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-start text-[12px] text-[#c9d1d9] hover:bg-white/5 transition-colors"
+                        >
+                          <Camera className="w-3.5 h-3.5 text-cyan-400" />
+                          {isRTL ? "صورة كامل الشاشة" : "Full screenshot"}
+                        </button>
+                        <button
+                          onClick={startCropMode}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-start text-[12px] text-[#c9d1d9] hover:bg-white/5 transition-colors"
+                        >
+                          <Scissors className="w-3.5 h-3.5 text-amber-400" />
+                          {isRTL ? "قص جزء من الشاشة" : "Crop area"}
+                        </button>
+                        <button
+                          onClick={() => { setShowScreenshotMenu(false); fileInputRef.current?.click(); }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-start text-[12px] text-[#c9d1d9] hover:bg-white/5 transition-colors"
+                        >
+                          <ImageIcon className="w-3.5 h-3.5 text-green-400" />
+                          {isRTL ? "رفع صورة من الجهاز" : "Upload image"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileUpload} />
                 {loading ? (
                   <button onClick={handleStop} className="absolute end-2 bottom-2 p-2 bg-red-500 hover:bg-red-400 text-white rounded-lg transition-colors">
                     <X className="w-3.5 h-3.5" />
                   </button>
                 ) : (
-                  <button onClick={() => doSend()} disabled={!prompt.trim()} className="absolute end-2 bottom-2 p-2 bg-cyan-500 hover:bg-cyan-400 text-black rounded-lg disabled:opacity-40 transition-colors">
+                  <button onClick={() => doSend()} disabled={!prompt.trim() && pendingImages.length === 0} className="absolute end-2 bottom-2 p-2 bg-cyan-500 hover:bg-cyan-400 text-black rounded-lg disabled:opacity-40 transition-colors">
                     <Send className={`w-3.5 h-3.5 ${isRTL ? "rotate-180" : ""}`} />
                   </button>
                 )}
@@ -925,6 +1123,39 @@ function FloatingChatInner() {
               </div>
             </div>
           )}
+        </div>,
+        document.body
+      )}
+
+      {screenshotMode === "crop" && createPortal(
+        <div
+          data-crop-overlay="true"
+          className="fixed inset-0 z-[9995] cursor-crosshair"
+          style={{ background: "rgba(0,0,0,0.3)" }}
+          onMouseDown={handleCropMouseDown}
+          onMouseMove={handleCropMouseMove}
+          onMouseUp={handleCropMouseUp}
+        >
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[#161b22] border border-[#30363d] rounded-lg px-4 py-2 flex items-center gap-3 shadow-2xl">
+            <Scissors className="w-4 h-4 text-amber-400" />
+            <span className="text-[12px] text-[#e1e4e8]">{isRTL ? "اسحب لتحديد المنطقة — Esc للإلغاء" : "Drag to select area — Esc to cancel"}</span>
+            <button onClick={() => { setScreenshotMode("off"); setCropRect(null); cropStartRef.current = null; }} className="p-1 text-[#8b949e] hover:text-red-400">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          {cropRect && (() => {
+            const x = Math.min(cropRect.startX, cropRect.endX);
+            const y = Math.min(cropRect.startY, cropRect.endY);
+            const w = Math.abs(cropRect.endX - cropRect.startX);
+            const h = Math.abs(cropRect.endY - cropRect.startY);
+            return w > 5 && h > 5 ? (
+              <div className="absolute border-2 border-cyan-400 bg-cyan-400/10 rounded-sm" style={{ left: x, top: y, width: w, height: h }}>
+                <div className="absolute -top-5 left-0 bg-cyan-500 text-black text-[9px] font-bold px-1.5 py-0.5 rounded-sm whitespace-nowrap">
+                  {Math.round(w)}×{Math.round(h)}
+                </div>
+              </div>
+            ) : null;
+          })()}
         </div>,
         document.body
       )}
