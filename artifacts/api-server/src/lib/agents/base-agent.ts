@@ -144,7 +144,7 @@ export abstract class BaseAgent {
   }
 
   protected get defaultTimeoutSeconds(): number {
-    return 600;
+    return 180;
   }
 
   protected getEffectiveMaxTokens(): number | undefined {

@@ -994,6 +994,7 @@ async function executeBatchedBuildPipeline(
 
     const buildTimeout = getBuildTimeoutMs(totalPlannedFiles);
     const buildDeadline = Date.now() + buildTimeout;
+    const isTimedOut = () => Date.now() > buildDeadline;
 
     logExecution(buildId, projectId, null, "planner", "planning_modules", "completed", {
       framework: modulePlan.framework,
@@ -1138,6 +1139,10 @@ async function executeBatchedBuildPipeline(
       let earlySandboxInitiated = !!getRunner(buildId);
 
       const processModule = async (mod: PlannedModule, idx: number) => {
+        if (isTimedOut()) {
+          return { result: { success: false, error: "Build timeout", tokensUsed: 0, durationMs: 0 }, moduleTaskId: null, mod };
+        }
+
         const moduleTaskId = await createTask(buildId, projectId, "codegen", `Module: ${mod.name}`);
 
         logExecution(buildId, projectId, moduleTaskId, "codegen", "generate_module", "in_progress", {
@@ -1334,45 +1339,61 @@ async function executeBatchedBuildPipeline(
     );
 
     if (finalSave.success && !build.cancelRequested) {
-      const runnerTaskId = await createTask(buildId, projectId, "package_runner");
-      logExecution(buildId, projectId, runnerTaskId, "package_runner", "install_and_run", "in_progress", {
-        fileCount: allGeneratedFiles.length,
-        message: lang === "ar"
-          ? `أثبّت الحزم وأشغّل المشروع (${allGeneratedFiles.length} ملف)...`
-          : `Installing packages and running project (${allGeneratedFiles.length} files)...`,
-      });
+      if (!isTimedOut()) {
+        const runnerTaskId = await createTask(buildId, projectId, "package_runner");
+        logExecution(buildId, projectId, runnerTaskId, "package_runner", "install_and_run", "in_progress", {
+          fileCount: allGeneratedFiles.length,
+          message: lang === "ar"
+            ? `أثبّت الحزم وأشغّل المشروع (${allGeneratedFiles.length} ملف)...`
+            : `Installing packages and running project (${allGeneratedFiles.length} files)...`,
+        });
 
-      const runnerStartTime = Date.now();
-      const existingRunner = getRunner(buildId);
-      const packageRunner = existingRunner || new PackageRunnerAgent(constitution);
-      if (!existingRunner) setRunner(buildId, packageRunner);
+        const runnerStartTime = Date.now();
+        const existingRunner = getRunner(buildId);
+        const packageRunner = existingRunner || new PackageRunnerAgent(constitution);
+        if (!existingRunner) setRunner(buildId, packageRunner);
 
-      try {
-        const runnerResult = await packageRunner.executeWithFiles(projectId, allGeneratedFiles);
-        const runnerDuration = Date.now() - runnerStartTime;
+        try {
+          const runnerResult = await packageRunner.executeWithFiles(projectId, allGeneratedFiles);
+          const runnerDuration = Date.now() - runnerStartTime;
 
-        if (runnerResult.success) {
-          await completeTask(runnerTaskId, 0, 0, runnerDuration);
-        } else {
-          await failTask(runnerTaskId, runnerResult.error ?? "Package runner failed", runnerDuration);
+          if (runnerResult.success) {
+            await completeTask(runnerTaskId, 0, 0, runnerDuration);
+          } else {
+            await failTask(runnerTaskId, runnerResult.error ?? "Package runner failed", runnerDuration);
+          }
+
+          logExecution(buildId, projectId, runnerTaskId, "package_runner", "install_and_run",
+            runnerResult.success ? "completed" : "failed", runnerResult.data, 0, runnerDuration);
+        } catch (runnerError) {
+          const runnerDuration = Date.now() - runnerStartTime;
+          const errMsg = runnerError instanceof Error ? runnerError.message : String(runnerError);
+          await failTask(runnerTaskId, errMsg, runnerDuration);
+          logExecution(buildId, projectId, runnerTaskId, "package_runner", "install_and_run", "failed", { error: errMsg }, 0, runnerDuration);
         }
-
-        logExecution(buildId, projectId, runnerTaskId, "package_runner", "install_and_run",
-          runnerResult.success ? "completed" : "failed", runnerResult.data, 0, runnerDuration);
-      } catch (runnerError) {
-        const runnerDuration = Date.now() - runnerStartTime;
-        const errMsg = runnerError instanceof Error ? runnerError.message : String(runnerError);
-        await failTask(runnerTaskId, errMsg, runnerDuration);
-        logExecution(buildId, projectId, runnerTaskId, "package_runner", "install_and_run", "failed", { error: errMsg }, 0, runnerDuration);
+      } else {
+        logExecution(buildId, projectId, null, "system", "build_timeout", "completed", {
+          message: lang === "ar"
+            ? `⏱️ تخطي تشغيل الحزم — انتهى الوقت المحدد`
+            : `⏱️ Skipping package runner — build timeout reached`,
+        });
       }
 
-      try {
-        logExecution(buildId, projectId, null, "qa_pipeline", "qa_validation", "in_progress");
-        const qaReportId = await runQaWithRetry(buildId, projectId, userId);
-        logExecution(buildId, projectId, null, "qa_pipeline", "qa_validation", "completed", { qaReportId });
-      } catch (qaError) {
-        logExecution(buildId, projectId, null, "qa_pipeline", "qa_validation", "failed", {
-          error: qaError instanceof Error ? qaError.message : String(qaError),
+      if (!isTimedOut() && !build.cancelRequested) {
+        try {
+          logExecution(buildId, projectId, null, "qa_pipeline", "qa_validation", "in_progress");
+          const qaReportId = await runQaWithRetry(buildId, projectId, userId);
+          logExecution(buildId, projectId, null, "qa_pipeline", "qa_validation", "completed", { qaReportId });
+        } catch (qaError) {
+          logExecution(buildId, projectId, null, "qa_pipeline", "qa_validation", "failed", {
+            error: qaError instanceof Error ? qaError.message : String(qaError),
+          });
+        }
+      } else if (isTimedOut()) {
+        logExecution(buildId, projectId, null, "system", "build_timeout", "completed", {
+          message: lang === "ar"
+            ? `⏱️ تخطي فحص الجودة — انتهى الوقت المحدد`
+            : `⏱️ Skipping QA — build timeout reached`,
         });
       }
     }
