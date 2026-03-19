@@ -545,6 +545,27 @@ function InfraInlineChat({ agent, lang, onClose }: { agent: SidebarInfraAgent; l
       });
 
       setMessages(prev => prev.map(m => m.id === streamMsgId ? { ...m, ...streamMeta } : m));
+
+      const hasCode = streamedContent.includes("```") || streamedContent.includes("<!DOCTYPE") || streamedContent.includes("<html");
+      if (hasCode && streamedContent.length > 200) {
+        const { name, files } = extractCodeFromMessage(streamedContent);
+        if (files.length > 0) {
+          setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "status", content: isRTL ? "جاري إنشاء المشروع تلقائياً..." : "Auto-creating project...", timestamp: new Date() }]);
+          scrollToBottom();
+          try {
+            const createRes = await fetch(`${import.meta.env.BASE_URL}api/infra/create-project`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ name, description: isRTL ? "تم إنشاؤه بواسطة وكيل البنية التحتية" : "Created by infra agent", files }),
+            });
+            if (createRes.ok) {
+              const projData = await createRes.json();
+              setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "status", content: isRTL ? `تم إنشاء مشروع "${projData.name}" بنجاح (${projData.filesCount} ملفات) — افتحه من مشاريعك` : `Project "${projData.name}" created (${projData.filesCount} files)`, timestamp: new Date() }]);
+            }
+          } catch {}
+        }
+      }
     } catch (err: any) {
       if (err.name !== "AbortError") {
         setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "assistant", content: `Error: ${err.message}`, timestamp: new Date() }]);
