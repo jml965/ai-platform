@@ -77,6 +77,18 @@ function FloatingChatInner() {
   const { t, lang } = useI18n();
   const isRTL = lang === "ar";
 
+  const STORAGE_KEY = "floating-admin-chat";
+
+  const loadSaved = () => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return null;
+  };
+
+  const saved = loadSaved();
+
   const [open, setOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const [agents, setAgents] = useState<AgentInfo[]>([]);
@@ -88,8 +100,14 @@ function FloatingChatInner() {
   const [wandMode, setWandMode] = useState(false);
   const [wandHighlight, setWandHighlight] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
 
-  const [pos, setPos] = useState({ x: window.innerWidth - 420, y: window.innerHeight - 580 });
-  const [size, setSize] = useState({ w: 380, h: 520 });
+  const [pos, setPos] = useState(saved?.pos || { x: window.innerWidth - 420, y: window.innerHeight - 580 });
+  const [size, setSize] = useState(saved?.size || { w: 380, h: 520 });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ pos, size, agentKey: selectedAgent?.agentKey }));
+    } catch {}
+  }, [pos, size, selectedAgent]);
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -114,10 +132,13 @@ function FloatingChatInner() {
             enabled: true,
             primaryModel: { provider: "anthropic", model: "claude-sonnet-4-6" },
           };
-          setAgents([strategicAgent, ...data]);
+          const allAgents = [strategicAgent, ...data];
+          setAgents(allAgents);
           if (!selectedAgent) {
+            const savedKey = saved?.agentKey;
+            const restored = savedKey ? allAgents.find(a => a.agentKey === savedKey) : null;
             const director = data.find((a: AgentInfo) => a.agentKey === "infra_sysadmin");
-            setSelectedAgent(director || strategicAgent);
+            setSelectedAgent(restored || director || strategicAgent);
           }
         }
       })
