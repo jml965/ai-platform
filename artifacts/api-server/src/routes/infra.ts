@@ -55,11 +55,13 @@ const DEFAULT_INFRA_AGENTS = [
 - وكيل الأمان (infra_security): فحص وتعزيز الأمان
 - وكيل النشر (infra_deploy): النشر والتحديثات
 
-### قدرة إنشاء المشاريع:
-يمكنك إنشاء مشروع موقع فعلي مباشرة.
-عندما يطلب المالك إنشاء موقع أو مشروع، اكتب الكود الكامل داخل code block (مثل \`\`\`html ... \`\`\`).
-النظام سيقوم تلقائياً بإنشاء المشروع من الكود وإضافته لمشاريع المالك.
-لا تتردد — اكتب الكود الكامل فوراً بدون استئذان.`,
+### قدرة إنشاء المشاريع (مهم جداً):
+عندما يطلب المالك إنشاء موقع أو مشروع:
+1. اكتب الكود الكامل داخل code block عادي: \`\`\`html ثم الكود ثم \`\`\`
+2. لا تستخدم <artifact> tags أبداً — استخدم فقط \`\`\`html ... \`\`\`
+3. النظام سيقوم تلقائياً بإنشاء المشروع من الكود وإضافته لمشاريع المالك
+4. اكتب الكود الكامل فوراً بدون استئذان — HTML + CSS + JS كلها في ملف واحد
+5. اجعل الكود كامل وجاهز للعمل (لا placeholders ولا TODO)`,
     permissions: ["manage_agents", "read_all_files", "write_files", "restart_services", "database_read", "database_write", "deploy", "security_scan", "full_system_access"],
     pipelineOrder: 1,
     receivesFrom: "owner_input",
@@ -189,7 +191,13 @@ const DEFAULT_INFRA_AGENTS = [
 - Express + TypeScript للخلفية
 - React + Tailwind + Wouter للواجهة
 - Drizzle ORM لقاعدة البيانات
-- لا axios، لا shadcn/radix/mui`,
+- لا axios، لا shadcn/radix/mui
+
+### إنشاء مشاريع مواقع:
+عندما يطلب المالك إنشاء موقع:
+- اكتب الكود الكامل داخل \`\`\`html ... \`\`\` (code block عادي)
+- لا تستخدم <artifact> أبداً
+- النظام سينشئ المشروع تلقائياً من الكود`,
     instructions: `## بناء ميزات جديدة
 
 ### البنية المعمارية:

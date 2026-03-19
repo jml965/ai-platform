@@ -1,0 +1,70 @@
+اريدك ان تنشئ مشروع موقع لمطعم امكتروني وتختبر الموقع هل لديه مشاكل او لا وتشاهد الموقع ينشى في شاشه المعاينه
+# 🍽️ مطعم الذواقة — موقع إلكتروني احترافي
+
+إليك الموقع الكامل جاهز للمعاينة الفورية:
+
+<artifact identifier="restaurant-website" type="application/code" language="html" title="🍽️ مطعم الذواقة — موقع كامل">
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="مطعم الذواقة — أفضل مطعم عربي في الرياض">
+  <title>🍽️ مطعم الذواقة | Dhawaqa Restaurant</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --gold: #D4AF37; --gold-light: #F0D060; --gold-dark: #A88B20;
+      --brown-dark: #2C1810; --brown-mid: #4A2C1A; --brown-light: #7A4A2A;
+      --cream: #FFF8F0; --cream-dark: #F5E6D0; --white: #FFFFFF;
+      --text-dark: #1A0A00; --text-mid: #4A3020; --text-light: #8A6A50;
+      --shadow: 0 10px 40px rgba(44,24,16,0.15);
+      --shadow-gold: 0 5px 20px rgba(212,175,55,0.3);
+      --radius: 16px; --transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+    }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Cairo', sans-serif; background: var(--cream); color: var(--text-dark); overflow-x: hidden; line-height: 1.7; }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: var(--cream-dark); }
+    ::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 4px; }
+
+    /* NAVBAR */
+    .navbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+      padding: 1rem 2rem; display: flex; align-items: center;
+      justify-content: space-between; transition: var(--transition); background: transparent;
+    }
+    .navbar.scrolled {
+      background: rgba(44,24,16,0.97); backdrop-filter: blur(20px);
+      padding: 0.7rem 2rem; box-shadow: 0 4px 30px rgba(0,0,0,0.3);
+    }
+    .nav-logo { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; color: var(--gold); font-size: 1.4rem; font-weight: 900; }
+    .nav-logo span { font-size: 1.8rem; }
+    .nav-links { display: flex; gap: 2rem; list-style: none; }
+    .nav-links a { color: var(--white); text-decoration: none; font-weight: 600; font-size: 0.95rem; position: relative; transition: var(--transition); }
+    .nav-links a::after { content: ''; position: absolute; bottom: -4px; right: 0; width: 0; height: 2px; background: var(--gold); transition: var(--transition); }
+    .nav-links a:hover { color: var(--gold); }
+    .nav-links a:hover::after { width: 100%; }
+    .nav-actions { display: flex; align-items: center; gap: 1rem; }
+    .cart-btn {
+      position: relative; background: var(--gold); color: var(--brown-dark);
+      border: none; padding: 0.6rem 1.2rem; border-radius: 50px;
+      font-family: 'Cairo', sans-serif; font-weight: 700; font-size: 0.9rem;
+      cursor: pointer; transition: var(--transition); display: flex; align-items: center; gap: 0.5rem;
+    }
+    .cart-btn:hover { background: var(--gold-light); transform: translateY(-2px); box-shadow: var(--shadow-gold); }
+    .cart-count {
+      background: var(--brown-dark); color: var(--gold); border-radius: 50%;
+      width: 20px; height: 20px; display: flex; align-items: center;
+      justify-content: center; font-size: 0.75rem; font-weight: 900;
+    }
+    .hamburger { display: none; flex-direction: column; gap: 5px; cursor: pointer; padding: 5px; }
+    .hamburger span { display: block; width: 25px; height: 2px; background: var(--white); transition: var(--transition); }
+
+    /* HERO */
+    .hero {
+      min-height: 100vh; position: relative; display: flex;
+      align-items: center; justify-content: center; overflow: hidden;
+      background: linear-gradient(135deg, var(--brown-dark) 0%, var(--brown-mid) 50%, #3D1F0F 100%);
+  
