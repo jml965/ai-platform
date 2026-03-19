@@ -37,9 +37,6 @@ interface ActiveBuild {
   userId: string;
   status: BuildStatus;
   cancelRequested: boolean;
-  timeoutExtended: boolean;
-  waitingForUserDecision: boolean;
-  resumeResolver: (() => void) | null;
 }
 
 const activeBuilds = new Map<string, ActiveBuild>();
@@ -84,28 +81,7 @@ export function cancelBuild(buildId: string): boolean {
   const build = activeBuilds.get(buildId);
   if (!build || build.status !== "in_progress") return false;
   build.cancelRequested = true;
-  if (build.resumeResolver) {
-    build.resumeResolver();
-    build.resumeResolver = null;
-  }
   return true;
-}
-
-export function resumeBuild(buildId: string): boolean {
-  const build = activeBuilds.get(buildId);
-  if (!build || !build.waitingForUserDecision) return false;
-  build.waitingForUserDecision = false;
-  if (build.resumeResolver) {
-    build.resumeResolver();
-    build.resumeResolver = null;
-  }
-  return true;
-}
-
-export function getBuildWaitingStatus(buildId: string): { waiting: boolean; extended: boolean } {
-  const build = activeBuilds.get(buildId);
-  if (!build) return { waiting: false, extended: false };
-  return { waiting: build.waitingForUserDecision, extended: build.timeoutExtended };
 }
 
 function logExecution(
@@ -253,9 +229,6 @@ export async function startBuild(
     userId,
     status: "pending",
     cancelRequested: false,
-    timeoutExtended: false,
-    waitingForUserDecision: false,
-    resumeResolver: null,
   };
   activeBuilds.set(buildId, activeBuild);
 
@@ -288,9 +261,6 @@ export async function startBuildWithPlan(
     userId,
     status: "pending",
     cancelRequested: false,
-    timeoutExtended: false,
-    waitingForUserDecision: false,
-    resumeResolver: null,
   };
   activeBuilds.set(buildId, activeBuild);
 
@@ -851,25 +821,8 @@ async function executeBuildPipeline(
   }
 }
 
-const MODULE_CONCURRENCY = 15;
+const MODULE_CONCURRENCY = 10;
 const BATCHED_BUILD_THRESHOLD = 15;
-const MAX_FILES_PER_MODULE = 12;
-
-const BUILD_TIMEOUT_MS: Record<string, number> = {
-  tiny: 7 * 60 * 1000,
-  small: 9 * 60 * 1000,
-  medium: 12 * 60 * 1000,
-  large: 20 * 60 * 1000,
-  xlarge: 30 * 60 * 1000,
-};
-
-function getBuildTimeoutMs(totalFiles: number): number {
-  if (totalFiles < 100) return BUILD_TIMEOUT_MS.tiny;
-  if (totalFiles < 150) return BUILD_TIMEOUT_MS.small;
-  if (totalFiles < 250) return BUILD_TIMEOUT_MS.medium;
-  if (totalFiles < 400) return BUILD_TIMEOUT_MS.large;
-  return BUILD_TIMEOUT_MS.xlarge;
-}
 
 function shouldUseBatchedBuild(prompt: string, existingFileCount: number): boolean {
   if (existingFileCount > 0) return false;
@@ -996,50 +949,25 @@ async function executeBatchedBuildPipeline(
         message: lang === "ar" ? "فشل التخطيط — أرجع للتوليد العادي" : "Planning failed — falling back to normal generation",
       });
       activeBuilds.delete(buildId);
-      const newBuild: ActiveBuild = { buildId, projectId, userId, status: "in_progress", cancelRequested: false, timeoutExtended: false, waitingForUserDecision: false, resumeResolver: null };
+      const newBuild: ActiveBuild = { buildId, projectId, userId, status: "in_progress", cancelRequested: false };
       activeBuilds.set(buildId, newBuild);
       await executeBuildPipeline(buildId, projectId, userId, prompt + "\n[FORCE_SINGLE_SHOT]", constitution);
       return;
     }
 
-    const rawModules = modulePlan.modules;
-    const modules: PlannedModule[] = [];
-    for (const mod of rawModules) {
-      if (mod.files.length > MAX_FILES_PER_MODULE) {
-        const chunks: string[][] = [];
-        for (let i = 0; i < mod.files.length; i += MAX_FILES_PER_MODULE) {
-          chunks.push(mod.files.slice(i, i + MAX_FILES_PER_MODULE));
-        }
-        chunks.forEach((chunk, ci) => {
-          modules.push({
-            name: `${mod.name}-part${ci + 1}`,
-            nameAr: mod.nameAr ? `${mod.nameAr}-${ci + 1}` : "",
-            description: `${mod.description} (part ${ci + 1})`,
-            files: chunk,
-          });
-        });
-      } else {
-        modules.push(mod);
-      }
-    }
+    const modules = modulePlan.modules;
     const totalModules = modules.length;
     const totalPlannedFiles = modulePlan.files.length;
     const allModuleNames = modules.map(m => m.name);
-
-    const buildTimeout = getBuildTimeoutMs(totalPlannedFiles);
-    const extensionTime = Math.round(buildTimeout * 0.25);
-    let buildDeadline = Date.now() + buildTimeout;
-    const isTimedOut = () => Date.now() > buildDeadline;
 
     logExecution(buildId, projectId, null, "planner", "planning_modules", "completed", {
       framework: modulePlan.framework,
       totalFiles: totalPlannedFiles,
       totalModules,
-      timeoutMinutes: Math.round(buildTimeout / 60000),
       modules: modules.map(m => ({ name: m.name, nameAr: m.nameAr, files: m.files.length })),
       message: lang === "ar"
-        ? `خطة المشروع: ${totalPlannedFiles} ملف في ${totalModules} حزمة (${modulePlan.framework}) — الحد الزمني: ${Math.round(buildTimeout / 60000)} دقيقة`
-        : `Project plan: ${totalPlannedFiles} files in ${totalModules} chunks (${modulePlan.framework}) — timeout: ${Math.round(buildTimeout / 60000)} min`,
+        ? `خطة المشروع: ${totalPlannedFiles} ملف في ${totalModules} قسم (${modulePlan.framework}) — ${modules.map(m => `${m.nameAr || m.name}(${m.files.length})`).join(", ")}`
+        : `Project plan: ${totalPlannedFiles} files in ${totalModules} modules (${modulePlan.framework}) — ${modules.map(m => `${m.name}(${m.files.length})`).join(", ")}`,
     });
 
     const { getProjectTemplate } = await import("./project-templates");
@@ -1174,10 +1102,6 @@ async function executeBatchedBuildPipeline(
       let earlySandboxInitiated = !!getRunner(buildId);
 
       const processModule = async (mod: PlannedModule, idx: number) => {
-        if (isTimedOut()) {
-          return { result: { success: false, error: "Build timeout", tokensUsed: 0, durationMs: 0 }, moduleTaskId: null, mod };
-        }
-
         const moduleTaskId = await createTask(buildId, projectId, "codegen", `Module: ${mod.name}`);
 
         logExecution(buildId, projectId, moduleTaskId, "codegen", "generate_module", "in_progress", {
@@ -1295,53 +1219,13 @@ async function executeBatchedBuildPipeline(
         return { result, moduleTaskId, mod };
       };
 
-      const effectiveConcurrency = Math.max(concurrencyLimit, Math.min(remainingModules.length, MODULE_CONCURRENCY));
       const batches: PlannedModule[][] = [];
-      for (let i = 0; i < remainingModules.length; i += effectiveConcurrency) {
-        batches.push(remainingModules.slice(i, i + effectiveConcurrency));
+      for (let i = 0; i < remainingModules.length; i += concurrencyLimit) {
+        batches.push(remainingModules.slice(i, i + concurrencyLimit));
       }
 
       let globalIdx = 0;
       for (const batch of batches) {
-        if (Date.now() > buildDeadline) {
-          if (!build.timeoutExtended) {
-            build.timeoutExtended = true;
-            buildDeadline = Date.now() + extensionTime;
-            logExecution(buildId, projectId, null, "system", "build_timeout_extension", "completed", {
-              extensionMinutes: Math.round(extensionTime / 60000),
-              message: lang === "ar"
-                ? `⏱️ انتهى الوقت الأساسي — تمديد تلقائي ${Math.round(extensionTime / 60000)} دقائق إضافية (25%)`
-                : `⏱️ Base timeout reached — auto-extending by ${Math.round(extensionTime / 60000)} min (25%)`,
-            });
-          } else {
-            logExecution(buildId, projectId, null, "system", "build_timeout_final", "completed", {
-              filesGenerated: allGeneratedFiles.length,
-              message: lang === "ar"
-                ? `⏱️ انتهى الوقت الإضافي — في انتظار قرارك: إكمال أو إلغاء المشروع (${allGeneratedFiles.length} ملف جاهز)`
-                : `⏱️ Extended timeout reached — waiting for your decision: continue or cancel (${allGeneratedFiles.length} files ready)`,
-            });
-            build.waitingForUserDecision = true;
-            await new Promise<void>((resolve) => {
-              build.resumeResolver = resolve;
-              setTimeout(() => {
-                if (build.waitingForUserDecision) {
-                  build.waitingForUserDecision = false;
-                  build.cancelRequested = true;
-                  resolve();
-                }
-              }, 10 * 60 * 1000);
-            });
-            if (build.cancelRequested) break;
-            buildDeadline = Date.now() + extensionTime;
-            logExecution(buildId, projectId, null, "system", "build_resumed", "completed", {
-              message: lang === "ar"
-                ? `▶️ تم استئناف البناء — وقت إضافي ${Math.round(extensionTime / 60000)} دقائق`
-                : `▶️ Build resumed — additional ${Math.round(extensionTime / 60000)} min`,
-            });
-          }
-        }
-        if (build.cancelRequested) break;
-
         const batchPromises = batch.map((mod, localIdx) => processModule(mod, globalIdx + localIdx));
         await Promise.allSettled(batchPromises);
         globalIdx += batch.length;
@@ -1403,61 +1287,45 @@ async function executeBatchedBuildPipeline(
     );
 
     if (finalSave.success && !build.cancelRequested) {
-      if (!isTimedOut()) {
-        const runnerTaskId = await createTask(buildId, projectId, "package_runner");
-        logExecution(buildId, projectId, runnerTaskId, "package_runner", "install_and_run", "in_progress", {
-          fileCount: allGeneratedFiles.length,
-          message: lang === "ar"
-            ? `أثبّت الحزم وأشغّل المشروع (${allGeneratedFiles.length} ملف)...`
-            : `Installing packages and running project (${allGeneratedFiles.length} files)...`,
-        });
+      const runnerTaskId = await createTask(buildId, projectId, "package_runner");
+      logExecution(buildId, projectId, runnerTaskId, "package_runner", "install_and_run", "in_progress", {
+        fileCount: allGeneratedFiles.length,
+        message: lang === "ar"
+          ? `أثبّت الحزم وأشغّل المشروع (${allGeneratedFiles.length} ملف)...`
+          : `Installing packages and running project (${allGeneratedFiles.length} files)...`,
+      });
 
-        const runnerStartTime = Date.now();
-        const existingRunner = getRunner(buildId);
-        const packageRunner = existingRunner || new PackageRunnerAgent(constitution);
-        if (!existingRunner) setRunner(buildId, packageRunner);
+      const runnerStartTime = Date.now();
+      const existingRunner = getRunner(buildId);
+      const packageRunner = existingRunner || new PackageRunnerAgent(constitution);
+      if (!existingRunner) setRunner(buildId, packageRunner);
 
-        try {
-          const runnerResult = await packageRunner.executeWithFiles(projectId, allGeneratedFiles);
-          const runnerDuration = Date.now() - runnerStartTime;
+      try {
+        const runnerResult = await packageRunner.executeWithFiles(projectId, allGeneratedFiles);
+        const runnerDuration = Date.now() - runnerStartTime;
 
-          if (runnerResult.success) {
-            await completeTask(runnerTaskId, 0, 0, runnerDuration);
-          } else {
-            await failTask(runnerTaskId, runnerResult.error ?? "Package runner failed", runnerDuration);
-          }
-
-          logExecution(buildId, projectId, runnerTaskId, "package_runner", "install_and_run",
-            runnerResult.success ? "completed" : "failed", runnerResult.data, 0, runnerDuration);
-        } catch (runnerError) {
-          const runnerDuration = Date.now() - runnerStartTime;
-          const errMsg = runnerError instanceof Error ? runnerError.message : String(runnerError);
-          await failTask(runnerTaskId, errMsg, runnerDuration);
-          logExecution(buildId, projectId, runnerTaskId, "package_runner", "install_and_run", "failed", { error: errMsg }, 0, runnerDuration);
+        if (runnerResult.success) {
+          await completeTask(runnerTaskId, 0, 0, runnerDuration);
+        } else {
+          await failTask(runnerTaskId, runnerResult.error ?? "Package runner failed", runnerDuration);
         }
-      } else {
-        logExecution(buildId, projectId, null, "system", "build_timeout", "completed", {
-          message: lang === "ar"
-            ? `⏱️ تخطي تشغيل الحزم — انتهى الوقت المحدد`
-            : `⏱️ Skipping package runner — build timeout reached`,
-        });
+
+        logExecution(buildId, projectId, runnerTaskId, "package_runner", "install_and_run",
+          runnerResult.success ? "completed" : "failed", runnerResult.data, 0, runnerDuration);
+      } catch (runnerError) {
+        const runnerDuration = Date.now() - runnerStartTime;
+        const errMsg = runnerError instanceof Error ? runnerError.message : String(runnerError);
+        await failTask(runnerTaskId, errMsg, runnerDuration);
+        logExecution(buildId, projectId, runnerTaskId, "package_runner", "install_and_run", "failed", { error: errMsg }, 0, runnerDuration);
       }
 
-      if (!isTimedOut() && !build.cancelRequested) {
-        try {
-          logExecution(buildId, projectId, null, "qa_pipeline", "qa_validation", "in_progress");
-          const qaReportId = await runQaWithRetry(buildId, projectId, userId);
-          logExecution(buildId, projectId, null, "qa_pipeline", "qa_validation", "completed", { qaReportId });
-        } catch (qaError) {
-          logExecution(buildId, projectId, null, "qa_pipeline", "qa_validation", "failed", {
-            error: qaError instanceof Error ? qaError.message : String(qaError),
-          });
-        }
-      } else if (isTimedOut()) {
-        logExecution(buildId, projectId, null, "system", "build_timeout", "completed", {
-          message: lang === "ar"
-            ? `⏱️ تخطي فحص الجودة — انتهى الوقت المحدد`
-            : `⏱️ Skipping QA — build timeout reached`,
+      try {
+        logExecution(buildId, projectId, null, "qa_pipeline", "qa_validation", "in_progress");
+        const qaReportId = await runQaWithRetry(buildId, projectId, userId);
+        logExecution(buildId, projectId, null, "qa_pipeline", "qa_validation", "completed", { qaReportId });
+      } catch (qaError) {
+        logExecution(buildId, projectId, null, "qa_pipeline", "qa_validation", "failed", {
+          error: qaError instanceof Error ? qaError.message : String(qaError),
         });
       }
     }
@@ -1999,9 +1867,6 @@ export async function startSurgicalFix(
       userId,
       status: "in_progress",
       cancelRequested: false,
-      timeoutExtended: false,
-      waitingForUserDecision: false,
-      resumeResolver: null,
     });
 
     await db.update(projectsTable).set({ status: "building" }).where(eq(projectsTable.id, projectId));

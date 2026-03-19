@@ -578,10 +578,10 @@ export default function Builder() {
   const isBuilding = buildStatus?.status === "pending" || buildStatus?.status === "in_progress" || startBuildMut.isPending || (!!activeBuildId && !buildStatus);
 
   const actionCount = logs.length;
-  const files = projectFiles?.data || [];
   const isDeploying = deployMut.isPending || redeployMut.isPending || deploymentStatus?.status === "deploying";
   const isDeployed = deploymentStatus?.status === "active";
-  const canDeploy = (project?.status === "ready" || files.length > 0) && !isBuilding;
+  const canDeploy = project?.status === "ready" && !isBuilding;
+  const files = projectFiles?.data || [];
 
   const handleSaveCSS = useCallback(async () => {
     if (!id || cssEditor.changeCount === 0) return;
@@ -616,21 +616,18 @@ export default function Builder() {
     }
   }, [id, cssEditor, files, updateFileMut]);
 
+  const htmlFile = files.find((f) => f.filePath?.endsWith('.html'));
+  const hasPreview = !!htmlFile?.content;
+
   const currentPhase = inferPhase(buildStatus?.status, logs);
   const phaseFailed = buildStatus?.status === "failed";
 
   const [sandboxRunning, setSandboxRunning] = useState(false);
 
-  const recoveryTriggeredRef = useRef<string | null>(null);
-
   useEffect(() => {
     if (!id) return;
-    if (recoveryTriggeredRef.current !== id) {
-      recoveryTriggeredRef.current = null;
-    }
     const baseUrl = import.meta.env.VITE_API_URL || "";
     let stopped = false;
-    let recoveryTriggered = recoveryTriggeredRef.current === id;
     const check = () => {
       if (stopped) return;
       fetch(`${baseUrl}/api/sandbox/project/${id}`, { credentials: "include" })
@@ -639,30 +636,25 @@ export default function Builder() {
           if (stopped) return;
           if (d && d.status === "running") {
             setSandboxRunning(true);
-            recoveryTriggered = false;
-            recoveryTriggeredRef.current = null;
           } else {
             setSandboxRunning(false);
-            if (!recoveryTriggered && !isBuilding) {
-              recoveryTriggered = true;
-              recoveryTriggeredRef.current = id || null;
-              fetch(`${baseUrl}/api/sandbox/proxy/${id}/`, { method: "HEAD", credentials: "include" })
-                .then(() => setTimeout(check, 3000))
-                .catch(() => {});
-            }
           }
         })
         .catch(() => {
           if (!stopped) setSandboxRunning(false);
         });
     };
-    check();
-    if (!recoveryTriggered) {
+    const triggerRecovery = () => {
+      if (stopped) return;
       fetch(`${baseUrl}/api/sandbox/proxy/${id}/`, { method: "HEAD", credentials: "include" })
-        .then(() => setTimeout(check, 3000))
+        .then(() => {
+          setTimeout(check, 2000);
+        })
         .catch(() => {});
-    }
-    const pollInterval = isBuilding ? 2000 : 4000;
+    };
+    check();
+    triggerRecovery();
+    const pollInterval = isBuilding ? 2000 : 5000;
     const iv = setInterval(check, pollInterval);
     return () => { stopped = true; clearInterval(iv); };
   }, [id, isBuilding]);
@@ -698,16 +690,12 @@ export default function Builder() {
       "serverStarted" in l.details &&
       (l.details as Record<string, unknown>).serverStarted === true
     );
-    const hasFiles = files.length > 0;
-    const hasPackageJson = files.some(f => f.filePath === "package.json");
-    if (runnerLog || sandboxRunning || (hasFiles && hasPackageJson)) {
+    if (runnerLog || sandboxRunning) {
       const baseUrl = import.meta.env.VITE_API_URL || "";
       return `${baseUrl}/api/sandbox/proxy/${id}/`;
     }
     return null;
-  }, [id, logs, sandboxRunning, files]);
-
-  const hasPreview = sandboxRunning || !!sandboxProxyUrl || files.some(f => f.filePath === "package.json");
+  }, [id, logs, sandboxRunning]);
 
   useEffect(() => {
     if (!sandboxProxyUrl) {
@@ -716,21 +704,21 @@ export default function Builder() {
       return;
     }
     let cancelled = false;
+    let attempt = 0;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
-    const verify = (attempt: number) => {
+    const maxAttempts = 6;
+    const baseDelay = 1000;
+    const verify = () => {
       if (cancelled) return;
+      attempt++;
       fetch(sandboxProxyUrl, { method: "HEAD", credentials: "include" })
         .then(r => {
           if (cancelled) return;
-          if (r.status === 202) {
-            const delay = Math.min(2000 + attempt * 500, 5000);
-            retryTimer = setTimeout(() => verify(attempt + 1), delay);
-          } else if (r.status >= 200 && r.status < 300) {
+          if (r.ok || (r.status >= 200 && r.status < 400)) {
             setProxyVerified(true);
             setProxyFailed(false);
-          } else if (attempt < 30) {
-            const delay = Math.min(1500 + attempt * 300, 5000);
-            retryTimer = setTimeout(() => verify(attempt + 1), delay);
+          } else if (attempt < maxAttempts) {
+            retryTimer = setTimeout(verify, baseDelay * Math.min(attempt, 4));
           } else {
             setProxyVerified(false);
             setProxyFailed(true);
@@ -738,16 +726,15 @@ export default function Builder() {
         })
         .catch(() => {
           if (cancelled) return;
-          if (attempt < 30) {
-            const delay = Math.min(2000 + attempt * 500, 5000);
-            retryTimer = setTimeout(() => verify(attempt + 1), delay);
+          if (attempt < maxAttempts) {
+            retryTimer = setTimeout(verify, baseDelay * Math.min(attempt, 4));
           } else {
             setProxyVerified(false);
             setProxyFailed(true);
           }
         });
     };
-    verify(0);
+    verify();
     return () => {
       cancelled = true;
       if (retryTimer) clearTimeout(retryTimer);
@@ -756,7 +743,533 @@ export default function Builder() {
 
   const previewUrl = (sandboxProxyUrl && proxyVerified && !proxyFailed) ? sandboxProxyUrl : null;
 
+  const buildPreviewHtml = (): string => {
+    if (!htmlFile?.content) return "";
 
+    const cssFiles = files.filter(f => f.filePath?.endsWith('.css') && f.content);
+    const reactFiles = files.filter(f =>
+      f.content &&
+      (f.filePath?.endsWith('.tsx') || f.filePath?.endsWith('.jsx') ||
+       (f.filePath?.endsWith('.ts') && !f.filePath?.endsWith('.config.ts') && !f.filePath?.endsWith('vite-env.d.ts')) ||
+       (f.filePath?.endsWith('.js') && !f.filePath?.endsWith('.config.js') && f.filePath?.startsWith('src/'))) &&
+      !f.filePath?.endsWith('.config.ts') && !f.filePath?.endsWith('.config.js')
+    );
+    const isReactProject = reactFiles.some(f =>
+      f.content?.includes('React') || f.content?.includes('react') ||
+      f.content?.includes('useState') || f.content?.includes('jsx')
+    );
+
+    if (!isReactProject) {
+      let resultHtml = htmlFile.content;
+      const cssContents: string[] = [];
+      const jsContents: string[] = [];
+      for (const f of files) {
+        if (f.filePath?.endsWith('.css') && f.content && f.filePath !== htmlFile.filePath) {
+          cssContents.push(`/* ${f.filePath} */\n${f.content}`);
+        }
+        if (f.filePath?.endsWith('.js') && f.content && f.filePath !== htmlFile.filePath) {
+          jsContents.push(`// ${f.filePath}\n${f.content}`);
+        }
+      }
+      if (cssContents.length > 0) {
+        const cssBlock = `<style>\n${cssContents.join('\n')}\n</style>`;
+        if (resultHtml.includes('</head>')) {
+          resultHtml = resultHtml.replace('</head>', `${cssBlock}\n</head>`);
+        } else {
+          resultHtml = cssBlock + resultHtml;
+        }
+      }
+      if (jsContents.length > 0) {
+        const jsBlock = `<script>\n${jsContents.join('\n')}\n<\/script>`;
+        if (resultHtml.includes('</body>')) {
+          resultHtml = resultHtml.replace('</body>', `${jsBlock}\n</body>`);
+        } else {
+          resultHtml += jsBlock;
+        }
+      }
+      resultHtml = resultHtml.replace(/<link\s+rel=["']stylesheet["']\s+href=["'][^"']*["']\s*\/?>/gi, '');
+      resultHtml = resultHtml.replace(/<script\s+src=["'][^"']*["']\s*>\s*<\/script>/gi, '');
+      return resultHtml;
+    }
+
+    const allCSS = cssFiles.map(f => f.content).join('\n');
+
+    const stripImportsExports = (code: string, fallbackName: string): string => {
+      let c = code;
+      c = c.replace(/^import\s+\{([^}]+)\}\s+from\s+['"]lucide-react['"]\s*;?\s*$/gm, (_m, names) => {
+        const iconNames = names.split(',').map((n: string) => n.trim()).filter(Boolean);
+        return iconNames.map((n: string) => {
+          const parts = n.split(/\s+as\s+/);
+          const original = parts[0].trim();
+          const alias = (parts[1] || parts[0]).trim();
+          return `var ${alias} = __icons['${original}'];`;
+        }).join('\n');
+      });
+      c = c.replace(/^import\s[\s\S]*?from\s+['"].*?['"]\s*;?\s*$/gm, '');
+      c = c.replace(/^import\s+['"].*?['"]\s*;?\s*$/gm, '');
+      c = c.replace(/^import\s+type\s+[\s\S]*?from\s+['"].*?['"]\s*;?\s*$/gm, '');
+
+      c = c.replace(/export\s+default\s+function\s+(\w+)/g, 'function $1');
+      c = c.replace(/export\s+default\s+class\s+(\w+)/g, 'class $1');
+      c = c.replace(/export\s+default\s+(\w+)\s*;?/g, '');
+
+      c = c.replace(/export\s+(const|function|class|let|var)\s+/g, '$1 ');
+
+      c = c.replace(/export\s+type\s+/g, 'type ');
+      c = c.replace(/export\s+interface\s+/g, 'interface ');
+      c = c.replace(/export\s+enum\s+/g, 'enum ');
+
+      c = c.replace(/export\s+\{[^}]*\}\s*(from\s+['"].*?['"])?\s*;?/g, '');
+
+      c = c.replace(/^export\s+default\s+/gm, 'var _default = ');
+
+      c = c.replace(/^(?:const|let|var)\s+\w+\s*=\s*(?:React\.)?lazy\s*\(.*?\)\s*;?\s*$/gm, '');
+
+      c = c.replace(/:\s*React\.FC(<[^>]*>)?/g, '');
+      c = c.replace(/:\s*React\.ReactNode/g, '');
+      c = c.replace(/:\s*React\.CSSProperties/g, '');
+      c = c.replace(/:\s*React\.ChangeEvent<[^>]*>/g, '');
+      c = c.replace(/:\s*React\.FormEvent<[^>]*>/g, '');
+      c = c.replace(/:\s*React\.MouseEvent<[^>]*>/g, '');
+      c = c.replace(/:\s*React\.KeyboardEvent<[^>]*>/g, '');
+      c = c.replace(/:\s*React\.FocusEvent<[^>]*>/g, '');
+      c = c.replace(/:\s*React\.TouchEvent<[^>]*>/g, '');
+      c = c.replace(/:\s*React\.DragEvent<[^>]*>/g, '');
+      c = c.replace(/:\s*React\.ClipboardEvent<[^>]*>/g, '');
+      c = c.replace(/:\s*React\.Dispatch<[^>]*>/g, '');
+      c = c.replace(/:\s*React\.SetStateAction<[^>]*>/g, '');
+      c = c.replace(/:\s*React\.RefObject<[^>]*>/g, '');
+      c = c.replace(/:\s*React\.MutableRefObject<[^>]*>/g, '');
+      c = c.replace(/:\s*React\.ComponentProps<[^>]*>/g, '');
+
+      c = c.replace(/^interface\s+\w+[\s\S]*?^\}/gm, '');
+      c = c.replace(/^type\s+\w+\s*=\s*[\s\S]*?(?=\n(?:const|let|var|function|export|import|\/\/|\/\*|$))/gm, '');
+
+      c = c.replace(/as\s+\w+(\[\])?\s*[;,)]/g, (m) => m.slice(m.length - 1));
+      c = c.replace(/as\s+\w+\s*$/gm, '');
+
+      c = c.replace(/<(\w+)(?:\s*,\s*\w+)*>(?=\()/g, '');
+      c = c.replace(/\w+\s*<[^>]+>\s*(?=\()/g, (m) => m.replace(/<[^>]+>/, ''));
+
+      c = c.replace(/import\.meta\.env\.\w+/g, '""');
+      c = c.replace(/import\.meta/g, '({})');
+
+      c = c.replace(/process\.env\.\w+/g, '""');
+
+      c = c.replace(/<(\w+)(\s[^>]*)?\s*\/>/g, (m, tag, attrs) => {
+        if (/^[a-z]/.test(tag)) return m;
+        return `<${tag}${attrs || ''} />`;
+      });
+      return c;
+    };
+
+    const componentFiles = reactFiles
+      .filter(f => !f.filePath?.includes('main.') && !f.filePath?.includes('index.') && !f.filePath?.includes('vite-env'))
+      .sort((a, b) => {
+        const depthA = (a.filePath?.match(/\//g) || []).length;
+        const depthB = (b.filePath?.match(/\//g) || []).length;
+        if (depthA !== depthB) return depthB - depthA;
+        const isAppA = a.filePath?.includes('App.') ? 1 : 0;
+        const isAppB = b.filePath?.includes('App.') ? 1 : 0;
+        return isAppA - isAppB;
+      });
+
+    const componentScripts = componentFiles.map(f => {
+      return `// __FILE__: ${f.filePath}\n${f.content || ''}`;
+    }).join('\n\n// __FILE_SEPARATOR__\n\n');
+
+    const dir = files.some(f => f.content?.includes('dir="rtl"') || f.content?.includes("dir='rtl'") || f.content?.includes('direction: rtl'))
+      ? 'rtl' : 'ltr';
+    const htmlLang = dir === 'rtl' ? 'ar' : 'en';
+
+    const safeComponentCode = componentScripts.replace(/<\/script/gi, '<\\/script');
+
+    return `<!DOCTYPE html>
+<html lang="${htmlLang}" dir="${dir}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Cairo', 'Inter', sans-serif; }
+    ${allCSS}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/plain" id="__component_code__">${safeComponentCode}<\/script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin><\/script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin><\/script>
+  <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"><\/script>
+  <script>
+    var useState = React.useState, useEffect = React.useEffect, useCallback = React.useCallback,
+        useMemo = React.useMemo, useRef = React.useRef, Fragment = React.Fragment,
+        useReducer = React.useReducer, useLayoutEffect = React.useLayoutEffect,
+        useImperativeHandle = React.useImperativeHandle, useDebugValue = React.useDebugValue,
+        forwardRef = React.forwardRef, memo = React.memo, Children = React.Children,
+        isValidElement = React.isValidElement, cloneElement = React.cloneElement,
+        createElement = React.createElement, Component = React.Component, PureComponent = React.PureComponent,
+        StrictMode = React.StrictMode;
+    var createContext = function(defaultValue) {
+      var ctx = React.createContext(defaultValue);
+      var OrigProvider = ctx.Provider;
+      return ctx;
+    };
+    var useContext = function(ctx) {
+      try { var v = React.useContext(ctx); return v; } catch(e) { return null; }
+    };
+    var useId = function() { return 'id-' + Math.random().toString(36).slice(2, 8); };
+    var useSyncExternalStore = function(sub, getSnapshot) { var _s = useState(0); useEffect(function() { return sub(function() { _s[1](function(c) { return c+1; }); }); }, []); return getSnapshot(); };
+    var useDeferredValue = function(v) { return v; };
+    var useTransition = function() { return [false, function(fn) { fn(); }]; };
+    var startTransition = function(fn) { fn(); };
+    var __currentParams = {};
+    function __matchRoute(pattern, pathname) {
+      if (!pattern) return false;
+      if (pattern === pathname) return { exact: true, params: {} };
+      if (pattern === '*') return { exact: false, params: { '*': pathname } };
+      var patternParts = pattern.split('/').filter(Boolean);
+      var pathParts = pathname.split('/').filter(Boolean);
+      if (patternParts.length !== pathParts.length) return false;
+      var params = {};
+      for (var i = 0; i < patternParts.length; i++) {
+        if (patternParts[i].charAt(0) === ':') {
+          params[patternParts[i].slice(1)] = decodeURIComponent(pathParts[i]);
+        } else if (patternParts[i] !== pathParts[i]) {
+          return false;
+        }
+      }
+      return { exact: true, params: params };
+    }
+    var useNavigate = function() { return function(p, opts) { if (typeof p === 'number') { return; } window.location.hash = p; }; };
+    var useParams = function() { return __currentParams; };
+    var useLocation = function() {
+      var _s = React.useState(window.location.hash.slice(1) || '/');
+      React.useEffect(function() {
+        var handler = function() { _s[1](window.location.hash.slice(1) || '/'); };
+        window.addEventListener('hashchange', handler);
+        return function() { window.removeEventListener('hashchange', handler); };
+      }, []);
+      return { pathname: _s[0], search: '', hash: '', state: null };
+    };
+    var useSearchParams = function() {
+      var params = new URLSearchParams(window.location.search);
+      var setParams = function() {};
+      return [params, setParams];
+    };
+    var Navigate = function(props) { if (props.to) window.location.hash = props.to; return null; };
+    var Link = function(props) {
+      var p = {};
+      for (var k in props) { if (k !== 'to' && k !== 'children' && k !== 'reloadDocument') p[k] = props[k]; }
+      p.href = '#' + (props.to || '/');
+      var origClick = props.onClick;
+      p.onClick = function(e) { e.preventDefault(); if (origClick) origClick(e); window.location.hash = props.to || '/'; };
+      return React.createElement('a', p, props.children);
+    };
+    var NavLink = function(props) {
+      var currentPath = window.location.hash.slice(1) || '/';
+      var isActive = currentPath === props.to || (props.to !== '/' && currentPath.indexOf(props.to) === 0);
+      var cn = props.className;
+      if (typeof cn === 'function') cn = cn({ isActive: isActive, isPending: false });
+      var newProps = {};
+      for (var k in props) { if (k !== 'to' && k !== 'children' && k !== 'className' && k !== 'end' && k !== 'reloadDocument') newProps[k] = props[k]; }
+      newProps.className = cn || '';
+      if (isActive && props.style && typeof props.style === 'function') newProps.style = props.style({ isActive: isActive });
+      newProps.href = '#' + (props.to || '/');
+      newProps.onClick = function(e) { e.preventDefault(); window.location.hash = props.to || '/'; };
+      return React.createElement('a', newProps, props.children);
+    };
+    var BrowserRouter = function(props) { return React.createElement(Fragment, null, props.children); };
+    var Routes = function(props) {
+      var _s = React.useState(window.location.hash.slice(1) || '/');
+      var path = _s[0], setPath = _s[1];
+      React.useEffect(function() {
+        var handler = function() { setPath(window.location.hash.slice(1) || '/'); };
+        window.addEventListener('hashchange', handler);
+        return function() { window.removeEventListener('hashchange', handler); };
+      }, []);
+      var routes = React.Children.toArray(props.children);
+      var matched = null;
+      for (var i = 0; i < routes.length; i++) {
+        var r = routes[i];
+        if (!r.props) continue;
+        var result = __matchRoute(r.props.path, path);
+        if (result) {
+          __currentParams = result.params || {};
+          matched = r;
+          break;
+        }
+        if (r.props.index && path === '/') { matched = r; __currentParams = {}; break; }
+      }
+      if (!matched) {
+        var fallback = routes.find(function(r) { return r.props && r.props.path === '*'; });
+        if (!fallback) fallback = routes.find(function(r) { return r.props && (r.props.path === '/' || r.props.index); });
+        if (fallback) { matched = fallback; __currentParams = {}; }
+      }
+      return matched && matched.props ? matched.props.element : null;
+    };
+    var Route = function() { return null; };
+    var Outlet = function(props) { return props && props.children ? React.createElement(Fragment, null, props.children) : null; };
+    var HashRouter = BrowserRouter;
+    var MemoryRouter = BrowserRouter;
+    var Router = BrowserRouter;
+    var RouterProvider = function(props) {
+      var _s = React.useState(window.location.hash.slice(1) || '/');
+      var currentPath = _s[0];
+      React.useEffect(function() {
+        var handler = function() { _s[1](window.location.hash.slice(1) || '/'); };
+        window.addEventListener('hashchange', handler);
+        return function() { window.removeEventListener('hashchange', handler); };
+      }, []);
+      var router = props.router;
+      if (!router || !router.routes) return null;
+      function findMatch(routesList, path) {
+        for (var i = 0; i < routesList.length; i++) {
+          var route = routesList[i];
+          if (route.path) {
+            var m = __matchRoute(route.path, path);
+            if (m) { __currentParams = m.params || {}; return route; }
+          }
+          if (route.index && path === '/') { __currentParams = {}; return route; }
+          if (route.children) {
+            var child = findMatch(route.children, path);
+            if (child) {
+              if (route.element) return { element: React.createElement(Fragment, null, route.element, child.element) };
+              return child;
+            }
+          }
+        }
+        return null;
+      }
+      var matchedRoute = findMatch(router.routes, currentPath);
+      if (!matchedRoute) {
+        var firstRoute = router.routes[0];
+        if (firstRoute && firstRoute.children) {
+          var indexChild = firstRoute.children.find(function(r) { return r.index; }) || firstRoute.children[0];
+          if (indexChild) {
+            return firstRoute.element ? React.createElement(Fragment, null, firstRoute.element, indexChild.element) : indexChild.element;
+          }
+        }
+        if (firstRoute && firstRoute.element) return firstRoute.element;
+      }
+      return matchedRoute ? matchedRoute.element : null;
+    };
+    var createBrowserRouter = function(routes) { return { routes: routes }; };
+    var createHashRouter = createBrowserRouter;
+    var createMemoryRouter = createBrowserRouter;
+    var ScrollRestoration = function() { return null; };
+    var useMatch = function(pattern) {
+      var path = window.location.hash.slice(1) || '/';
+      return __matchRoute(pattern, path) || null;
+    };
+    var useRouteError = function() { return null; };
+    var useLoaderData = function() { return {}; };
+    var Form = function(props) { return React.createElement('form', props, props.children); };
+    var Suspense = function(props) { return React.createElement(Fragment, null, props.children); };
+    var lazy = function(fn) { return function(props) { return null; }; };
+
+    var axios = {
+      get: function(url, config) { return fetch(url, config).then(function(r) { return r.json().then(function(d) { return { data: d, status: r.status, statusText: r.statusText, headers: {}, config: config || {} }; }); }); },
+      post: function(url, data, config) { return fetch(url, Object.assign({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }, config)).then(function(r) { return r.json().then(function(d) { return { data: d, status: r.status, statusText: r.statusText, headers: {}, config: config || {} }; }); }); },
+      put: function(url, data, config) { return fetch(url, Object.assign({ method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }, config)).then(function(r) { return r.json().then(function(d) { return { data: d, status: r.status, statusText: r.statusText, headers: {}, config: config || {} }; }); }); },
+      delete: function(url, config) { return fetch(url, Object.assign({ method: 'DELETE' }, config)).then(function(r) { return r.json().then(function(d) { return { data: d, status: r.status, statusText: r.statusText, headers: {}, config: config || {} }; }); }); },
+      create: function() { return axios; },
+      defaults: { headers: { common: {} } },
+      interceptors: { request: { use: function(){} }, response: { use: function(){} } }
+    };
+    var toast = function(msg) { console.log('[toast]', msg); };
+    toast.success = toast; toast.error = toast; toast.info = toast; toast.warning = toast;
+    var Toaster = function() { return null; };
+    var useToast = function() { return { toast: toast }; };
+    var motion = new Proxy({}, { get: function(t, prop) { return function(p) { return React.createElement(prop, p, p ? p.children : null); }; } });
+    var AnimatePresence = function(props) { return React.createElement(Fragment, null, props.children); };
+    var framerMotion = { motion: motion, AnimatePresence: AnimatePresence };
+    var clsx = function() { return Array.prototype.slice.call(arguments).filter(Boolean).join(' '); };
+    var cn = clsx;
+    var twMerge = function(s) { return s; };
+    function cva(base, config) { return function(props) { return base; }; }
+
+    var __iconSvgPaths = {
+      Car: 'M7 17h10M5 13l1.5-4.5h11L19 13M6 17a1 1 0 1 0 2 0 1 1 0 0 0-2 0m10 0a1 1 0 1 0 2 0 1 1 0 0 0-2 0M3 13h18v4H3z',
+      Menu: 'M4 6h16M4 12h16M4 18h16',
+      X: 'M18 6L6 18M6 6l12 12',
+      Search: 'M21 21l-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0z',
+      MapPin: 'M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0zm-9 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+      Phone: 'M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z',
+      Mail: 'M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zm16 2l-8 5-8-5',
+      Calendar: 'M19 4H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zM16 2v4M8 2v4M3 10h18',
+      Clock: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 6v4l3 3',
+      Check: 'M20 6L9 17l-5-5',
+      Filter: 'M22 3H2l8 9.46V19l4 2v-8.54L22 3z',
+      Globe: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z',
+      ChevronDown: 'M6 9l6 6 6-6', ChevronLeft: 'M15 18l-6-6 6-6', ChevronRight: 'M9 18l6-6-6-6',
+      DollarSign: 'M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',
+      Fuel: 'M3 22V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v17M13 10h2a2 2 0 0 1 2 2v3a2 2 0 0 0 4 0V8l-4-4',
+      Gauge: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 6l3 6',
+      Settings: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4',
+      Shield: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
+      User: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',
+      Users: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
+      Award: 'M12 2l3 6 7 1-5 5 1.5 7L12 17.5 5.5 21 7 14l-5-5 7-1z',
+      CreditCard: 'M1 4h22v16H1zM1 10h22',
+      AlertCircle: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 6v4m0 4h.01',
+      Star: 'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z',
+      Heart: 'M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z',
+      Facebook: 'M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z',
+      Twitter: 'M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5',
+      Instagram: 'M16 2H8a6 6 0 0 0-6 6v8a6 6 0 0 0 6 6h8a6 6 0 0 0 6-6V8a6 6 0 0 0-6-6zm-4 14a4 4 0 1 1 0-8 4 4 0 0 1 0 8zm5-9a1 1 0 1 1 0-2 1 1 0 0 1 0 2z'
+    };
+    function __makeIcon(name) {
+      return function(props) {
+        var p = props || {};
+        var size = p.size || p.width || 24;
+        var color = p.color || 'currentColor';
+        var cls = p.className || '';
+        var pathD = __iconSvgPaths[name] || 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z';
+        var paths = pathD.split(/(?<=z)(?=[A-Z])/i);
+        var children = paths.map(function(d, i) { return React.createElement('path', { key: i, d: d }); });
+        return React.createElement('svg', {
+          xmlns: 'http://www.w3.org/2000/svg', width: size, height: size,
+          viewBox: '0 0 24 24', fill: 'none', stroke: color,
+          strokeWidth: p.strokeWidth || 2, strokeLinecap: 'round', strokeLinejoin: 'round',
+          className: cls, style: p.style
+        }, children);
+      };
+    }
+    var __icons = new Proxy({}, { get: function(t, name) { return __makeIcon(String(name)); } });
+
+    // DO NOT define icons as global vars - they conflict with component names (Home, Link, Menu, etc.)
+    // Instead, icons are accessed via __icons registry. The import transform below handles this.
+    // Only define icons that will NEVER conflict with component names as convenience globals:
+    var AlertCircle=__makeIcon('AlertCircle'),Award=__makeIcon('Award'),Calendar=__makeIcon('Calendar'),Car=__makeIcon('Car'),Check=__makeIcon('Check'),ChevronDown=__makeIcon('ChevronDown'),ChevronLeft=__makeIcon('ChevronLeft'),ChevronRight=__makeIcon('ChevronRight'),ChevronUp=__makeIcon('ChevronDown'),Clock=__makeIcon('Clock'),CreditCard=__makeIcon('CreditCard'),DollarSign=__makeIcon('DollarSign'),Facebook=__makeIcon('Facebook'),Filter=__makeIcon('Filter'),Fuel=__makeIcon('Fuel'),Gauge=__makeIcon('Gauge'),Globe=__makeIcon('Globe'),Heart=__makeIcon('Heart'),Instagram=__makeIcon('Instagram'),Mail=__makeIcon('Mail'),MapPin=__makeIcon('MapPin'),Phone=__makeIcon('Phone'),Settings=__makeIcon('Settings'),Shield=__makeIcon('Shield'),Star=__makeIcon('Star'),Sun=__makeIcon('Star'),Moon=__makeIcon('Star'),Twitter=__makeIcon('Twitter'),Users=__makeIcon('Users'),ArrowRight=__makeIcon('ChevronRight'),ArrowLeft=__makeIcon('ChevronLeft'),ArrowUp=__makeIcon('ChevronDown'),ArrowDown=__makeIcon('ChevronDown'),Plus=__makeIcon('Check'),Minus=__makeIcon('X'),Eye=__makeIcon('Search'),EyeOff=__makeIcon('X'),Trash=__makeIcon('X'),Trash2=__makeIcon('X'),Edit=__makeIcon('Settings'),Edit2=__makeIcon('Settings'),Edit3=__makeIcon('Settings'),Copy=__makeIcon('CreditCard'),Download=__makeIcon('ChevronDown'),Upload=__makeIcon('ChevronDown'),Share=__makeIcon('Globe'),Share2=__makeIcon('Globe'),ExternalLink=__makeIcon('Globe'),Loader=__makeIcon('Settings'),Loader2=__makeIcon('Settings'),RefreshCw=__makeIcon('Settings'),RotateCw=__makeIcon('Settings'),RotateCcw=__makeIcon('Settings'),Info=__makeIcon('AlertCircle'),HelpCircle=__makeIcon('AlertCircle'),Bell=__makeIcon('AlertCircle'),BellRing=__makeIcon('AlertCircle'),Zap=__makeIcon('Star'),Sparkles=__makeIcon('Star'),ShoppingCart=__makeIcon('CreditCard'),ShoppingBag=__makeIcon('CreditCard'),Package=__makeIcon('CreditCard'),Tag=__makeIcon('DollarSign'),Bookmark=__makeIcon('Star'),Image=__makeIcon('CreditCard'),Camera=__makeIcon('Search'),Video=__makeIcon('CreditCard'),FileText=__makeIcon('CreditCard'),File=__makeIcon('CreditCard'),Folder=__makeIcon('CreditCard'),Paperclip=__makeIcon('CreditCard'),Send=__makeIcon('ChevronRight'),MessageCircle=__makeIcon('AlertCircle'),MessageSquare=__makeIcon('CreditCard'),Truck=__makeIcon('Car'),Grid=__makeIcon('Menu'),List=__makeIcon('Menu'),Lock=__makeIcon('Shield'),Save=__makeIcon('Check'),HeadphonesIcon=__makeIcon('Phone'),Headphones=__makeIcon('Phone'),Wifi=__makeIcon('Globe'),WifiOff=__makeIcon('X'),Battery=__makeIcon('CreditCard'),Power=__makeIcon('Zap'),Layers=__makeIcon('CreditCard'),Layout=__makeIcon('CreditCard'),Maximize=__makeIcon('CreditCard'),Minimize=__makeIcon('X'),AlertTriangle=__makeIcon('AlertCircle'),ThumbsUp=__makeIcon('Check'),ThumbsDown=__makeIcon('X'),LogIn=__makeIcon('ChevronRight'),LogOut=__makeIcon('ChevronRight'),UserPlus=__makeIcon('User'),UserMinus=__makeIcon('User'),UserCheck=__makeIcon('User'),Percent=__makeIcon('DollarSign'),Hash=__makeIcon('Menu'),AtSign=__makeIcon('Mail'),Gift=__makeIcon('Star'),Repeat=__makeIcon('Settings'),MoreHorizontal=__makeIcon('Menu'),MoreVertical=__makeIcon('Menu'),Sliders=__makeIcon('Settings'),Target=__makeIcon('Search'),Crosshair=__makeIcon('Search'),Compass=__makeIcon('Globe'),Navigation=__makeIcon('MapPin'),Map=__makeIcon('Globe'),Linkedin=__makeIcon('Globe'),Youtube=__makeIcon('Globe'),Github=__makeIcon('Globe'),Chrome=__makeIcon('Globe'),Smartphone=__makeIcon('CreditCard'),Monitor=__makeIcon('CreditCard'),Printer=__makeIcon('CreditCard'),Mic=__makeIcon('Phone'),Volume2=__makeIcon('Phone'),VolumeX=__makeIcon('X');
+
+    try {
+      var rawCode = document.getElementById('__component_code__').textContent;
+      var fileChunks = rawCode.split('// __FILE_SEPARATOR__');
+      var chunkErrors = [];
+      var __exports = {};
+      function processChunk(code, idx) {
+        var fileLabel = (code.match(/\\/\\/ __FILE__:\\s*(.+)/) || [])[1] || ('chunk-' + idx);
+
+        // 1. Extract names that should be exported to global scope BEFORE stripping
+        var exportedNames = [];
+        var defMatch = code.match(/export\\s+default\\s+(?:function|class)\\s+(\\w+)/);
+        if (defMatch) exportedNames.push(defMatch[1]);
+        var defNameMatch = code.match(/export\\s+default\\s+(\\w+)\\s*;/);
+        if (defNameMatch && exportedNames.indexOf(defNameMatch[1]) === -1) exportedNames.push(defNameMatch[1]);
+        var declMatches = code.match(/(?:export\\s+)?(?:const|let|var|function)\\s+(\\w+)/g);
+        if (declMatches) {
+          declMatches.forEach(function(d) {
+            var nm = d.match(/(\\w+)$/);
+            if (nm && exportedNames.indexOf(nm[1]) === -1) exportedNames.push(nm[1]);
+          });
+        }
+
+        // 2. Convert lucide-react imports to local icon vars (scoped inside IIFE)
+        code = code.replace(/^import\\s+\\{([^}]+)\\}\\s+from\\s+['"]lucide-react['"]\\s*;?\\s*$/gm, function(m, names) {
+          return names.split(',').map(function(n) { n = n.trim(); if (!n) return ''; var parts = n.split(/\\s+as\\s+/); var orig = parts[0].trim(); var alias = (parts[1] || parts[0]).trim(); return 'var ' + alias + ' = __icons[\"' + orig + '\"];'; }).join('\\n');
+        });
+
+        // 3. Strip remaining imports
+        code = code.replace(/^import\\s+[\\s\\S]*?from\\s+.+$/gm, '');
+        code = code.replace(/^import\\s+['"].+['"].*$/gm, '');
+
+        // 4. Strip exports
+        code = code.replace(/export\\s+default\\s+function\\s+(\\w+)/g, 'function $1');
+        code = code.replace(/export\\s+default\\s+class\\s+(\\w+)/g, 'class $1');
+        code = code.replace(/export\\s+default\\s+(\\w+)\\s*;?$/gm, '');
+        code = code.replace(/export\\s+(const|function|class|let|var|type|interface|enum)\\s+/g, '$1 ');
+        code = code.replace(/export\\s+\\{[^}]*\\}/g, '');
+        code = code.replace(/^export\\s+default\\s+/gm, 'var _default = ');
+
+        // 5. Other cleanups
+        code = code.replace(/^(?:const|let|var)\\s+\\w+\\s*=\\s*(?:React\\.)?lazy\\s*\\(.*?\\)\\s*;?\\s*$/gm, '');
+        code = code.replace(/import\\.meta\\.env\\.\\w+/g, '""');
+        code = code.replace(/import\\.meta/g, '({})');
+        code = code.replace(/process\\.env\\.\\w+/g, '""');
+        code = code.replace(/\\bconst \\{ [^}]+ \\} = require\\([^)]+\\);?/g, '');
+        code = code.replace(/\\brequire\\([^)]+\\)/g, '({})');
+
+        try {
+          var transformed = Babel.transform(code, { presets: ['react', 'typescript'], filename: fileLabel }).code;
+          transformed = transformed.replace(/\\bconst\\s+/g, 'var ');
+          transformed = transformed.replace(/\\blet\\s+/g, 'var ');
+
+          // 6. Wrap in IIFE so icon vars stay local, export component names to global
+          var exportStmts = exportedNames.filter(function(n) { return n && n !== '_default' && n.length > 1; }).map(function(n) {
+            return 'if (typeof ' + n + ' !== "undefined") __exports["' + n + '"] = ' + n + ';';
+          }).join('\\n');
+          // Import previously exported globals into this IIFE scope (skip router/React mocks)
+          var __skipImports = ['Link','NavLink','BrowserRouter','Routes','Route','HashRouter','MemoryRouter','Router','RouterProvider','Navigate','Outlet','Suspense','Fragment','useState','useEffect','useCallback','useMemo','useRef','useReducer','useContext','createContext','useNavigate','useParams','useLocation','useSearchParams','useMatch','useRouteError','useLoaderData','Form','ScrollRestoration','lazy','forwardRef','memo','axios','toast','Toaster','useToast','motion','AnimatePresence','clsx','cn','twMerge','cva'];
+          var importStmts = Object.keys(__exports).filter(function(k) { return __skipImports.indexOf(k) === -1; }).map(function(k) {
+            return 'var ' + k + ' = __exports["' + k + '"];';
+          }).join('\\n');
+          transformed = '(function() {\\n' + importStmts + '\\n' + transformed + '\\n' + exportStmts + '\\n})();';
+
+          (0, eval)(transformed);
+        } catch(chunkErr) {
+          console.warn('[Preview] Error in ' + fileLabel + ':', chunkErr.message, chunkErr.stack);
+          chunkErrors.push({ file: fileLabel, error: chunkErr.message });
+        }
+      }
+      for (var fi = 0; fi < fileChunks.length; fi++) {
+        processChunk(fileChunks[fi], fi);
+      }
+      // Copy exports to window for compatibility
+      Object.keys(__exports).forEach(function(k) { window[k] = __exports[k]; });
+      var root = ReactDOM.createRoot(document.getElementById('root'));
+      var AppComp = __exports.App || window.App || null;
+      if (!AppComp) {
+        var possibleNames = ['App', 'HomePage', 'Home', 'Main', 'Page', 'Root', 'Landing', 'LandingPage', 'Dashboard', 'Layout', 'AppLayout'];
+        for (var i = 0; i < possibleNames.length; i++) {
+          if (__exports[possibleNames[i]] && typeof __exports[possibleNames[i]] === 'function') { AppComp = __exports[possibleNames[i]]; break; }
+          try { if (window[possibleNames[i]] && typeof window[possibleNames[i]] === 'function') { AppComp = window[possibleNames[i]]; break; } } catch(ex) {}
+        }
+      }
+      if (AppComp) {
+        var ErrorBoundary = (function() {
+          function EB(props) {
+            this.state = { hasError: false, error: null };
+          }
+          EB.prototype = Object.create(React.Component.prototype);
+          EB.prototype.constructor = EB;
+          EB.getDerivedStateFromError = function(error) { return { hasError: true, error: error }; };
+          EB.prototype.componentDidCatch = function(error, info) { console.error('Component error:', error); };
+          EB.prototype.render = function() {
+            if (this.state.hasError) {
+              var msg = this.state.error ? (this.state.error.message || String(this.state.error)) : 'Unknown error';
+              return React.createElement('div', { style: { padding: '40px', textAlign: 'center', fontFamily: 'sans-serif', color: '#666' } },
+                React.createElement('h3', { style: { marginBottom: '12px', color: '#e53e3e' } }, 'Render Error'),
+                React.createElement('pre', { style: { textAlign: 'left', background: '#f7f7f7', padding: '16px', borderRadius: '8px', fontSize: '13px', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '300px', overflow: 'auto', color: '#c53030' } }, msg)
+              );
+            }
+            return this.props.children;
+          };
+          return EB;
+        })();
+        try {
+          root.render(React.createElement(ErrorBoundary, null, React.createElement(AppComp)));
+        } catch(renderErr) {
+          console.error('React render error:', renderErr);
+          document.getElementById('root').innerHTML = '<div style="padding:40px;text-align:center;font-family:sans-serif;color:#666"><h3 style="margin-bottom:12px;color:#e53e3e">Render Error</h3><pre style="text-align:left;background:#f7f7f7;padding:16px;border-radius:8px;font-size:13px;white-space:pre-wrap;word-break:break-word;max-height:300px;overflow:auto;color:#c53030">' + (renderErr.message || String(renderErr)).replace(/</g, '&lt;') + '</pre></div>';
+        }
+      } else {
+        document.getElementById('root').innerHTML = '<div style="padding:40px;text-align:center;font-family:sans-serif;color:#666"><h3>No App Component</h3><p>Could not find main component to render.</p></div>';
+      }
+    } catch(e) {
+      console.error('Preview render error:', e);
+      var errMsg = (e.message || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      var errStack = (e.stack || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      var errLine = '';
+      if (e.loc) errLine = '<p style="font-size:12px;color:#888;margin-top:4px">Line ' + e.loc.line + ', Column ' + e.loc.column + '</p>';
+      var chunkInfo = chunkErrors.length > 0 ? '<p style="font-size:12px;color:#888;margin-top:8px">File errors: ' + chunkErrors.map(function(ce) { return ce.file + ': ' + ce.error; }).join('; ') + '</p>' : '';
+      document.getElementById('root').innerHTML = '<div style="padding:40px;text-align:center;font-family:sans-serif;color:#666"><h3 style="margin-bottom:12px;color:#e53e3e">Preview Error</h3><pre style="text-align:left;background:#f7f7f7;padding:16px;border-radius:8px;font-size:13px;white-space:pre-wrap;word-break:break-word;max-height:300px;overflow:auto;color:#c53030">' + errMsg + '</pre><pre style="text-align:left;background:#f0f0f0;padding:12px;border-radius:8px;font-size:11px;white-space:pre-wrap;word-break:break-word;max-height:200px;overflow:auto;color:#666;margin-top:8px">' + errStack + '</pre>' + errLine + chunkInfo + '</div>';
+    }
+  <\/script>
+</body>
+</html>`;
+  };
 
   const parseInlineMarkdown = (text: string): React.ReactNode[] => {
     const parts: React.ReactNode[] = [];
@@ -1597,25 +2110,41 @@ export default function Builder() {
                 />
               </DevicePreviewFrame>
             ) : hasPreview ? (
-              <div className="h-full flex items-center justify-center bg-[#0d1117]">
-                <div className="text-center">
-                  <Loader2 className="w-8 h-8 mx-auto mb-3 text-[#58a6ff] animate-spin" />
-                  <p className="text-sm text-[#c9d1d9]">{t.preview_connecting || "Starting development server..."}</p>
-                  <p className="text-xs text-[#484f58] mt-1">{t.preview_sandbox_starting || "Preparing sandbox environment..."}</p>
-                  <button
-                    onClick={() => {
-                      setProxyFailed(false);
-                      setProxyVerified(false);
-                      setPreviewKey(k => k + 1);
-                      const baseUrl = import.meta.env.VITE_API_URL || "";
-                      fetch(`${baseUrl}/api/sandbox/proxy/${id}/`, { method: "HEAD", credentials: "include" }).catch(() => {});
-                    }}
-                    className="mt-3 px-4 py-1.5 text-xs bg-[#1f6feb]/20 text-[#58a6ff] rounded-md hover:bg-[#1f6feb]/30 transition-colors"
-                  >
-                    {t.preview_retry}
-                  </button>
-                </div>
-              </div>
+              <DevicePreviewFrame device={currentDevice} previewKey={previewKey}>
+                {(() => {
+                  try {
+                    const html = buildPreviewHtml();
+                    if (!html) return (
+                      <div className="w-full h-full flex items-center justify-center bg-[#0d1117] text-[#484f58]">
+                        <div className="text-center">
+                          <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                          <p className="text-xs">{t.preview_error_render}</p>
+                        </div>
+                      </div>
+                    );
+                    return (
+                      <iframe
+                        key={`doc-${previewKey}`}
+                        ref={iframeRef}
+                        srcDoc={html}
+                        sandbox="allow-scripts allow-same-origin"
+                        className="border-0 bg-white"
+                        style={{ width: "100%", height: "100%", display: "block" }}
+                        title={t.live_preview}
+                      />
+                    );
+                  } catch {
+                    return (
+                      <div className="w-full h-full flex items-center justify-center bg-[#0d1117] text-red-400">
+                        <div className="text-center">
+                          <AlertTriangle className="w-8 h-8 mx-auto mb-2" />
+                          <p className="text-xs">{t.preview_error_render}</p>
+                        </div>
+                      </div>
+                    );
+                  }
+                })()}
+              </DevicePreviewFrame>
             ) : isBuilding ? (
               <div className="h-full flex items-center justify-center text-[#8b949e]">
                 <div className="text-center">
@@ -1634,16 +2163,13 @@ export default function Builder() {
             ) : sandboxProxyUrl && proxyFailed ? (
               <div className="h-full flex items-center justify-center text-[#484f58]">
                 <div className="text-center">
-                  <AlertTriangle className="w-10 h-10 mx-auto mb-3 text-amber-400 opacity-60" />
-                  <p className="text-sm text-amber-400">{t.preview_sandbox_failed}</p>
-                  <p className="text-xs text-[#484f58] mt-1">The sandbox may need more time to start</p>
+                  <AlertTriangle className="w-10 h-10 mx-auto mb-3 text-red-400 opacity-60" />
+                  <p className="text-sm text-red-400">{t.preview_sandbox_failed}</p>
                   <button
                     onClick={() => {
                       setProxyFailed(false);
                       setProxyVerified(false);
                       setPreviewKey(k => k + 1);
-                      const baseUrl = import.meta.env.VITE_API_URL || "";
-                      fetch(`${baseUrl}/api/sandbox/proxy/${id}/`, { method: "HEAD", credentials: "include" }).catch(() => {});
                     }}
                     className="mt-3 px-4 py-1.5 text-xs bg-[#1f6feb]/20 text-[#58a6ff] rounded-md hover:bg-[#1f6feb]/30 transition-colors"
                   >

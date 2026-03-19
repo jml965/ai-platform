@@ -1,4 +1,4 @@
-export { startBuild, startBuildWithPlan, generatePlan, cancelBuild, resumeBuild, getBuildWaitingStatus, getActiveBuild, getAllActiveBuilds, checkBuildLimits } from "./execution-engine";
+export { startBuild, startBuildWithPlan, generatePlan, cancelBuild, getActiveBuild, getAllActiveBuilds, checkBuildLimits } from "./execution-engine";
 export { getConstitution } from "./constitution";
 export { runQaPipeline, runQaWithRetry } from "./qa-pipeline";
 export { getRunner, removeRunner } from "./package-runner-agent";

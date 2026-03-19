@@ -95,29 +95,13 @@ export class PlannerAgent extends BaseAgent {
 EXAMPLE: {"framework":"React","description":"short","descriptionAr":"قصير","directoryStructure":["src/"],"packages":["react"],"modules":[{"name":"core","nameAr":"الأساسي","description":"Core setup files","files":["src/App.tsx","src/main.tsx","src/index.css"]},{"name":"auth","nameAr":"المصادقة","description":"Login and register","files":["src/pages/Login.tsx","src/pages/Register.tsx","src/contexts/AuthContext.tsx"]}]}
 Rules:
 - NO "files" top-level array — files are ONLY inside modules
-- Split into MANY small MODULES by domain (core, auth, products-pages, products-components, cart, dashboard, admin, etc.)
-- Each module: 5-12 files MAXIMUM, self-contained (pages + components + hooks + utils)
-- "core" module FIRST: App.tsx, main.tsx, layouts, router, shared types, contexts, index.css (max 8 files)
+- Split into 8-15 independent MODULES by domain (core, auth, products, cart, dashboard, admin, etc.)
+- Each module: 15-40 files, self-contained (pages + components + hooks + utils)
+- "core" module FIRST: App.tsx, main.tsx, layouts, router, shared types, contexts, index.css
 - Keep file paths SHORT (src/pages/X.tsx, src/components/X.tsx)
 - Modules are built by independent developers in parallel — no cross-module dependencies except core
-- For 250-file projects: create 20-25 modules with 8-12 files each
-- For 500-file projects: create 40-50 modules with 8-12 files each
-- JSON only, no comments, no descriptions longer than 5 words
-
-QUALITY & ASSETS PLANNING:
-- Always plan an src/assets/ directory for images referenced via Unsplash URLs
-- Plan dedicated component files for visual sections: Hero, Gallery, Testimonials, Features
-- Every module with UI pages MUST include visual components (cards with images, icon sections, hero banners)
-- Plan small, focused components (max 150 lines each) for fast rendering and code-splitting
-- Include a src/data/ directory for mock data files (products, services, team members) with image URLs
-- Ensure each UI module has at least 2-3 reusable visual components (cards, badges, rating stars)
-
-SPEED — CRITICAL MODULE SIZING RULES:
-- Each module MUST have 5-12 files MAXIMUM — NEVER exceed 12 files per module
-- If a domain needs 20+ files, split it into sub-modules (e.g., "products-pages", "products-components", "products-data")
-- Create 12-20 modules for medium projects (100-250 files), 20-30 modules for large projects (250-500 files)
-- Smaller modules = faster parallel execution = shorter build time
-- Target: build completes in under 10 minutes for <250 files, 15 minutes for <400 files, 20 minutes for 500+ files`;
+- For 500-file projects: create 12-15 modules with 30-40 files each
+- JSON only, no comments, no descriptions longer than 5 words`;
 
   async execute(context: BuildContext): Promise<AgentResult> {
     const startTime = Date.now();

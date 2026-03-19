@@ -816,12 +816,8 @@ function AgentSettingsPanel({ config, onClose, onSave, lang }: { config: FullAge
 export default function InfraPanel() {
   const { lang } = useI18n();
   const [agents, setAgents] = useState<InfraAgent[]>([]);
-  const [selectedAgent, setSelectedAgent] = useState<InfraAgent | null>(() => {
-    try { const s = sessionStorage.getItem("infra_selected_agent"); return s ? JSON.parse(s) : null; } catch { return null; }
-  });
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    try { const s = sessionStorage.getItem("infra_selected_agent"); if (!s) return []; const a = JSON.parse(s); const m = sessionStorage.getItem(`infra_msgs_${a.agentKey}`); return m ? JSON.parse(m).map((x: any) => ({ ...x, timestamp: new Date(x.timestamp) })) : []; } catch { return []; }
-  });
+  const [selectedAgent, setSelectedAgent] = useState<InfraAgent | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -832,13 +828,6 @@ export default function InfraPanel() {
   const abortRef = useRef<AbortController | null>(null);
   const [settingsAgent, setSettingsAgent] = useState<string | null>(null);
   const [fullConfig, setFullConfig] = useState<FullAgentConfig | null>(null);
-
-  useEffect(() => {
-    if (selectedAgent) {
-      sessionStorage.setItem("infra_selected_agent", JSON.stringify(selectedAgent));
-      sessionStorage.setItem(`infra_msgs_${selectedAgent.agentKey}`, JSON.stringify(messages.slice(-100)));
-    }
-  }, [messages, selectedAgent]);
 
   const openSettings = async (agentKey: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -880,14 +869,7 @@ export default function InfraPanel() {
 
   const selectAgent = (agent: InfraAgent) => {
     setSelectedAgent(agent);
-    try {
-      const saved = sessionStorage.getItem(`infra_msgs_${agent.agentKey}`);
-      if (saved) {
-        setMessages(JSON.parse(saved).map((x: any) => ({ ...x, timestamp: new Date(x.timestamp) })));
-      } else {
-        setMessages([]);
-      }
-    } catch { setMessages([]); }
+    setMessages([]);
     setPrompt("");
   };
 
@@ -1044,7 +1026,6 @@ export default function InfraPanel() {
       body: JSON.stringify({ agentKey: selectedAgent.agentKey }),
     });
     setMessages([]);
-    sessionStorage.removeItem(`infra_msgs_${selectedAgent.agentKey}`);
   };
 
   return (

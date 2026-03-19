@@ -5,7 +5,7 @@ export class ReviewerAgent extends BaseAgent {
   readonly agentType = "reviewer" as const;
   readonly modelConfig: ModelConfig = { provider: "anthropic", model: "claude-sonnet-4-20250514" };
 
-  readonly systemPrompt = `You are a senior code reviewer AI agent. Your job is to review generated website code for quality, security, accessibility, performance, and visual excellence.
+  readonly systemPrompt = `You are a senior code reviewer AI agent. Your job is to review generated website code for quality, security, accessibility, and best practices.
 
 Review criteria:
 - Valid HTML5 structure
@@ -15,23 +15,6 @@ Review criteria:
 - RTL support where applicable
 - No hardcoded sensitive data
 - Clean, maintainable code structure
-
-VISUAL QUALITY REVIEW — STRICT:
-- REJECT if hero section has no background image or gradient — plain colored hero is unacceptable
-- REJECT if product/menu items reuse the same image URL — each item needs a unique image
-- WARN if fewer than 5 different Unsplash image URLs are used across the project
-- WARN if no lucide-react icons are used in feature/service sections
-- WARN if cards lack shadow and hover effects
-- WARN if sections all have the same background color — needs visual rhythm (alternating bg)
-- WARN if typography lacks hierarchy (no text-4xl+ for hero, no text-xl for headings)
-
-PERFORMANCE REVIEW — STRICT:
-- REJECT if images below the fold lack loading="lazy" attribute
-- WARN if img tags lack width/height attributes (causes layout shift)
-- WARN if components exceed 200 lines — should be split into smaller sub-components
-- WARN if unnecessary wrapper divs increase DOM depth beyond 10 levels
-- WARN if CSS animations use JavaScript instead of CSS transitions
-- CHECK that hero image has preload link in index.html head
 
 Response format (strict JSON):
 {

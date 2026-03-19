@@ -1,9 +1,8 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { agentConfigsTable, projectsTable, projectFilesTable } from "@workspace/db/schema";
+import { agentConfigsTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getSystemBlueprint } from "../lib/system-blueprint";
-import { getFullLiveContext, detectAndExecuteCommands, queryTable, executeSqlQuery, readProjectFile, getProjectFileTree, getSystemHealth } from "../lib/system-live-context";
 const router = Router();
 
 function requireInfraAdmin(req: any, res: any, next: any) {
@@ -53,15 +52,7 @@ const DEFAULT_INFRA_AGENTS = [
 - وكيل التصميم (infra_ui): تحسين الواجهات
 - وكيل قاعدة البيانات (infra_db): إدارة البيانات والجداول
 - وكيل الأمان (infra_security): فحص وتعزيز الأمان
-- وكيل النشر (infra_deploy): النشر والتحديثات
-
-### قدرة إنشاء المشاريع (مهم جداً):
-عندما يطلب المالك إنشاء موقع أو مشروع:
-1. اكتب الكود الكامل داخل code block عادي: \`\`\`html ثم الكود ثم \`\`\`
-2. لا تستخدم <artifact> tags أبداً — استخدم فقط \`\`\`html ... \`\`\`
-3. النظام سيقوم تلقائياً بإنشاء المشروع من الكود وإضافته لمشاريع المالك
-4. اكتب الكود الكامل فوراً بدون استئذان — HTML + CSS + JS كلها في ملف واحد
-5. اجعل الكود كامل وجاهز للعمل (لا placeholders ولا TODO)`,
+- وكيل النشر (infra_deploy): النشر والتحديثات`,
     permissions: ["manage_agents", "read_all_files", "write_files", "restart_services", "database_read", "database_write", "deploy", "security_scan", "full_system_access"],
     pipelineOrder: 1,
     receivesFrom: "owner_input",
@@ -191,13 +182,7 @@ const DEFAULT_INFRA_AGENTS = [
 - Express + TypeScript للخلفية
 - React + Tailwind + Wouter للواجهة
 - Drizzle ORM لقاعدة البيانات
-- لا axios، لا shadcn/radix/mui
-
-### إنشاء مشاريع مواقع:
-عندما يطلب المالك إنشاء موقع:
-- اكتب الكود الكامل داخل \`\`\`html ... \`\`\` (code block عادي)
-- لا تستخدم <artifact> أبداً
-- النظام سينشئ المشروع تلقائياً من الكود`,
+- لا axios، لا shadcn/radix/mui`,
     instructions: `## بناء ميزات جديدة
 
 ### البنية المعمارية:
@@ -625,13 +610,6 @@ router.post("/infra/chat-stream", requireInfraAdmin, async (req, res) => {
     }
 
     const blueprint = getSystemBlueprint();
-    const liveContext = await getFullLiveContext();
-
-    const commandResult = await detectAndExecuteCommands(message);
-    let commandData = "";
-    if (commandResult) {
-      commandData = `\n\n# ===== نتيجة تنفيذ الأمر الحقيقي =====\n${commandResult}\n# ===== نهاية النتيجة =====\n`;
-    }
 
     const infraSystemPrompt = `أنت ${config.displayNameAr} (${config.displayNameEn}) — وكيل بنية تحتية لمنصة Mr Code AI.
 
@@ -640,19 +618,7 @@ router.post("/infra/chat-stream", requireInfraAdmin, async (req, res) => {
 أنت تعمل على البنية التحتية للمنصة نفسها — لست وكيل خدمة عملاء.
 المالك يتحدث معك مباشرة ويطلب منك مهام تتعلق بالنظام.
 
-## هام جداً — أنت متصل فعلياً بالنظام:
-- أنت لديك وصول حقيقي لقاعدة البيانات (PostgreSQL) ويمكنك قراءة الجداول والبيانات
-- أنت لديك وصول حقيقي لملفات المشروع ويمكنك قراءتها
-- أنت لديك معلومات حية عن حالة النظام (ذاكرة، معالج، إلخ)
-- البيانات أدناه حقيقية تم جلبها لحظياً من قاعدة البيانات والخادم
-- عندما يسألك المالك عن بيانات، أجب من البيانات الحقيقية أدناه
-- لا تخترع أرقام أو بيانات — استخدم البيانات الحقيقية فقط
-
 ${blueprint}
-
-${liveContext}
-
-${commandData}
 
 القواعد:
 - رد بالعربية إذا المالك يتحدث بالعربية، وبالإنجليزية إذا يتحدث بالإنجليزية
@@ -661,7 +627,6 @@ ${commandData}
 - إذا تحتاج تعديل كود، اكتب الكود الكامل مع المسار
 - استخدم markdown code blocks لأي كود
 - لا تخترع ملفات غير موجودة — اعتمد على خريطة النظام
-- عند عرض البيانات استخدم الجداول والأرقام الحقيقية
 ${config.instructions ? `\n\nتعليمات إضافية:\n${config.instructions}` : ""}
 ${config.permissions && Array.isArray(config.permissions) && config.permissions.length > 0 ? `\nصلاحياتك: ${config.permissions.join(", ")}` : ""}`;
 
@@ -791,13 +756,6 @@ router.post("/infra/director-stream", requireInfraAdmin, async (req, res) => {
     }
 
     const blueprint = getSystemBlueprint();
-    const liveContext = await getFullLiveContext();
-
-    const commandResult = await detectAndExecuteCommands(message);
-    let commandData = "";
-    if (commandResult) {
-      commandData = `\n\n# ===== نتيجة تنفيذ الأمر الحقيقي =====\n${commandResult}\n# ===== نهاية النتيجة =====\n`;
-    }
 
     const allAgents = await db.select({
       agentKey: agentConfigsTable.agentKey,
@@ -818,18 +776,7 @@ ${config.description}
 
 أنت تعمل بنظام Governor — ثلاثة نماذج ذكاء اصطناعي تحلل طلبك بالتوازي، ثم الحاكم يدمج أفضل النتائج في رد واحد نهائي دقيق جداً.
 
-## هام جداً — أنت متصل فعلياً بالنظام:
-- أنت لديك وصول حقيقي لقاعدة البيانات (PostgreSQL) ويمكنك قراءة الجداول والبيانات
-- أنت لديك وصول حقيقي لملفات المشروع ويمكنك قراءتها
-- أنت لديك معلومات حية عن حالة النظام (ذاكرة، معالج، إلخ)
-- البيانات أدناه حقيقية تم جلبها لحظياً
-- لا تخترع أرقام أو بيانات — استخدم البيانات الحقيقية فقط
-
 ${blueprint}
-
-${liveContext}
-
-${commandData}
 
 ## حالة الوكلاء الحالية:
 ${agentStatusReport}
@@ -841,7 +788,6 @@ ${agentStatusReport}
 - اذكر أسماء الملفات والمسارات بدقة
 - إذا تحتاج تعديل كود، اعرض التعديل الجراحي (قبل/بعد) مع المسار ورقم السطر
 - لا تخترع ملفات — اعتمد على خريطة النظام
-- عند عرض البيانات استخدم الجداول والأرقام الحقيقية
 - اقترح دائماً الخطوة التالية
 
 ${config.instructions || ""}
@@ -874,12 +820,8 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
 
     res.write(`data: ${JSON.stringify({ type: "status", message: `🧠 تشغيل ${slots.length} نموذج ذكاء اصطناعي بالتوازي...`, messageEn: `Running ${slots.length} AI models in parallel...` })}\n\n`);
 
-    const agentNames: Record<string, string> = { "claude-sonnet-4-6": "وكيل Claude", "gemini-2.5-flash": "وكيل Gemini", "o3-mini": "وكيل OpenAI", "gpt-4o": "وكيل GPT-4" };
-
     const callModel = async (provider: string, model: string, maxTokens: number, timeoutSec: number): Promise<{ content: string; tokensUsed: number; model: string; durationMs: number } | null> => {
-      const aName = agentNames[model] || model;
       const start = Date.now();
-      res.write(`data: ${JSON.stringify({ type: "agent_activity", agent: aName, model, step: "thinking", message: `${aName} يحلل الطلب...` })}\n\n`);
       try {
         if (provider === "anthropic") {
           const { getAnthropicClient } = await import("../lib/agents/ai-clients");
@@ -895,10 +837,7 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
           const response = await stream.finalMessage();
           const text = response.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
           const tokens = (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0);
-          const dur = Date.now() - start;
-          const preview = text.slice(0, 120).replace(/\n/g, " ");
-          res.write(`data: ${JSON.stringify({ type: "agent_activity", agent: aName, model, step: "done", durationMs: dur, message: `${aName} أنهى التحليل (${(dur/1000).toFixed(1)}ث)`, preview })}\n\n`);
-          return { content: text, tokensUsed: tokens, model, durationMs: dur };
+          return { content: text, tokensUsed: tokens, model, durationMs: Date.now() - start };
         } else if (provider === "google") {
           const { getGoogleClient } = await import("../lib/agents/ai-clients");
           const client = await getGoogleClient();
@@ -911,10 +850,7 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
             config: { systemInstruction: directorPrompt, maxOutputTokens: maxTokens, temperature: parseFloat(String(config.creativity)) || 0.3 },
           });
           const text = response.text || "";
-          const dur = Date.now() - start;
-          const preview = text.slice(0, 120).replace(/\n/g, " ");
-          res.write(`data: ${JSON.stringify({ type: "agent_activity", agent: aName, model, step: "done", durationMs: dur, message: `${aName} أنهى التحليل (${(dur/1000).toFixed(1)}ث)`, preview })}\n\n`);
-          return { content: text, tokensUsed: Math.ceil(text.length / 3), model, durationMs: dur };
+          return { content: text, tokensUsed: Math.ceil(text.length / 3), model, durationMs: Date.now() - start };
         } else if (provider === "openai") {
           const { getOpenAIClient } = await import("../lib/agents/ai-clients");
           const client = await getOpenAIClient();
@@ -929,21 +865,20 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
           });
           const text = response.choices[0]?.message?.content || "";
           const tokens = (response.usage?.total_tokens ?? 0) || Math.ceil(text.length / 3);
-          const dur = Date.now() - start;
-          const preview = text.slice(0, 120).replace(/\n/g, " ");
-          res.write(`data: ${JSON.stringify({ type: "agent_activity", agent: aName, model, step: "done", durationMs: dur, message: `${aName} أنهى التحليل (${(dur/1000).toFixed(1)}ث)`, preview })}\n\n`);
-          return { content: text, tokensUsed: tokens, model, durationMs: dur };
+          return { content: text, tokensUsed: tokens, model, durationMs: Date.now() - start };
         }
         return null;
       } catch (err: any) {
         console.error(`[Director] Model ${model} failed:`, err.message);
-        res.write(`data: ${JSON.stringify({ type: "agent_activity", agent: aName, model, step: "failed", message: `${aName} فشل: ${err.message.slice(0, 80)}` })}\n\n`);
         return null;
       }
     };
 
     const thinkResults = await Promise.allSettled(
-      slots.map(slot => callModel(slot.provider, slot.model, slot.maxTokens, slot.timeoutSeconds))
+      slots.map(slot => {
+        res.write(`data: ${JSON.stringify({ type: "status", message: `⚡ ${slot.model} يحلل...`, messageEn: `${slot.model} analyzing...` })}\n\n`);
+        return callModel(slot.provider, slot.model, slot.maxTokens, slot.timeoutSeconds);
+      })
     );
 
     const successResults: Array<{ content: string; tokensUsed: number; model: string; durationMs: number }> = [];
@@ -963,14 +898,9 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
 
     if (successResults.length === 1) {
       finalContent = successResults[0].content;
-      res.write(`data: ${JSON.stringify({ type: "agent_activity", agent: "مدير النظام", model: successResults[0].model, step: "single_response", message: `نموذج واحد أجاب — يعرض النتيجة مباشرة` })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: "status", message: `✅ نموذج واحد أجاب: ${successResults[0].model}`, messageEn: `Single model responded: ${successResults[0].model}` })}\n\n`);
     } else {
-      for (const r of successResults) {
-        const aName = agentNames[r.model] || r.model;
-        const summary = r.content.slice(0, 200).replace(/\n/g, " ").replace(/[#*`]/g, "");
-        res.write(`data: ${JSON.stringify({ type: "agent_proposal", agent: aName, model: r.model, durationMs: r.durationMs, summary })}\n\n`);
-      }
-      res.write(`data: ${JSON.stringify({ type: "agent_activity", agent: "الحاكم (Governor)", model: "governor", step: "merging", message: `الحاكم يقارن ${successResults.length} تحليلات ويدمج أفضل النتائج...` })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: "status", message: `🏛️ الحاكم يدمج ${successResults.length} تحليلات...`, messageEn: `Governor merging ${successResults.length} analyses...` })}\n\n`);
 
       const proposalsText = successResults.map((r, i) =>
         `=== تحليل ${i + 1} (من ${r.model}, ${r.durationMs}ms) ===\n${r.content}`
@@ -1214,104 +1144,6 @@ router.get("/infra/defaults/:agentKey", requireInfraAdmin, (req, res) => {
     return;
   }
   res.json(defaultAgent);
-});
-
-router.post("/infra/query-db", requireInfraAdmin, async (req, res) => {
-  try {
-    const { query: sqlQuery, table } = req.body as { query?: string; table?: string };
-    if (sqlQuery) {
-      const result = await executeSqlQuery(sqlQuery);
-      res.json({ result });
-    } else if (table) {
-      const result = await queryTable(table);
-      res.json({ result });
-    } else {
-      res.status(400).json({ error: { message: "query or table is required" } });
-    }
-  } catch (err: any) {
-    res.status(500).json({ error: { message: err.message } });
-  }
-});
-
-router.post("/infra/read-file", requireInfraAdmin, async (req, res) => {
-  try {
-    const { path: filePath } = req.body as { path: string };
-    if (!filePath) {
-      res.status(400).json({ error: { message: "path is required" } });
-      return;
-    }
-    const result = readProjectFile(filePath);
-    res.json({ result });
-  } catch (err: any) {
-    res.status(500).json({ error: { message: err.message } });
-  }
-});
-
-router.get("/infra/file-tree", requireInfraAdmin, async (req, res) => {
-  try {
-    const dir = req.query.dir as string | undefined;
-    const result = getProjectFileTree(dir);
-    res.json({ result });
-  } catch (err: any) {
-    res.status(500).json({ error: { message: err.message } });
-  }
-});
-
-router.get("/infra/system-health", requireInfraAdmin, async (req, res) => {
-  try {
-    const result = getSystemHealth();
-    res.json({ result });
-  } catch (err: any) {
-    res.status(500).json({ error: { message: err.message } });
-  }
-});
-
-router.post("/infra/create-project", requireInfraAdmin, async (req, res) => {
-  try {
-    const userId = req.user!.id;
-    const { name, description, files } = req.body as {
-      name: string;
-      description?: string;
-      files?: { path: string; content: string }[];
-    };
-
-    if (!name?.trim()) {
-      res.status(400).json({ error: { message: "Project name is required" } });
-      return;
-    }
-
-    const [project] = await db.insert(projectsTable).values({
-      userId,
-      name: name.trim(),
-      description: description || "",
-    }).returning();
-
-    if (files && Array.isArray(files) && files.length > 0) {
-      for (const file of files) {
-        if (file.path && file.content) {
-          const ext = file.path.split(".").pop() || "txt";
-          const typeMap: Record<string, string> = { html: "html", css: "css", js: "javascript", ts: "typescript", tsx: "tsx", jsx: "jsx", json: "json", md: "markdown" };
-          await db.insert(projectFilesTable).values({
-            projectId: project.id,
-            filePath: file.path,
-            content: file.content,
-            fileType: typeMap[ext] || ext,
-          });
-        }
-      }
-    }
-
-    res.status(201).json({
-      id: project.id,
-      name: project.name,
-      description: project.description,
-      url: `/project/${project.id}`,
-      filesCount: files?.length || 0,
-    });
-  } catch (err: any) {
-    console.error("[Infra Create Project Error]", err.message);
-    res.status(500).json({ error: { message: err.message } });
-  }
 });
 
 export default router;

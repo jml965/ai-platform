@@ -1,8 +1,7 @@
 import { spawn, execSync, type ChildProcess } from "child_process";
-import { mkdirSync, rmSync, existsSync, writeFileSync, chmodSync, readFileSync } from "fs";
+import { mkdirSync, rmSync, existsSync, writeFileSync } from "fs";
 import { join, resolve, normalize } from "path";
 import { tmpdir } from "os";
-import http from "http";
 import { db } from "@workspace/db";
 import { sandboxInstancesTable, projectFilesTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
@@ -10,24 +9,9 @@ import { v4 as uuidv4 } from "uuid";
 
 const MAX_CONCURRENT_SANDBOXES = 10;
 const CLEANUP_INTERVAL_MS = 60_000;
-const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
+const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
 const BASE_PORT = 9000;
 const PORT_RANGE = 100;
-const SANDBOX_BASE_DIR = join(tmpdir(), "sandboxes");
-const MAX_SANDBOX_LIFETIME_MS = 30 * 60 * 1000;
-const MAX_OUTPUT_BUFFER = 2000;
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
-const BLOCKED_COMMANDS = [
-  /rm\s+-rf\s+\/(?!\s)/,
-  /mkfs\./,
-  /dd\s+if=/,
-  /:(){ :\|:& };:/,
-  />\s*\/dev\/sd/,
-  /shutdown/,
-  /reboot/,
-  /init\s+0/,
-  /halt/,
-];
 
 const SAFE_ENV_KEYS = new Set([
   "PATH",
@@ -35,7 +19,13 @@ const SAFE_ENV_KEYS = new Set([
   "LC_ALL",
   "TERM",
   "SHELL",
+  "TMPDIR",
   "NODE_ENV",
+  "XDG_CONFIG_HOME",
+  "XDG_DATA_HOME",
+  "XDG_CACHE_HOME",
+  "XDG_STATE_HOME",
+  "XDG_RUNTIME_DIR",
   "NIX_PROFILES",
   "NIX_SSL_CERT_FILE",
   "SSL_CERT_FILE",
@@ -45,7 +35,6 @@ const SAFE_ENV_KEYS = new Set([
 interface SandboxProcess {
   id: string;
   projectId: string;
-  userId: string;
   process: ChildProcess | null;
   workDir: string;
   port: number;
@@ -53,19 +42,15 @@ interface SandboxProcess {
   memoryLimitMb: number;
   timeoutSeconds: number;
   status: "created" | "running" | "stopped" | "error";
-  createdAt: Date;
   lastActivity: Date;
   outputBuffer: string[];
   listeners: Set<(data: string) => void>;
   lastCommand?: string;
-  serverPid?: number;
 }
 
 const activeSandboxes = new Map<string, SandboxProcess>();
 const usedPorts = new Set<number>();
 let cleanupInterval: ReturnType<typeof setInterval> | null = null;
-
-mkdirSync(SANDBOX_BASE_DIR, { recursive: true });
 
 function allocatePort(): number | null {
   for (let i = 0; i < PORT_RANGE; i++) {
@@ -83,9 +68,8 @@ function releasePort(port: number) {
 }
 
 function createWorkDir(sandboxId: string): string {
-  const dir = join(SANDBOX_BASE_DIR, sandboxId);
+  const dir = join(tmpdir(), "sandboxes", sandboxId);
   mkdirSync(dir, { recursive: true });
-  mkdirSync(join(dir, ".tmp"), { recursive: true });
   return dir;
 }
 
@@ -95,17 +79,8 @@ function cleanWorkDir(dir: string) {
       rmSync(dir, { recursive: true, force: true });
     }
   } catch (e: unknown) {
-    console.error(`[Sandbox] Failed to clean work dir ${dir}:`, e);
+    console.error(`Failed to clean work dir ${dir}:`, e);
   }
-}
-
-function isCommandSafe(command: string): boolean {
-  for (const pattern of BLOCKED_COMMANDS) {
-    if (pattern.test(command)) {
-      return false;
-    }
-  }
-  return true;
 }
 
 function buildSafeEnv(sandbox: SandboxProcess): Record<string, string> {
@@ -119,18 +94,8 @@ function buildSafeEnv(sandbox: SandboxProcess): Record<string, string> {
 
   env.PORT = String(sandbox.port);
   env.SANDBOX_ID = sandbox.id;
-  env.HOME = process.env.HOME || "/home/runner";
+  env.HOME = sandbox.workDir;
   env.TMPDIR = join(sandbox.workDir, ".tmp");
-  env.SANDBOX_PROJECT_ID = sandbox.projectId;
-  env.NODE_ENV = "development";
-
-  const nodeModulesBin = join(sandbox.workDir, "node_modules", ".bin");
-  env.PATH = `${nodeModulesBin}:${env.PATH || "/usr/bin:/bin"}`;
-
-  env.npm_config_cache = join(sandbox.workDir, ".tmp", ".npm");
-  env.npm_config_prefix = sandbox.workDir;
-  env.XDG_CONFIG_HOME = join(sandbox.workDir, ".tmp", ".config");
-  env.XDG_CACHE_HOME = join(sandbox.workDir, ".tmp", ".cache");
 
   if (sandbox.runtime === "node") {
     env.NODE_OPTIONS = `--max-old-space-size=${sandbox.memoryLimitMb}`;
@@ -147,9 +112,12 @@ function buildSafeEnv(sandbox: SandboxProcess): Record<string, string> {
   return env;
 }
 
+function buildResourceLimitedCommand(command: string, memoryLimitMb: number, runtime: "node" | "python"): string {
+  return command;
+}
+
 function isPathSafe(filePath: string, workDir: string): boolean {
   if (filePath.includes("\0")) return false;
-  if (filePath.includes("..")) return false;
 
   const normalizedPath = normalize(filePath);
   if (normalizedPath.startsWith("/") || normalizedPath.startsWith("..")) return false;
@@ -157,16 +125,6 @@ function isPathSafe(filePath: string, workDir: string): boolean {
   const resolvedPath = resolve(workDir, normalizedPath);
   const resolvedWorkDir = resolve(workDir);
   return resolvedPath.startsWith(resolvedWorkDir + "/") || resolvedPath === resolvedWorkDir;
-}
-
-function isSandboxAlive(sandbox: SandboxProcess): boolean {
-  if (!sandbox.process || !sandbox.process.pid) return false;
-  try {
-    process.kill(sandbox.process.pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export function getSandboxProjectId(sandboxId: string): string | null {
@@ -178,21 +136,14 @@ export async function createSandbox(
   projectId: string,
   runtime: "node" | "python" = "node",
   memoryLimitMb: number = 256,
-  timeoutSeconds: number = 600,
-  userId: string = "system"
+  timeoutSeconds: number = 300
 ): Promise<{ id: string; port: number; status: string }> {
   if (activeSandboxes.size >= MAX_CONCURRENT_SANDBOXES) {
-    const oldestInactive = findOldestInactiveSandbox();
-    if (oldestInactive) {
-      console.log(`[Sandbox] Evicting inactive sandbox ${oldestInactive} to make room`);
-      try { await stopSandbox(oldestInactive); } catch {}
-    } else {
-      throw new Error(`Maximum concurrent sandboxes reached (${MAX_CONCURRENT_SANDBOXES}). Try again later.`);
-    }
+    throw new Error(`Maximum concurrent sandboxes reached (${MAX_CONCURRENT_SANDBOXES})`);
   }
 
   const clampedMemory = Math.min(Math.max(memoryLimitMb, 64), 1024);
-  const clampedTimeout = Math.min(Math.max(timeoutSeconds, 30), 1800);
+  const clampedTimeout = Math.min(Math.max(timeoutSeconds, 30), 600);
 
   const existingSandbox = Array.from(activeSandboxes.values()).find(
     (s) => s.projectId === projectId
@@ -209,44 +160,46 @@ export async function createSandbox(
   }
 
   const port = allocatePort();
-  if (!port) {
-    throw new Error("No available ports for sandbox. Try again later.");
+  if (port === null) {
+    throw new Error("No available ports for sandbox");
   }
 
-  const instance = {
-    id: uuidv4(),
-    projectId,
-    port,
-    runtime,
-    memoryLimitMb: clampedMemory,
-    timeoutSeconds: clampedTimeout,
-  };
+  const sandboxId = uuidv4();
+  const workDir = createWorkDir(sandboxId);
 
-  const workDir = createWorkDir(instance.id);
+  mkdirSync(join(workDir, ".tmp"), { recursive: true });
+
+  if (runtime === "python") {
+    try {
+      execSync("python3 -m venv .venv", { cwd: workDir, timeout: 30_000 });
+    } catch (e: unknown) {
+      console.warn(`Failed to create Python venv: ${e}`);
+    }
+  }
+
   await syncProjectFiles(projectId, workDir);
 
-  try {
-    await db.insert(sandboxInstancesTable).values({
-      id: instance.id,
-      projectId,
-      port,
-      status: "created",
-      lastActivityAt: new Date(),
-    });
-  } catch {}
+  const [instance] = await db.insert(sandboxInstancesTable).values({
+    projectId,
+    status: "created",
+    runtime,
+    port,
+    workDir,
+    memoryLimitMb: clampedMemory,
+    timeoutSeconds: clampedTimeout,
+    lastActivityAt: new Date(),
+  }).returning();
 
   const sandbox: SandboxProcess = {
     id: instance.id,
     projectId,
-    userId,
     process: null,
     workDir,
     port,
-    runtime: instance.runtime,
+    runtime,
     memoryLimitMb: clampedMemory,
     timeoutSeconds: clampedTimeout,
     status: "created",
-    createdAt: new Date(),
     lastActivity: new Date(),
     outputBuffer: [],
     listeners: new Set(),
@@ -255,7 +208,6 @@ export async function createSandbox(
   activeSandboxes.set(instance.id, sandbox);
   startCleanupIfNeeded();
 
-  console.log(`[Sandbox] Created sandbox ${instance.id} for project ${projectId} on port ${port} (mem: ${clampedMemory}MB, timeout: ${clampedTimeout}s)`);
   return { id: instance.id, port, status: "created" };
 }
 
@@ -265,16 +217,9 @@ async function syncProjectFiles(projectId: string, workDir: string) {
     .from(projectFilesTable)
     .where(eq(projectFilesTable.projectId, projectId));
 
-  let synced = 0;
   for (const file of files) {
     if (!isPathSafe(file.filePath, workDir)) {
-      console.warn(`[Sandbox] Skipping unsafe file path: ${file.filePath}`);
-      continue;
-    }
-
-    const contentSize = Buffer.byteLength(file.content, 'utf-8');
-    if (contentSize > MAX_FILE_SIZE_BYTES) {
-      console.warn(`[Sandbox] Skipping oversized file: ${file.filePath} (${contentSize} bytes)`);
+      console.warn(`Skipping unsafe file path: ${file.filePath}`);
       continue;
     }
 
@@ -288,19 +233,17 @@ async function syncProjectFiles(projectId: string, workDir: string) {
     } else {
       writeFileSync(fullPath, file.content, "utf-8");
     }
-    synced++;
   }
-  console.log(`[Sandbox] Synced ${synced}/${files.length} files for project ${projectId}`);
 }
 
 function appendOutput(sandbox: SandboxProcess, text: string) {
   sandbox.lastActivity = new Date();
   sandbox.outputBuffer.push(text);
-  if (sandbox.outputBuffer.length > MAX_OUTPUT_BUFFER) {
-    sandbox.outputBuffer.splice(0, sandbox.outputBuffer.length - (MAX_OUTPUT_BUFFER / 2));
+  if (sandbox.outputBuffer.length > 1000) {
+    sandbox.outputBuffer.splice(0, sandbox.outputBuffer.length - 500);
   }
   for (const listener of sandbox.listeners) {
-    try { listener(text); } catch {}
+    listener(text);
   }
 }
 
@@ -314,25 +257,20 @@ export async function executeCommand(
     throw new Error(`Sandbox not found: ${sandboxId}`);
   }
 
-  if (!isCommandSafe(command)) {
-    throw new Error("Command blocked by security policy");
-  }
-
   sandbox.lastActivity = new Date();
 
-  try {
-    await db.update(sandboxInstancesTable)
-      .set({ lastActivityAt: new Date(), updatedAt: new Date() })
-      .where(eq(sandboxInstancesTable.id, sandboxId));
-  } catch {}
+  await db.update(sandboxInstancesTable)
+    .set({ lastActivityAt: new Date(), updatedAt: new Date() })
+    .where(eq(sandboxInstancesTable.id, sandboxId));
 
-  const timeoutMs = Math.min(sandbox.timeoutSeconds * 1000, 300_000);
+  const timeoutMs = sandbox.timeoutSeconds * 1000;
 
   return new Promise((resolve, reject) => {
     const outputChunks: string[] = [];
     const env = buildSafeEnv(sandbox);
+    const wrappedCommand = buildResourceLimitedCommand(command, sandbox.memoryLimitMb, sandbox.runtime);
 
-    const child = spawn("sh", ["-c", command], {
+    const child = spawn("sh", ["-c", wrappedCommand], {
       cwd: sandbox.workDir,
       env,
       stdio: ["pipe", "pipe", "pipe"],
@@ -359,7 +297,6 @@ export async function executeCommand(
 
     child.on("close", (code) => {
       clearTimeout(timeout);
-      sandbox.lastActivity = new Date();
       resolve({ exitCode: code, output: outputChunks.join("") });
     });
 
@@ -372,80 +309,86 @@ export async function executeCommand(
 
 export async function startServer(
   sandboxId: string,
-  command: string,
-  onOutput?: (data: string) => void
+  command: string
 ): Promise<{ pid: number; port: number }> {
   const sandbox = activeSandboxes.get(sandboxId);
   if (!sandbox) {
     throw new Error(`Sandbox not found: ${sandboxId}`);
   }
 
-  if (!isCommandSafe(command)) {
-    throw new Error("Command blocked by security policy");
+  if (sandbox.process) {
+    sandbox.process.kill("SIGTERM");
+    sandbox.process = null;
   }
 
-  if (sandbox.process && isSandboxAlive(sandbox)) {
-    sandbox.process.kill("SIGTERM");
-    await new Promise(resolve => setTimeout(resolve, 2000));
-  }
+  sandbox.lastActivity = new Date();
+  sandbox.lastCommand = command;
 
   const env = buildSafeEnv(sandbox);
 
-  const child = spawn("sh", ["-c", command], {
+  const wrappedCommand = buildResourceLimitedCommand(command, sandbox.memoryLimitMb, sandbox.runtime);
+
+  const child = spawn("sh", ["-c", wrappedCommand], {
     cwd: sandbox.workDir,
     env,
     stdio: ["pipe", "pipe", "pipe"],
     detached: false,
   });
 
-  sandbox.process = child;
-  sandbox.status = "running";
-  sandbox.lastActivity = new Date();
-  sandbox.lastCommand = command;
-  sandbox.serverPid = child.pid;
-
   child.stdout?.on("data", (data: Buffer) => {
     appendOutput(sandbox, data.toString());
-    if (onOutput) onOutput(data.toString());
   });
 
   child.stderr?.on("data", (data: Buffer) => {
     appendOutput(sandbox, `[stderr] ${data.toString()}`);
-    if (onOutput) onOutput(`[stderr] ${data.toString()}`);
   });
 
-  const maxLifetimeMs = Math.min(sandbox.timeoutSeconds * 1000, MAX_SANDBOX_LIFETIME_MS);
+  const maxServerLifetimeMs = sandbox.timeoutSeconds * 1000;
   const serverTimeout = setTimeout(() => {
-    console.log(`[Sandbox] Server in ${sandboxId} exceeded max lifetime (${maxLifetimeMs / 1000}s), terminating`);
+    console.log(`Server in sandbox ${sandboxId} exceeded max lifetime (${sandbox.timeoutSeconds}s), terminating`);
     child.kill("SIGTERM");
     setTimeout(() => {
       if (sandbox.process === child) {
         child.kill("SIGKILL");
       }
     }, 5000);
-  }, maxLifetimeMs);
+  }, maxServerLifetimeMs);
 
   child.on("error", (err) => {
     clearTimeout(serverTimeout);
-    console.error(`[Sandbox] Server spawn error in ${sandboxId}:`, err);
+    console.error(`Server spawn error in sandbox ${sandboxId}:`, err);
     sandbox.status = "error";
+    sandbox.process = null;
+    appendOutput(sandbox, `[error] Failed to start server: ${err.message}`);
+    db.update(sandboxInstancesTable)
+      .set({ status: "error", stoppedAt: new Date(), updatedAt: new Date() })
+      .where(eq(sandboxInstancesTable.id, sandboxId))
+      .catch((e: unknown) => console.error(`Failed to update sandbox status: ${e}`));
   });
 
-  child.on("close", (code) => {
+  child.on("close", () => {
     clearTimeout(serverTimeout);
-    console.log(`[Sandbox] Server in ${sandboxId} exited with code ${code}`);
     sandbox.status = "stopped";
     sandbox.process = null;
-    sandbox.serverPid = undefined;
+    db.update(sandboxInstancesTable)
+      .set({ status: "stopped", stoppedAt: new Date(), updatedAt: new Date() })
+      .where(eq(sandboxInstancesTable.id, sandboxId))
+      .catch((e: unknown) => console.error(`Failed to update sandbox status: ${e}`));
   });
 
-  try {
-    await db.update(sandboxInstancesTable)
-      .set({ status: "running", lastActivityAt: new Date(), updatedAt: new Date() })
-      .where(eq(sandboxInstancesTable.id, sandboxId));
-  } catch {}
+  sandbox.process = child;
+  sandbox.status = "running";
 
-  console.log(`[Sandbox] Server started in ${sandboxId} (pid: ${child.pid}, port: ${sandbox.port})`);
+  await db.update(sandboxInstancesTable)
+    .set({
+      status: "running",
+      pid: child.pid ?? null,
+      startedAt: new Date(),
+      lastActivityAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(sandboxInstancesTable.id, sandboxId));
+
   return { pid: child.pid!, port: sandbox.port };
 }
 
@@ -454,8 +397,6 @@ export async function stopSandbox(sandboxId: string): Promise<void> {
   if (!sandbox) {
     throw new Error(`Sandbox not found: ${sandboxId}`);
   }
-
-  console.log(`[Sandbox] Stopping sandbox ${sandboxId} for project ${sandbox.projectId}`);
 
   if (sandbox.process) {
     sandbox.process.kill("SIGTERM");
@@ -479,11 +420,9 @@ export async function stopSandbox(sandboxId: string): Promise<void> {
   cleanWorkDir(sandbox.workDir);
   activeSandboxes.delete(sandboxId);
 
-  try {
-    await db.update(sandboxInstancesTable)
-      .set({ status: "stopped", stoppedAt: new Date(), updatedAt: new Date() })
-      .where(eq(sandboxInstancesTable.id, sandboxId));
-  } catch {}
+  await db.update(sandboxInstancesTable)
+    .set({ status: "stopped", stoppedAt: new Date(), updatedAt: new Date() })
+    .where(eq(sandboxInstancesTable.id, sandboxId));
 }
 
 export async function restartSandbox(
@@ -494,8 +433,6 @@ export async function restartSandbox(
   if (!sandbox) {
     throw new Error(`Sandbox not found: ${sandboxId}`);
   }
-
-  console.log(`[Sandbox] Restarting sandbox ${sandboxId}`);
 
   if (sandbox.process) {
     sandbox.process.kill("SIGTERM");
@@ -518,11 +455,9 @@ export async function restartSandbox(
 
   await syncProjectFiles(sandbox.projectId, sandbox.workDir);
 
-  try {
-    await db.update(sandboxInstancesTable)
-      .set({ status: "created", lastActivityAt: new Date(), updatedAt: new Date() })
-      .where(eq(sandboxInstancesTable.id, sandboxId));
-  } catch {}
+  await db.update(sandboxInstancesTable)
+    .set({ status: "created", lastActivityAt: new Date(), updatedAt: new Date() })
+    .where(eq(sandboxInstancesTable.id, sandboxId));
 
   if (command) {
     const result = await startServer(sandboxId, command);
@@ -542,17 +477,9 @@ export function getSandboxStatus(sandboxId: string): {
   timeoutSeconds: number;
   pid: number | undefined;
   outputTail: string[];
-  alive: boolean;
-  uptimeMs: number;
 } | null {
   const sandbox = activeSandboxes.get(sandboxId);
   if (!sandbox) return null;
-
-  const alive = sandbox.process ? isSandboxAlive(sandbox) : false;
-  if (sandbox.status === "running" && !alive) {
-    sandbox.status = "stopped";
-    sandbox.process = null;
-  }
 
   return {
     id: sandbox.id,
@@ -564,8 +491,6 @@ export function getSandboxStatus(sandboxId: string): {
     timeoutSeconds: sandbox.timeoutSeconds,
     pid: sandbox.process?.pid ?? undefined,
     outputTail: sandbox.outputBuffer.slice(-50),
-    alive,
-    uptimeMs: Date.now() - sandbox.createdAt.getTime(),
   };
 }
 
@@ -577,11 +502,6 @@ export function getSandboxWorkDir(sandboxId: string): string | null {
 export function getProjectSandbox(projectId: string): string | null {
   for (const [id, sandbox] of activeSandboxes) {
     if (sandbox.projectId === projectId && (sandbox.status === "created" || sandbox.status === "running")) {
-      if (sandbox.status === "running" && sandbox.process && !isSandboxAlive(sandbox)) {
-        sandbox.status = "stopped";
-        sandbox.process = null;
-        continue;
-      }
       return id;
     }
   }
@@ -598,25 +518,6 @@ export function getProjectSandboxAny(projectId: string): string | null {
 }
 
 const recoveryInProgress = new Set<string>();
-
-async function waitForServerReady(port: number, timeoutMs: number = 30000): Promise<boolean> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    try {
-      const ok = await new Promise<boolean>((resolve) => {
-        const req = http.request({ hostname: "127.0.0.1", port, path: "/", method: "HEAD", timeout: 2000 }, (res) => {
-          resolve(res.statusCode !== undefined && res.statusCode < 500);
-        });
-        req.on("error", () => resolve(false));
-        req.on("timeout", () => { req.destroy(); resolve(false); });
-        req.end();
-      });
-      if (ok) return true;
-    } catch {}
-    await new Promise(resolve => setTimeout(resolve, 1500));
-  }
-  return false;
-}
 
 export async function recoverSandboxForProject(projectId: string): Promise<string | null> {
   if (recoveryInProgress.has(projectId)) {
@@ -642,30 +543,20 @@ export async function recoverSandboxForProject(projectId: string): Promise<strin
   recoveryInProgress.add(projectId);
   console.log(`[Sandbox Recovery] Recreating sandbox for project ${projectId} (${files.length} files)`);
   try {
-    const { id, port } = await createSandbox(projectId, "node", 256, 600);
+    const { id } = await createSandbox(projectId, "node", 256, 300);
 
     const hasPackageJson = files.some(f => f.filePath === "package.json");
     if (hasPackageJson) {
       console.log(`[Sandbox Recovery] Installing dependencies for ${projectId}...`);
-      const installCmd = "npm install --legacy-peer-deps 2>&1";
-      const installResult = await executeCommand(id, installCmd);
-      if (installResult.exitCode !== 0) {
-        console.warn(`[Sandbox Recovery] npm install exited with code ${installResult.exitCode} for ${projectId}`);
-        console.warn(`[Sandbox Recovery] npm output: ${installResult.output.slice(-500)}`);
-      } else {
-        console.log(`[Sandbox Recovery] Dependencies installed successfully for ${projectId}`);
-      }
+      const installCmd = "npm install --legacy-peer-deps 2>&1 | tail -10";
+      await executeCommand(id, installCmd);
 
       console.log(`[Sandbox Recovery] Starting dev server for ${projectId}...`);
-      const devCmd = "vite --port $PORT --host 0.0.0.0 --strictPort";
+      const devCmd = "npx vite --port $PORT --host 0.0.0.0 --strictPort";
       await startServer(id, devCmd);
 
-      const ready = await waitForServerReady(port, 30000);
-      if (ready) {
-        console.log(`[Sandbox Recovery] Server confirmed ready for ${projectId} on port ${port}`);
-      } else {
-        console.warn(`[Sandbox Recovery] Server did not respond in 30s for ${projectId}, sandbox may still be starting`);
-      }
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      console.log(`[Sandbox Recovery] Recovery complete for ${projectId}`);
     }
 
     return id;
@@ -687,9 +578,6 @@ export function writeFilesToSandboxDirect(
   let written = 0;
   for (const file of files) {
     if (!isPathSafe(file.filePath, sandbox.workDir)) continue;
-
-    const contentSize = Buffer.byteLength(file.content, 'utf-8');
-    if (contentSize > MAX_FILE_SIZE_BYTES) continue;
 
     const normalizedPath = normalize(file.filePath);
     const fullPath = join(sandbox.workDir, normalizedPath);
@@ -721,7 +609,6 @@ export function listUserSandboxes(projectIds: string[]): Array<{
   port: number;
   runtime: string;
   lastActivity: string;
-  alive: boolean;
 }> {
   const projectIdSet = new Set(projectIds);
   return Array.from(activeSandboxes.values())
@@ -733,7 +620,6 @@ export function listUserSandboxes(projectIds: string[]): Array<{
       port: s.port,
       runtime: s.runtime,
       lastActivity: s.lastActivity.toISOString(),
-      alive: s.process ? isSandboxAlive(s) : false,
     }));
 }
 
@@ -752,53 +638,22 @@ export function subscribeSandboxOutput(
   };
 }
 
-function findOldestInactiveSandbox(): string | null {
-  let oldest: { id: string; lastActivity: Date } | null = null;
-  for (const [id, sandbox] of activeSandboxes) {
-    if (sandbox.status === "stopped" || sandbox.status === "error" || !isSandboxAlive(sandbox)) {
-      if (!oldest || sandbox.lastActivity < oldest.lastActivity) {
-        oldest = { id, lastActivity: sandbox.lastActivity };
-      }
-    }
-  }
-  if (!oldest) {
-    for (const [id, sandbox] of activeSandboxes) {
-      if (!oldest || sandbox.lastActivity < oldest.lastActivity) {
-        oldest = { id, lastActivity: sandbox.lastActivity };
-      }
-    }
-  }
-  return oldest?.id ?? null;
-}
-
 async function cleanupInactiveSandboxes() {
-  const inactivityCutoff = new Date(Date.now() - INACTIVITY_TIMEOUT_MS);
-  const lifetimeCutoff = new Date(Date.now() - MAX_SANDBOX_LIFETIME_MS * 2);
+  const cutoff = new Date(Date.now() - INACTIVITY_TIMEOUT_MS);
   const toRemove: string[] = [];
 
   for (const [id, sandbox] of activeSandboxes) {
-    if (sandbox.lastActivity < inactivityCutoff) {
-      toRemove.push(id);
-      continue;
-    }
-    if (sandbox.createdAt < lifetimeCutoff) {
-      toRemove.push(id);
-      continue;
-    }
-    if (sandbox.status === "running" && sandbox.process && !isSandboxAlive(sandbox)) {
-      sandbox.status = "stopped";
-      sandbox.process = null;
+    if (sandbox.lastActivity < cutoff) {
       toRemove.push(id);
     }
   }
 
   for (const id of toRemove) {
-    console.log(`[Sandbox] Cleaning up sandbox: ${id} (project: ${activeSandboxes.get(id)?.projectId})`);
+    console.log(`Cleaning up inactive sandbox: ${id}`);
     try {
       await stopSandbox(id);
     } catch (e: unknown) {
-      console.error(`[Sandbox] Failed to cleanup sandbox ${id}:`, e);
-      activeSandboxes.delete(id);
+      console.error(`Failed to cleanup sandbox ${id}:`, e);
     }
   }
 
@@ -815,7 +670,6 @@ function startCleanupIfNeeded() {
 }
 
 export async function shutdownAllSandboxes(): Promise<void> {
-  console.log(`[Sandbox] Shutting down all sandboxes (${activeSandboxes.size} active)`);
   if (cleanupInterval) {
     clearInterval(cleanupInterval);
     cleanupInterval = null;
@@ -826,31 +680,7 @@ export async function shutdownAllSandboxes(): Promise<void> {
     try {
       await stopSandbox(id);
     } catch (e: unknown) {
-      console.error(`[Sandbox] Failed to shutdown sandbox ${id}:`, e);
+      console.error(`Failed to shutdown sandbox ${id}:`, e);
     }
   }
-}
-
-export function getSandboxStats(): {
-  active: number;
-  running: number;
-  stopped: number;
-  maxConcurrent: number;
-  portsUsed: number;
-  portRange: number;
-} {
-  let running = 0;
-  let stopped = 0;
-  for (const sandbox of activeSandboxes.values()) {
-    if (sandbox.status === "running" && isSandboxAlive(sandbox)) running++;
-    else stopped++;
-  }
-  return {
-    active: activeSandboxes.size,
-    running,
-    stopped,
-    maxConcurrent: MAX_CONCURRENT_SANDBOXES,
-    portsUsed: usedPorts.size,
-    portRange: PORT_RANGE,
-  };
 }

@@ -2,9 +2,6 @@ import { db } from "@workspace/db";
 import { deploymentsTable, projectsTable, projectFilesTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 import { ReplitConnectors } from "@replit/connectors-sdk";
-import { createSandbox, executeCommand, stopSandbox } from "./sandbox/sandbox-manager";
-import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, statSync } from "fs";
-import { join } from "path";
 
 const connectors = new ReplitConnectors();
 
@@ -22,27 +19,17 @@ function generateRepoName(projectName: string, projectId: string): string {
 }
 
 async function githubApi(path: string, options: { method?: string; body?: any } = {}) {
-  const maxRetries = 3;
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    const res = await connectors.proxy("github", path, {
-      method: options.method || "GET",
-      headers: { "Content-Type": "application/json" },
-      body: options.body ? JSON.stringify(options.body) : undefined,
-    });
-    const text = await res.text();
-    if (res.status === 429) {
-      const wait = Math.pow(2, attempt + 1) * 1000;
-      console.warn(`[GitHub] Rate limited on ${path}, retrying in ${wait}ms (attempt ${attempt + 1}/${maxRetries})`);
-      await new Promise(r => setTimeout(r, wait));
-      continue;
-    }
-    if (!res.ok && res.status !== 404 && res.status !== 422) {
-      throw new Error(`GitHub API error ${res.status}: ${text}`);
-    }
-    try { return { status: res.status, data: JSON.parse(text) }; }
-    catch { return { status: res.status, data: text }; }
+  const res = await connectors.proxy("github", path, {
+    method: options.method || "GET",
+    headers: { "Content-Type": "application/json" },
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+  const text = await res.text();
+  if (!res.ok && res.status !== 404 && res.status !== 422) {
+    throw new Error(`GitHub API error ${res.status}: ${text}`);
   }
-  throw new Error(`GitHub API rate limited after ${maxRetries} retries on ${path}`);
+  try { return { status: res.status, data: JSON.parse(text) }; }
+  catch { return { status: res.status, data: text }; }
 }
 
 async function getGitHubUsername(): Promise<string> {
@@ -62,7 +49,7 @@ async function ensureRepo(repoName: string): Promise<{ owner: string; repo: stri
     method: "POST",
     body: {
       name: repoName,
-      description: "Deployed via Mr Code AI",
+      description: "Deployed via AI Website Builder",
       homepage: `https://${owner}.github.io/${repoName}`,
       auto_init: true,
       private: false,
@@ -72,150 +59,11 @@ async function ensureRepo(repoName: string): Promise<{ owner: string; repo: stri
   return { owner, repo: repoName, created: true };
 }
 
-
-async function getDefaultBranch(owner: string, repo: string): Promise<string> {
-  const refMain = await githubApi(`/repos/${owner}/${repo}/git/ref/heads/main`);
-  if (refMain.status === 200) return "main";
-  const refMaster = await githubApi(`/repos/${owner}/${repo}/git/ref/heads/master`);
-  if (refMaster.status === 200) return "master";
-  return "main";
+function base64Encode(str: string): string {
+  return Buffer.from(str, "utf-8").toString("base64");
 }
 
-async function enableGitHubPages(owner: string, repo: string) {
-  const pagesCheck = await githubApi(`/repos/${owner}/${repo}/pages`);
-  if (pagesCheck.status === 200) {
-    return;
-  }
-
-  const branch = await getDefaultBranch(owner, repo);
-  await githubApi(`/repos/${owner}/${repo}/pages`, {
-    method: "POST",
-    body: {
-      source: { branch, path: "/" },
-    },
-  });
-}
-
-function isReactViteProject(files: { filePath: string; content: string | null }[]): boolean {
-  const hasViteConfig = files.some(f =>
-    f.filePath === "vite.config.ts" || f.filePath === "vite.config.js"
-  );
-  const hasIndexHtml = files.some(f => f.filePath === "index.html");
-
-  if (!hasViteConfig && !hasIndexHtml) return false;
-
-  const pkgFile = files.find(f => f.filePath === "package.json");
-  if (!pkgFile?.content) return false;
-  try {
-    const pkg = JSON.parse(pkgFile.content);
-    const allDeps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
-    return !!allDeps.vite || !!allDeps["@vitejs/plugin-react"];
-  } catch {
-    return false;
-  }
-}
-
-function isStaticProject(files: { filePath: string; content: string | null }[]): boolean {
-  const hasIndexHtml = files.some(f => f.filePath === "index.html");
-  const hasViteConfig = files.some(f =>
-    f.filePath === "vite.config.ts" || f.filePath === "vite.config.js"
-  );
-  return hasIndexHtml && !hasViteConfig;
-}
-
-function collectDistFiles(distDir: string, basePath = ""): { filePath: string; content: string }[] {
-  const result: { filePath: string; content: string }[] = [];
-  if (!existsSync(distDir)) return result;
-
-  const entries = readdirSync(distDir);
-  for (const entry of entries) {
-    const fullPath = join(distDir, entry);
-    const relativePath = basePath ? `${basePath}/${entry}` : entry;
-    const stat = statSync(fullPath);
-    if (stat.isDirectory()) {
-      result.push(...collectDistFiles(fullPath, relativePath));
-    } else {
-      try {
-        result.push({ filePath: relativePath, content: readFileSync(fullPath, "utf-8") });
-      } catch {}
-    }
-  }
-  return result;
-}
-
-async function buildProjectInSandbox(
-  projectId: string,
-  files: { filePath: string; content: string | null }[],
-  repoName: string
-): Promise<{ filePath: string; content: string }[]> {
-  console.log(`[Deploy] Building project ${projectId} in sandbox...`);
-
-  const { id: sandboxId } = await createSandbox(projectId, "node", 1024, 180, "deploy-system");
-  const sandboxDir = `/tmp/sandboxes/${sandboxId}`;
-
-  try {
-    console.log(`[Deploy] Installing dependencies...`);
-    const installResult = await executeCommand(sandboxId, "npm install --legacy-peer-deps 2>&1");
-    if (installResult.exitCode !== 0) {
-      console.warn(`[Deploy] npm install warning (code ${installResult.exitCode}): ${installResult.output.slice(-300)}`);
-    }
-
-    console.log(`[Deploy] Running vite build with base /${repoName}/...`);
-    const buildResult = await executeCommand(
-      sandboxId,
-      `./node_modules/.bin/vite build --base=/${repoName}/ 2>&1`
-    );
-    if (buildResult.exitCode !== 0) {
-      const output = buildResult.output || "";
-      const errorLines = output.split("\n").filter(
-        (l: string) => l.includes("error") || l.includes("Error") || l.includes("✘") || l.includes("SyntaxError") || l.includes("Transform failed")
-      ).join("\n");
-      console.error(`[Deploy] Build errors:\n${errorLines || output.slice(0, 2000)}`);
-      throw new Error(`Build failed: ${errorLines.slice(0, 500) || output.slice(-300)}`);
-    }
-
-    console.log(`[Deploy] Build succeeded, collecting dist files...`);
-    const distDir = join(sandboxDir, "dist");
-
-    const distFiles = collectDistFiles(distDir);
-    if (distFiles.length === 0) {
-      throw new Error("Build produced no output files in dist/");
-    }
-
-    console.log(`[Deploy] Collected ${distFiles.length} built files`);
-    return distFiles;
-  } finally {
-    try {
-      await stopSandbox(sandboxId);
-    } catch {}
-  }
-}
-
-async function getDeployableFiles(
-  projectId: string,
-  files: { filePath: string; content: string | null }[],
-  repoName: string
-): Promise<{ filePath: string; content: string }[]> {
-  if (isReactViteProject(files)) {
-    console.log(`[Deploy] Detected React+Vite project, building before deploy...`);
-    try {
-      return await buildProjectInSandbox(projectId, files, repoName);
-    } catch (buildErr) {
-      console.error(`[Deploy] Build failed, deploying source files as fallback:`, buildErr);
-    }
-  } else if (isStaticProject(files)) {
-    console.log(`[Deploy] Detected static HTML project, deploying as-is`);
-  } else {
-    console.log(`[Deploy] Non-frontend project (backend/fullstack), deploying source files`);
-  }
-
-  return files.map(f => ({
-    filePath: f.filePath,
-    content: f.content ?? "",
-  }));
-}
-
-async function pushFilesToGitHub(
+async function pushFilesToRepo(
   owner: string,
   repo: string,
   files: { filePath: string; content: string }[]
@@ -234,49 +82,25 @@ async function pushFilesToGitHub(
     }
   }
 
-  console.log(`[Deploy] Uploading ${files.length} files as individual blobs...`);
+  const baseCommit = await githubApi(`/repos/${owner}/${repo}/git/commits/${baseSha}`);
+  const baseTreeSha = baseCommit.data.tree.sha;
 
-  const BATCH_SIZE = 3;
-  const treeItems: any[] = [];
-
-  for (let i = 0; i < files.length; i += BATCH_SIZE) {
-    const batch = files.slice(i, i + BATCH_SIZE);
-    const batchResults = await Promise.all(
-      batch.map(async f => {
-        const blobRes = await githubApi(`/repos/${owner}/${repo}/git/blobs`, {
-          method: "POST",
-          body: {
-            content: Buffer.from(f.content, "utf-8").toString("base64"),
-            encoding: "base64",
-          },
-        });
-
-        return {
-          path: f.filePath.replace(/^\//, ""),
-          mode: "100644" as const,
-          type: "blob" as const,
-          sha: blobRes.data.sha,
-        };
-      })
-    );
-    treeItems.push(...batchResults);
-    if (i + BATCH_SIZE < files.length) {
-      console.log(`[Deploy] Uploaded ${Math.min(i + BATCH_SIZE, files.length)}/${files.length} blobs...`);
-      await new Promise(r => setTimeout(r, 300));
-    }
-  }
-
-  console.log(`[Deploy] All ${files.length} blobs uploaded, creating tree...`);
+  const treeItems = files.map(f => ({
+    path: f.filePath.replace(/^\//, ""),
+    mode: "100644" as const,
+    type: "blob" as const,
+    content: f.content,
+  }));
 
   const treeRes = await githubApi(`/repos/${owner}/${repo}/git/trees`, {
     method: "POST",
-    body: { tree: treeItems },
+    body: { base_tree: baseTreeSha, tree: treeItems },
   });
 
   const commitRes = await githubApi(`/repos/${owner}/${repo}/git/commits`, {
     method: "POST",
     body: {
-      message: `Deploy from Mr Code AI - ${new Date().toISOString()}`,
+      message: `Deploy from AI Website Builder - ${new Date().toISOString()}`,
       tree: treeRes.data.sha,
       parents: [baseSha],
     },
@@ -290,8 +114,20 @@ async function pushFilesToGitHub(
     method: "PATCH",
     body: { sha: commitRes.data.sha, force: true },
   });
+}
 
-  console.log(`[Deploy] Files pushed to ${owner}/${repo} successfully`);
+async function enableGitHubPages(owner: string, repo: string) {
+  const pagesCheck = await githubApi(`/repos/${owner}/${repo}/pages`);
+  if (pagesCheck.status === 200) {
+    return;
+  }
+
+  await githubApi(`/repos/${owner}/${repo}/pages`, {
+    method: "POST",
+    body: {
+      source: { branch: "main", path: "/" },
+    },
+  });
 }
 
 export async function deployProject(projectId: string, userId: string) {
@@ -303,6 +139,7 @@ export async function deployProject(projectId: string, userId: string) {
 
   if (!project) throw new Error("Project not found");
   if (project.userId !== userId) throw new Error("Access denied");
+  if (project.status !== "ready") throw new Error("Project must be in 'ready' status to deploy");
 
   const files = await db
     .select()
@@ -319,8 +156,6 @@ export async function deployProject(projectId: string, userId: string) {
 
   const repoName = existing?.subdomain || generateRepoName(project.name, projectId);
 
-  const deployableFiles = await getDeployableFiles(projectId, files, repoName);
-
   if (existing) {
     const newVersion = (existing.version ?? 1) + 1;
     await db
@@ -330,7 +165,11 @@ export async function deployProject(projectId: string, userId: string) {
 
     try {
       const { owner, repo } = await ensureRepo(repoName);
-      await pushFilesToGitHub(owner, repo, deployableFiles);
+      const deployableFiles = files.map(f => ({
+        filePath: f.filePath,
+        content: f.content ?? "",
+      }));
+      await pushFilesToRepo(owner, repo, deployableFiles);
       await enableGitHubPages(owner, repo);
 
       const url = `https://${owner}.github.io/${repo}`;
@@ -366,7 +205,11 @@ export async function deployProject(projectId: string, userId: string) {
 
   try {
     const { owner, repo } = await ensureRepo(repoName);
-    await pushFilesToGitHub(owner, repo, deployableFiles);
+    const deployableFiles = files.map(f => ({
+      filePath: f.filePath,
+      content: f.content ?? "",
+    }));
+    await pushFilesToRepo(owner, repo, deployableFiles);
     await enableGitHubPages(owner, repo);
 
     const url = `https://${owner}.github.io/${repo}`;

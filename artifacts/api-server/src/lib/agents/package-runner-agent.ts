@@ -132,7 +132,7 @@ export class PackageRunnerAgent extends BaseAgent {
       const isVite = this.isViteProject(files);
 
       if (isVite) {
-        return "vite --port $PORT --host 0.0.0.0 --strictPort";
+        return "npx vite --port $PORT --host 0.0.0.0 --strictPort";
       }
 
       const pkgFile = files.find(
@@ -144,7 +144,7 @@ export class PackageRunnerAgent extends BaseAgent {
           if (pkg.scripts?.dev) {
             const devScript = pkg.scripts.dev;
             if (devScript.includes("vite")) {
-              return "vite --port $PORT --host 0.0.0.0 --strictPort";
+              return "npx vite --port $PORT --host 0.0.0.0 --strictPort";
             }
             if (devScript.includes("next")) {
               return "npx next dev -p $PORT -H 0.0.0.0";

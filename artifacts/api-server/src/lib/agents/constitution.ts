@@ -15,9 +15,6 @@ export interface CodeQualityRules {
   requireResponsiveDesign: boolean;
   requireAccessibility: boolean;
   requireEnvironmentVariables: boolean;
-  requireHighQualityImages: boolean;
-  requirePerformanceOptimization: boolean;
-  requireVisualExcellence: boolean;
   maxComponentLines: number;
   maxFunctionLines: number;
 }
@@ -28,10 +25,7 @@ const DEFAULT_CODE_QUALITY_RULES: CodeQualityRules = {
   requireResponsiveDesign: true,
   requireAccessibility: true,
   requireEnvironmentVariables: true,
-  requireHighQualityImages: true,
-  requirePerformanceOptimization: true,
-  requireVisualExcellence: true,
-  maxComponentLines: 200,
+  maxComponentLines: 300,
   maxFunctionLines: 50,
 };
 
@@ -132,15 +126,6 @@ export function getCodeQualityPrompt(rules: CodeQualityRules): string {
   }
   if (rules.requireEnvironmentVariables) {
     lines.push("- Use environment variables for configuration (ports, API URLs, secrets) — never hardcode");
-  }
-  if (rules.requireHighQualityImages) {
-    lines.push("- Use real, high-quality Unsplash images (minimum 8 unique URLs per project). Each product/item must have its own unique image. Hero sections must have full-width background images with overlays");
-  }
-  if (rules.requirePerformanceOptimization) {
-    lines.push("- Performance: loading='lazy' on all images below the fold, width/height on img tags, preload hero image, prefer CSS transitions over JS animations, minimize DOM depth");
-  }
-  if (rules.requireVisualExcellence) {
-    lines.push("- Visual excellence: modern design with glassmorphism/gradients, extensive lucide-react icons (15+), shadow/hover effects on cards, alternating section backgrounds, professional typography hierarchy with gradient text for heroes");
   }
   lines.push(`- Keep components under ${rules.maxComponentLines} lines; extract sub-components when needed`);
   lines.push(`- Keep functions under ${rules.maxFunctionLines} lines; break down complex logic`);

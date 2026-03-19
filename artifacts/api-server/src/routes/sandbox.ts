@@ -26,59 +26,6 @@ import { eq, or, inArray } from "drizzle-orm";
 
 const router: IRouter = Router();
 
-const failedRecoveries = new Map<string, { count: number; lastAttempt: number }>();
-const MAX_RECOVERY_ATTEMPTS = 3;
-const RECOVERY_COOLDOWN_MS = 60000;
-
-function shouldAttemptRecovery(projectId: string): boolean {
-  const entry = failedRecoveries.get(projectId);
-  if (!entry) return true;
-  if (Date.now() - entry.lastAttempt > RECOVERY_COOLDOWN_MS) {
-    failedRecoveries.delete(projectId);
-    return true;
-  }
-  return entry.count < MAX_RECOVERY_ATTEMPTS;
-}
-
-function recordRecoveryAttempt(projectId: string, success: boolean): void {
-  if (success) {
-    failedRecoveries.delete(projectId);
-    return;
-  }
-  const entry = failedRecoveries.get(projectId) || { count: 0, lastAttempt: 0 };
-  entry.count++;
-  entry.lastAttempt = Date.now();
-  failedRecoveries.set(projectId, entry);
-}
-
-function buildLoadingPage(title: string, subtitle: string): string {
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<meta http-equiv="refresh" content="3">
-<title>Loading...</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#0d1117;color:#c9d1d9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}
-.c{text-align:center}
-.sp{width:40px;height:40px;border:3px solid #21262d;border-top-color:#58a6ff;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px}
-@keyframes spin{to{transform:rotate(360deg)}}
-h2{font-size:16px;font-weight:500;color:#58a6ff;margin-bottom:6px}
-p{font-size:13px;color:#484f58}
-</style>
-</head>
-<body>
-<div class="c">
-<div class="sp"></div>
-<h2>${title}</h2>
-<p>${subtitle}</p>
-</div>
-</body>
-</html>`;
-}
-
 async function getUserProjectIds(userId: string): Promise<string[]> {
   const teamMemberships = await db
     .select({ teamId: teamMembersTable.teamId })
@@ -338,7 +285,7 @@ router.use("/sandbox/proxy", async (req: Request, res: Response) => {
 
     let sandboxId = getProjectSandbox(projectId);
 
-    if (!sandboxId && shouldAttemptRecovery(projectId)) {
+    if (!sandboxId) {
       const stoppedId = getProjectSandboxAny(projectId);
       if (stoppedId) {
         const lastCmd = getSandboxLastCommand(stoppedId);
@@ -348,50 +295,29 @@ router.use("/sandbox/proxy", async (req: Request, res: Response) => {
             await restartSandbox(stoppedId, lastCmd);
             await new Promise(resolve => setTimeout(resolve, 3000));
             sandboxId = getProjectSandbox(projectId);
-            recordRecoveryAttempt(projectId, !!sandboxId);
           } catch (err) {
             console.error(`[Sandbox Proxy] Auto-restart failed for ${stoppedId}:`, err);
-            recordRecoveryAttempt(projectId, false);
           }
         }
       }
     }
 
-    if (!sandboxId && shouldAttemptRecovery(projectId)) {
+    if (!sandboxId) {
       console.log(`[Sandbox Proxy] No in-memory sandbox for project ${projectId}, attempting recovery from DB files...`);
       const recoveredId = await recoverSandboxForProject(projectId);
       if (recoveredId) {
         sandboxId = getProjectSandbox(projectId);
-        recordRecoveryAttempt(projectId, !!sandboxId);
-      } else {
-        recordRecoveryAttempt(projectId, false);
       }
     }
 
     if (!sandboxId) {
-      const isHtml = req.headers.accept?.includes("text/html");
-      if (isHtml) {
-        res.setHeader("Content-Type", "text/html");
-        res.setHeader("Retry-After", "3");
-        res.status(202).send(buildLoadingPage("Starting sandbox...", "Setting up your project environment"));
-        return;
-      }
-      res.setHeader("Retry-After", "3");
-      res.status(202).json({ status: "starting", message: "Sandbox is being prepared" });
+      res.status(404).json({ error: { code: "NOT_FOUND", message: "No active sandbox" } });
       return;
     }
 
     const status = getSandboxStatus(sandboxId);
     if (!status || status.status !== "running") {
-      const isHtml = req.headers.accept?.includes("text/html");
-      if (isHtml) {
-        res.setHeader("Content-Type", "text/html");
-        res.setHeader("Retry-After", "3");
-        res.status(202).send(buildLoadingPage("Starting server...", "Waiting for development server to be ready"));
-        return;
-      }
-      res.setHeader("Retry-After", "3");
-      res.status(202).json({ status: "starting", message: "Server is starting up" });
+      res.status(503).json({ error: { code: "NOT_RUNNING", message: "Sandbox not running" } });
       return;
     }
 
@@ -525,15 +451,7 @@ router.use("/sandbox/proxy", async (req: Request, res: Response) => {
 
     proxyReq.on("error", () => {
       if (!res.headersSent) {
-        const isHtml = req.headers.accept?.includes("text/html");
-        if (isHtml) {
-          res.setHeader("Content-Type", "text/html");
-          res.setHeader("Retry-After", "3");
-          res.status(202).send(buildLoadingPage("Connecting to server...", "The development server is still starting up"));
-        } else {
-          res.setHeader("Retry-After", "3");
-          res.status(202).json({ status: "starting", message: "Server is starting up" });
-        }
+        res.status(502).json({ error: { code: "PROXY_ERROR", message: "Cannot reach sandbox server" } });
       }
     });
 

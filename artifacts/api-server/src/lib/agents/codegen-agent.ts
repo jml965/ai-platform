@@ -33,12 +33,6 @@ Framework Selection Rules:
 
 === CRITICAL CODE QUALITY RULES ===
 
-FILE TYPES — TYPESCRIPT MANDATORY:
-- For react-vite projects: ALL files MUST use .tsx extension for components and .ts for utilities — NEVER use .js or .jsx
-- For express projects: ALL files MUST use .ts extension — NEVER use .js
-- Use proper TypeScript types for all props, state, and function parameters
-- Export types and interfaces from separate type files when shared
-
 STYLING — USE INLINE CSS OR SINGLE CSS FILE:
 - For react-vite projects: put ALL styles in ONE file (src/index.css or src/App.css)
 - Use Tailwind CSS utility classes if possible (already included in template)
@@ -128,68 +122,16 @@ FASTAPI (Python) PROJECTS:
 - Always generate the END-USER PRODUCT, never a meta-tool
 === END FORBIDDEN ===
 
-VISUAL DESIGN RULES — PREMIUM QUALITY MANDATORY:
-- Every website must look like it was designed by a top agency — NOT a template or student project
-- Use modern 2025 design trends: glassmorphism (backdrop-blur-xl bg-white/10), subtle gradients, large whitespace, oversized typography for hero sections
-- Color palettes MUST match the industry: restaurants=warm reds/oranges/golds, tech=blues/cyans/purples, health=greens/teals, fashion=black/gold/pink, real-estate=navy/gold
-- NEVER use default gray-on-white boring layouts. Every page needs visual personality
-
-IMAGES — REAL HIGH-QUALITY PHOTOS REQUIRED:
-- Use REAL Unsplash photos with SPECIFIC relevant IDs for the industry:
-  * Restaurants: https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&h=800&fit=crop (restaurant interior)
-  * Food: https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&h=600&fit=crop (food plating)
-  * Tech: https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&h=800&fit=crop (technology)
-  * Real estate: https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=1200&h=800&fit=crop (modern house)
-  * Healthcare: https://images.unsplash.com/photo-1631217868264-e5b90bb7e133?w=1200&h=800&fit=crop (medical)
-  * Education: https://images.unsplash.com/photo-1523050854058-8df90110c476?w=1200&h=800&fit=crop (learning)
-- Use MINIMUM 8-15 different images across the website (hero, about, services, gallery, team, testimonials)
-- Hero sections MUST have a full-width background image with overlay: bg-cover bg-center + absolute inset-0 bg-black/50
-- Product/menu items MUST each have their own unique image — NEVER reuse the same image
-- Add object-cover and proper aspect ratios (aspect-video, aspect-square) for image consistency
-- Use loading="lazy" on all images below the fold for performance
-
-BACKGROUNDS AND VISUAL DEPTH:
-- Hero: Full-bleed background image with gradient overlay OR animated gradient (bg-gradient-to-br from-X via-Y to-Z)
-- Sections: Alternate between light and slightly tinted backgrounds (bg-gray-50, bg-blue-50/30, bg-amber-50/20)
-- Cards: Use shadow-lg hover:shadow-2xl transition-shadow with rounded-2xl
-- Add decorative elements: subtle patterns, floating shapes with absolute positioning, blur circles for depth
-- Use backdrop-blur-md for glass effect overlays on images
-
-ICONS AND VISUAL ELEMENTS:
-- Use lucide-react icons EXTENSIVELY — every feature card, service item, benefit, and list item must have an icon
-- Icons should have colored backgrounds: p-3 bg-blue-100 text-blue-600 rounded-xl
-- Use at least 15-20 different icons across the website — Match icons to content semantically
-- Add decorative dividers between sections using gradients or SVG waves
-- Star ratings, badges, and status indicators where relevant (restaurants: ratings, e-commerce: sale badges)
-
-TYPOGRAPHY — PROFESSIONAL HIERARCHY:
-- Hero titles: text-5xl md:text-7xl font-bold with gradient text (bg-gradient-to-r bg-clip-text text-transparent)
-- Section headings: text-3xl md:text-4xl font-bold with a small colored accent line above or below
-- Subheadings: text-lg text-gray-600 max-w-2xl mx-auto
-- Body: text-base leading-relaxed text-gray-700
-- For Arabic: use font-family 'Tajawal' or 'Cairo' from Google Fonts via CDN link in index.html
-
-PERFORMANCE AND SPEED — TOP PRIORITY:
-- Use loading="lazy" on all images except the hero (first visible image)
-- Use width and height attributes on all img tags to prevent layout shift (CLS)
-- Minimize DOM depth — avoid unnecessary wrapper divs
-- Use CSS transitions (transition-all duration-300) NOT JavaScript animations
-- Prefer Tailwind utilities over custom CSS — smaller bundle size
-- Split large pages into small components (max 150 lines each) for fast rendering
-- Use will-change-transform on animated elements sparingly
-- Preload hero image: <link rel="preload" as="image" href="..."> in index.html head
-- Use srcset for responsive images when possible: srcset="...?w=400 400w, ...?w=800 800w, ...?w=1200 1200w"
-- Code-split routes with minimal overhead — keep initial bundle small
-
-HOVER EFFECTS AND MICRO-INTERACTIONS:
-- Buttons: hover:scale-105 active:scale-95 transition-transform duration-200
-- Cards: hover:-translate-y-2 hover:shadow-2xl transition-all duration-300
-- Links: hover:text-primary-600 transition-colors underline-offset-4
-- Images: group-hover:scale-110 transition-transform duration-500 overflow-hidden on container
-- Navigation: active indicator with bottom border or background highlight
-
-For Arabic websites: use proper RTL layout, Arabic fonts (Tajawal/Cairo via Google Fonts CDN), and culturally appropriate design
-Use Tailwind's spacing scale consistently (p-4, p-6, p-8 for sections, py-16 md:py-24 for section padding)
+VISUAL DESIGN RULES:
+- Use beautiful, modern UI with gradients, shadows, rounded corners, and spacing
+- Use professional color palettes — not just gray/blue. Pick colors matching the website's industry
+- For hero sections: use gradient backgrounds (e.g., from-blue-600 to-purple-700) or solid vibrant colors
+- Use placeholder images from https://images.unsplash.com/photo-{id}?w=800&h=600&fit=crop for realistic visuals
+- Include proper typography hierarchy: large hero text, medium headings, readable body text
+- Add hover effects and smooth transitions on buttons and cards
+- For Arabic websites: use proper RTL layout, Arabic fonts, and culturally appropriate design
+- Add visual icons using lucide-react to enhance sections (e.g., services cards, feature lists)
+- Use Tailwind's spacing scale consistently (p-4, p-6, p-8 for sections)
 
 Project Generation Rules:
 - Generate a COMPLETE, working project — not placeholder or demo code
