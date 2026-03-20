@@ -1166,7 +1166,7 @@ function FloatingChatInner() {
                                       <MoreHorizontal className="w-3 h-3" />
                                     </button>
                                     {fileMenuId === file.id && (
-                                      <div className={`absolute ${isRTL ? "start-0" : "end-0"} top-full mt-1 w-36 bg-[#161b22] border border-[#30363d] rounded-lg shadow-2xl z-50 py-1`}>
+                                      <div className={`absolute ${isRTL ? "end-0" : "start-0"} top-full mt-1 w-[200px] bg-[#161b22] border border-[#30363d] rounded-lg shadow-2xl z-50 py-1`}>
                                         <button
                                           onClick={() => { setPreviewFileId(isPreviewing ? null : file.id); setFileMenuId(null); }}
                                           className="w-full flex items-center gap-2 px-3 py-1.5 text-start text-[11px] text-[#c9d1d9] hover:bg-white/5"
