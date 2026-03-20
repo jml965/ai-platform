@@ -231,7 +231,7 @@ export default function Billing() {
               <div>
                 <p className="text-sm text-muted-foreground">{t.billing_credits_balance}</p>
                 <p className="text-3xl font-bold mt-0.5">
-                  ${(credits?.balanceUsd ?? 0).toFixed(2)}
+                  ${Number(credits?.balanceUsd ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               </div>
             </motion.div>
@@ -254,7 +254,6 @@ export default function Billing() {
                     <input
                       type="number"
                       min="1"
-                      max="1000"
                       step="1"
                       value={topupAmount}
                       onChange={(e) => setTopupAmount(e.target.value)}
@@ -277,19 +276,19 @@ export default function Billing() {
                   </button>
                 </div>
               </form>
-              <div className="flex gap-2 mt-3">
-                {[10, 25, 50, 100].map((amt) => (
+              <div className="flex gap-2 mt-3 flex-wrap">
+                {[100, 500, 1000, 5000, 10000, 100000, 1000000].map((amt) => (
                   <button
                     key={amt}
                     type="button"
                     onClick={() => setTopupAmount(String(amt))}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                    className={`py-1.5 px-2 rounded-lg text-xs font-medium border transition-all ${
                       topupAmount === String(amt)
                         ? "bg-primary/20 border-primary/50 text-primary"
                         : "border-white/10 text-muted-foreground hover:border-white/20 hover:text-foreground"
                     }`}
                   >
-                    ${amt}
+                    ${amt >= 1000000 ? `${amt / 1000000}M` : amt >= 1000 ? `${amt / 1000}K` : amt}
                   </button>
                 ))}
               </div>

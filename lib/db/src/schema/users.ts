@@ -14,7 +14,7 @@ export const usersTable = pgTable("users", {
   dailyLimitUsd: numeric("daily_limit_usd", { precision: 10, scale: 4 }).default("5.0000"),
   monthlyLimitUsd: numeric("monthly_limit_usd", { precision: 10, scale: 4 }).default("50.0000"),
   perProjectLimitUsd: numeric("per_project_limit_usd", { precision: 10, scale: 4 }),
-  creditBalanceUsd: numeric("credit_balance_usd", { precision: 10, scale: 6 }).notNull().default("0.000000"),
+  creditBalanceUsd: numeric("credit_balance_usd", { precision: 18, scale: 6 }).notNull().default("0.000000"),
   activePlanId: uuid("active_plan_id"),
   stripeCustomerId: text("stripe_customer_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
