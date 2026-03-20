@@ -1138,9 +1138,7 @@ function FloatingChatInner() {
                 </>
               ) : (
                 <div className="flex-1 overflow-y-auto">
-                  {(() => {
-                    const agentFiles = savedFiles.filter(f => f.agentKey === (selectedAgent?.agentKey || "strategic"));
-                    return agentFiles.length === 0 ? (
+                  {savedFiles.filter(f => f.agentKey === (selectedAgent?.agentKey || "strategic")).length === 0 ? (
                     <div className="p-3 text-center">
                       <FolderOpen className="w-5 h-5 mx-auto text-[#30363d] mb-2" />
                       <p className="text-[10px] text-[#484f58]">{isRTL ? "لا توجد ملفات محفوظة" : "No saved files"}</p>
@@ -1148,7 +1146,7 @@ function FloatingChatInner() {
                     </div>
                   ) : (
                     <div className="py-1">
-                      {agentFiles.map(file => {
+                      {savedFiles.filter(f => f.agentKey === (selectedAgent?.agentKey || "strategic")).map(file => {
                         const isRenaming = renamingFileId === file.id;
                         const isPreviewing = previewFileId === file.id;
                         const fileColor = AGENT_COLORS[file.agentKey] || "text-[#8b949e]";
@@ -1239,8 +1237,7 @@ function FloatingChatInner() {
                         );
                       })}
                     </div>
-                  );
-                  })()}
+                  )}
                 </div>
               )}
             </div>
