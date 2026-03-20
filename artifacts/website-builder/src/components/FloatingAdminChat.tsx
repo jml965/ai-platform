@@ -233,13 +233,14 @@ function FloatingChatInner() {
     if (loading) return;
     const thread = threads.find(t => t.id === threadId);
     if (!thread) return;
-    setActiveThreadId(threadId);
-    setMessages(thread.messages.filter(m => m.role !== "status"));
     if (agents.length > 0) {
       const ag = agents.find(a => a.agentKey === thread.agentKey);
       if (ag) setSelectedAgent(ag);
     }
-    setShowSidebar(false);
+    const filteredMsgs = thread.messages.filter(m => m.role !== "status");
+    setActiveThreadId(threadId);
+    setMessages(filteredMsgs);
+    setSidebarTab("chats");
   };
 
   const deleteThread = (threadId: string) => {
@@ -1128,7 +1129,7 @@ function FloatingChatInner() {
               {sidebarTab === "chats" ? (
                 <>
                   <div className="p-2 flex items-center justify-between border-b border-[#1c2333]">
-                    <span className="text-[10px] text-[#484f58]">{threads.length} {isRTL ? "محادثة" : "chats"}</span>
+                    <span className="text-[10px] text-[#484f58]">{threads.filter(t => t.agentKey === (selectedAgent?.agentKey || "strategic")).length} {isRTL ? "محادثة" : "chats"}</span>
                     <button
                       onClick={startNewThread}
                       className="p-1 rounded-md hover:bg-white/5 text-[#8b949e] hover:text-cyan-400 transition-colors"
@@ -1138,14 +1139,14 @@ function FloatingChatInner() {
                     </button>
                   </div>
                   <div className="flex-1 overflow-y-auto">
-                    {threads.length === 0 ? (
+                    {threads.filter(t => t.agentKey === (selectedAgent?.agentKey || "strategic")).length === 0 ? (
                       <div className="p-3 text-center">
                         <MessageSquare className="w-5 h-5 mx-auto text-[#30363d] mb-2" />
                         <p className="text-[10px] text-[#484f58]">{isRTL ? "لا توجد محادثات" : "No conversations"}</p>
                       </div>
                     ) : (
                       <div className="py-1">
-                        {threads.map(thread => {
+                        {threads.filter(t => t.agentKey === (selectedAgent?.agentKey || "strategic")).map(thread => {
                           const isActive = thread.id === activeThreadId;
                           const isEditing = editingThreadId === thread.id;
                           const threadAgent = AGENT_ICONS[thread.agentKey];
