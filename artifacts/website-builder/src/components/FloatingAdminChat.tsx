@@ -104,23 +104,19 @@ interface SavedFile {
   savedAt: number;
 }
 
-const FILES_KEY_PREFIX = "floating-chat-files-";
+const FILES_KEY = "floating-chat-files";
 
-function getFilesKey(agentKey: string): string {
-  return `${FILES_KEY_PREFIX}${agentKey}`;
-}
-
-function loadSavedFiles(agentKey: string): SavedFile[] {
+function loadSavedFiles(): SavedFile[] {
   try {
-    const raw = localStorage.getItem(getFilesKey(agentKey));
+    const raw = localStorage.getItem(FILES_KEY);
     if (raw) return JSON.parse(raw);
   } catch {}
   return [];
 }
 
-function saveSavedFiles(agentKey: string, files: SavedFile[]) {
+function saveSavedFiles(files: SavedFile[]) {
   try {
-    localStorage.setItem(getFilesKey(agentKey), JSON.stringify(files.slice(0, 200)));
+    localStorage.setItem(FILES_KEY, JSON.stringify(files.slice(0, 200)));
   } catch {}
 }
 
@@ -179,8 +175,7 @@ function FloatingChatInner() {
   const [editTitle, setEditTitle] = useState("");
   const [threadMenuId, setThreadMenuId] = useState<string | null>(null);
 
-  const currentAgentKey = selectedAgent?.agentKey || "strategic";
-  const [savedFiles, setSavedFiles] = useState<SavedFile[]>(() => loadSavedFiles(currentAgentKey));
+  const [savedFiles, setSavedFiles] = useState<SavedFile[]>(() => loadSavedFiles());
   const [fileMenuId, setFileMenuId] = useState<string | null>(null);
   const [renamingFileId, setRenamingFileId] = useState<string | null>(null);
   const [renameFileName, setRenameFileName] = useState("");
@@ -223,12 +218,6 @@ function FloatingChatInner() {
   useEffect(() => {
     if (messages.length > 0 && activeThreadId) syncMessagesToThread(messages.filter(m => m.role !== "status"));
   }, [messages, activeThreadId, syncMessagesToThread]);
-
-  useEffect(() => {
-    setSavedFiles(loadSavedFiles(currentAgentKey));
-    setFileMenuId(null);
-    setPreviewFileId(null);
-  }, [currentAgentKey]);
 
   const startNewThread = () => {
     const id = crypto.randomUUID();
@@ -278,7 +267,7 @@ function FloatingChatInner() {
       agentKey: selectedAgent?.agentKey || "strategic",
       savedAt: Date.now(),
     };
-    setSavedFiles(prev => { const next = [file, ...prev]; saveSavedFiles(currentAgentKey, next); return next; });
+    setSavedFiles(prev => { const next = [file, ...prev]; saveSavedFiles(next); return next; });
   };
 
   const deleteFile = (fileId: string) => {
