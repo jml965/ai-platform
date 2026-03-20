@@ -796,6 +796,7 @@ function FloatingChatInner() {
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [expandedBlocks, setExpandedBlocks] = useState<Record<string, boolean>>({});
+  const [expandedToolGroups, setExpandedToolGroups] = useState<Record<string, boolean>>({});
 
   const copyCode = (code: string, blockId: string) => {
     navigator.clipboard.writeText(code).then(() => {
@@ -925,23 +926,53 @@ function FloatingChatInner() {
                   })}
                 </span>
               )}
-              {toolLines.length > 0 && (
-                <div className="flex items-center gap-1.5 my-1.5 flex-wrap">
-                  {toolLines.map((tool, ti) => (
-                    <div key={ti} className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-[#161b22] border border-[#30363d] text-[9px] text-[#484f58]" title={tool}>
-                      {TOOL_ICONS[tool] === "db" ? <Database className="w-2.5 h-2.5" /> :
-                       TOOL_ICONS[tool] === "terminal" ? <Terminal className="w-2.5 h-2.5" /> :
-                       TOOL_ICONS[tool] === "file" ? <FileText className="w-2.5 h-2.5" /> :
-                       TOOL_ICONS[tool] === "folder" ? <FolderOpen className="w-2.5 h-2.5" /> :
-                       TOOL_ICONS[tool] === "rocket" ? <Rocket className="w-2.5 h-2.5" /> :
-                       TOOL_ICONS[tool] === "list" ? <Settings className="w-2.5 h-2.5" /> :
-                       <Activity className="w-2.5 h-2.5" />}
-                      {tool.replace(/_/g, " ")}
-                    </div>
-                  ))}
-                  <span className="text-[9px] text-[#30363d]">{toolLines.length} {isRTL ? "إجراء" : toolLines.length === 1 ? "action" : "actions"}</span>
-                </div>
-              )}
+              {toolLines.length > 0 && (() => {
+                const toolGroupId = `tools-${i}-${toolLines.length}`;
+                const isExpanded = expandedToolGroups[toolGroupId] ?? false;
+                const getToolIcon = (tool: string) => {
+                  const t = TOOL_ICONS[tool];
+                  if (t === "db") return <Database className="w-3 h-3" />;
+                  if (t === "terminal") return <Terminal className="w-3 h-3" />;
+                  if (t === "file") return <FileText className="w-3 h-3" />;
+                  if (t === "folder") return <FolderOpen className="w-3 h-3" />;
+                  if (t === "rocket") return <Rocket className="w-3 h-3" />;
+                  if (t === "list") return <Settings className="w-3 h-3" />;
+                  return <Activity className="w-3 h-3" />;
+                };
+                return (
+                  <div className="my-1.5">
+                    <button
+                      onClick={() => setExpandedToolGroups(prev => ({ ...prev, [toolGroupId]: !prev[toolGroupId] }))}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[#161b22] border border-[#30363d] hover:border-[#484f58] transition-colors w-full"
+                    >
+                      <div className="flex items-center -space-x-1">
+                        {toolLines.slice(0, 4).map((tool, ti) => (
+                          <div key={ti} className="w-5 h-5 rounded-full bg-[#0d1117] border border-[#30363d] flex items-center justify-center text-[#484f58]">
+                            {getToolIcon(tool)}
+                          </div>
+                        ))}
+                        {toolLines.length > 4 && (
+                          <div className="w-5 h-5 rounded-full bg-[#0d1117] border border-[#30363d] flex items-center justify-center text-[9px] text-[#484f58]">
+                            +{toolLines.length - 4}
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-[#8b949e] flex-1 text-start">{toolLines.length} {isRTL ? "إجراء" : toolLines.length === 1 ? "action" : "actions"}</span>
+                      <ChevronDown className={`w-3 h-3 text-[#484f58] transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                    </button>
+                    {isExpanded && (
+                      <div className="mt-1 rounded-lg border border-[#30363d] bg-[#0d1117] overflow-hidden">
+                        {toolLines.map((tool, ti) => (
+                          <div key={ti} className="flex items-center gap-2 px-3 py-1.5 border-b border-[#1c2333] last:border-b-0 text-[#8b949e]">
+                            <div className="text-[#484f58]">{getToolIcon(tool)}</div>
+                            <span className="text-[11px] font-mono">{tool}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </React.Fragment>
           );
         })}
