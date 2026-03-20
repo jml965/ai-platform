@@ -6,6 +6,7 @@ import {
   ChevronDown, GripHorizontal, MessageSquare, Terminal, FileText, HardDrive,
   Settings, FolderOpen, Shield, PanelLeftOpen, PanelLeftClose, Plus, MoreHorizontal,
   Pencil, Check, Camera, Crop, Image as ImageIcon, Scissors, Copy, Download, CheckCheck,
+  Save, File, Eye,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { useGetMe } from "@workspace/api-client-react";
@@ -94,6 +95,31 @@ function generateTitle(msgs: ChatMsg[]): string {
   return text.length > 40 ? text.slice(0, 40) + "..." : text || "محادثة جديدة";
 }
 
+interface SavedFile {
+  id: string;
+  name: string;
+  lang: string;
+  content: string;
+  agentKey: string;
+  savedAt: number;
+}
+
+const FILES_KEY = "floating-chat-files";
+
+function loadSavedFiles(): SavedFile[] {
+  try {
+    const raw = localStorage.getItem(FILES_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return [];
+}
+
+function saveSavedFiles(files: SavedFile[]) {
+  try {
+    localStorage.setItem(FILES_KEY, JSON.stringify(files.slice(0, 200)));
+  } catch {}
+}
+
 interface WandTarget {
   tag: string;
   id?: string;
@@ -143,9 +169,16 @@ function FloatingChatInner() {
   const [threads, setThreads] = useState<ChatThread[]>(() => loadThreads());
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [sidebarTab, setSidebarTab] = useState<"chats" | "files">("chats");
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [threadMenuId, setThreadMenuId] = useState<string | null>(null);
+
+  const [savedFiles, setSavedFiles] = useState<SavedFile[]>(() => loadSavedFiles());
+  const [fileMenuId, setFileMenuId] = useState<string | null>(null);
+  const [renamingFileId, setRenamingFileId] = useState<string | null>(null);
+  const [renameFileName, setRenameFileName] = useState("");
+  const [previewFileId, setPreviewFileId] = useState<string | null>(null);
 
   const [screenshotMode, setScreenshotMode] = useState<"off" | "full" | "crop" | "capturing">("off");
   const [cropRect, setCropRect] = useState<{ startX: number; startY: number; endX: number; endY: number } | null>(null);
@@ -222,6 +255,44 @@ function FloatingChatInner() {
     setThreads(prev => prev.map(t => t.id === threadId ? { ...t, title: newTitle.trim() } : t));
     setEditingThreadId(null);
     setEditTitle("");
+  };
+
+  const saveFile = (name: string, lang: string, content: string) => {
+    const file: SavedFile = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      name,
+      lang,
+      content,
+      agentKey: selectedAgent?.agentKey || "strategic",
+      savedAt: Date.now(),
+    };
+    setSavedFiles(prev => { const next = [file, ...prev]; saveSavedFiles(next); return next; });
+  };
+
+  const deleteFile = (fileId: string) => {
+    setSavedFiles(prev => { const next = prev.filter(f => f.id !== fileId); saveSavedFiles(next); return next; });
+    if (fileMenuId === fileId) setFileMenuId(null);
+  };
+
+  const renameFile = (fileId: string, newName: string) => {
+    if (!newName.trim()) return;
+    setSavedFiles(prev => { const next = prev.map(f => f.id === fileId ? { ...f, name: newName.trim() } : f); saveSavedFiles(next); return next; });
+    setRenamingFileId(null);
+    setRenameFileName("");
+  };
+
+  const downloadFile = (file: SavedFile) => {
+    const blob = new Blob([file.content], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = file.name;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const copyFileContent = (content: string) => {
+    navigator.clipboard.writeText(content);
   };
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -784,6 +855,19 @@ function FloatingChatInner() {
                       <Download className="w-3 h-3" />
                       {isRTL ? "تحميل" : "Download"}
                     </button>
+                    <button
+                      onClick={() => {
+                        const fileName = `code.${ext}`;
+                        saveFile(fileName, seg.lang || "txt", trimmed);
+                        setShowSidebar(true);
+                        setSidebarTab("files");
+                      }}
+                      className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-[#8b949e] hover:text-cyan-400 hover:bg-cyan-500/5 transition-colors"
+                      title={isRTL ? "حفظ" : "Save"}
+                    >
+                      <Save className="w-3 h-3" />
+                      {isRTL ? "حفظ" : "Save"}
+                    </button>
                   </div>
                 </div>
                 <pre className="p-3 text-[12px] text-[#e1e4e8] overflow-x-auto max-h-[300px] overflow-y-auto" dir="ltr"><code>{trimmed}</code></pre>
@@ -934,85 +1018,210 @@ function FloatingChatInner() {
 
         <div className="flex-1 flex overflow-hidden min-h-0">
           {showSidebar && (
-            <div className={`w-[200px] flex-shrink-0 bg-[#0a0e14] ${isRTL ? "border-l" : "border-r"} border-[#1c2333] flex flex-col`}>
-              <div className="p-2 flex items-center justify-between border-b border-[#1c2333]">
-                <span className="text-[11px] font-semibold text-[#8b949e]">{isRTL ? "المحادثات" : "Chats"}</span>
+            <div className={`w-[220px] flex-shrink-0 bg-[#0a0e14] ${isRTL ? "border-l" : "border-r"} border-[#1c2333] flex flex-col`}>
+              <div className="flex border-b border-[#1c2333]">
                 <button
-                  onClick={startNewThread}
-                  className="p-1 rounded-md hover:bg-white/5 text-[#8b949e] hover:text-cyan-400 transition-colors"
-                  title={isRTL ? "محادثة جديدة" : "New chat"}
+                  onClick={() => setSidebarTab("chats")}
+                  className={`flex-1 px-2 py-1.5 text-[10px] font-semibold flex items-center justify-center gap-1 transition-colors ${sidebarTab === "chats" ? "text-cyan-400 border-b-2 border-cyan-400" : "text-[#484f58] hover:text-[#8b949e]"}`}
                 >
-                  <Plus className="w-3.5 h-3.5" />
+                  <MessageSquare className="w-3 h-3" />
+                  {isRTL ? "المحادثات" : "Chats"}
+                </button>
+                <button
+                  onClick={() => setSidebarTab("files")}
+                  className={`flex-1 px-2 py-1.5 text-[10px] font-semibold flex items-center justify-center gap-1 transition-colors ${sidebarTab === "files" ? "text-cyan-400 border-b-2 border-cyan-400" : "text-[#484f58] hover:text-[#8b949e]"}`}
+                >
+                  <FolderOpen className="w-3 h-3" />
+                  {isRTL ? "الملفات" : "Files"}
+                  {savedFiles.length > 0 && <span className="text-[8px] bg-cyan-500/20 text-cyan-400 px-1 rounded-full">{savedFiles.length}</span>}
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto">
-                {threads.length === 0 ? (
-                  <div className="p-3 text-center">
-                    <MessageSquare className="w-5 h-5 mx-auto text-[#30363d] mb-2" />
-                    <p className="text-[10px] text-[#484f58]">{isRTL ? "لا توجد محادثات" : "No conversations"}</p>
+
+              {sidebarTab === "chats" ? (
+                <>
+                  <div className="p-2 flex items-center justify-between border-b border-[#1c2333]">
+                    <span className="text-[10px] text-[#484f58]">{threads.length} {isRTL ? "محادثة" : "chats"}</span>
+                    <button
+                      onClick={startNewThread}
+                      className="p-1 rounded-md hover:bg-white/5 text-[#8b949e] hover:text-cyan-400 transition-colors"
+                      title={isRTL ? "محادثة جديدة" : "New chat"}
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                ) : (
-                  <div className="py-1">
-                    {threads.map(thread => {
-                      const isActive = thread.id === activeThreadId;
-                      const isEditing = editingThreadId === thread.id;
-                      const threadAgent = AGENT_ICONS[thread.agentKey];
-                      const threadColor = AGENT_COLORS[thread.agentKey] || "text-[#8b949e]";
-                      return (
-                        <div
-                          key={thread.id}
-                          className={`group relative px-2 py-1.5 mx-1 rounded-lg cursor-pointer transition-colors ${isActive ? "bg-white/8" : "hover:bg-white/5"}`}
-                          onClick={() => !isEditing && switchThread(thread.id)}
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <div className={`flex-shrink-0 ${threadColor}`}>
-                              {threadAgent || <Bot className="w-3 h-3" />}
+                  <div className="flex-1 overflow-y-auto">
+                    {threads.length === 0 ? (
+                      <div className="p-3 text-center">
+                        <MessageSquare className="w-5 h-5 mx-auto text-[#30363d] mb-2" />
+                        <p className="text-[10px] text-[#484f58]">{isRTL ? "لا توجد محادثات" : "No conversations"}</p>
+                      </div>
+                    ) : (
+                      <div className="py-1">
+                        {threads.map(thread => {
+                          const isActive = thread.id === activeThreadId;
+                          const isEditing = editingThreadId === thread.id;
+                          const threadAgent = AGENT_ICONS[thread.agentKey];
+                          const threadColor = AGENT_COLORS[thread.agentKey] || "text-[#8b949e]";
+                          return (
+                            <div
+                              key={thread.id}
+                              className={`group relative px-2 py-1.5 mx-1 rounded-lg cursor-pointer transition-colors ${isActive ? "bg-white/8" : "hover:bg-white/5"}`}
+                              onClick={() => !isEditing && switchThread(thread.id)}
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <div className={`flex-shrink-0 ${threadColor}`}>
+                                  {threadAgent || <Bot className="w-3 h-3" />}
+                                </div>
+                                {isEditing ? (
+                                  <div className="flex items-center gap-1 flex-1 min-w-0">
+                                    <input
+                                      autoFocus
+                                      value={editTitle}
+                                      onChange={e => setEditTitle(e.target.value)}
+                                      onKeyDown={e => { if (e.key === "Enter") renameThread(thread.id, editTitle); if (e.key === "Escape") setEditingThreadId(null); }}
+                                      onClick={e => e.stopPropagation()}
+                                      className="flex-1 min-w-0 bg-[#161b22] border border-[#30363d] rounded px-1.5 py-0.5 text-[10px] text-[#e1e4e8] focus:outline-none focus:border-cyan-500/50"
+                                    />
+                                    <button onClick={(e) => { e.stopPropagation(); renameThread(thread.id, editTitle); }} className="p-0.5 text-green-400 hover:text-green-300">
+                                      <Check className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="flex-1 min-w-0 text-[11px] text-[#c9d1d9] truncate">
+                                    {thread.title}
+                                  </span>
+                                )}
+                                {!isEditing && (
+                                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setEditingThreadId(thread.id); setEditTitle(thread.title); }}
+                                      className="p-0.5 text-[#484f58] hover:text-[#e1e4e8] rounded"
+                                    >
+                                      <Pencil className="w-2.5 h-2.5" />
+                                    </button>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); deleteThread(thread.id); }}
+                                      className="p-0.5 text-[#484f58] hover:text-red-400 rounded"
+                                    >
+                                      <Trash2 className="w-2.5 h-2.5" />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="text-[9px] text-[#484f58] mt-0.5 truncate" style={{ paddingInlineStart: "18px" }}>
+                                {thread.messages.length > 0 ? `${thread.messages.length} ${isRTL ? "رسالة" : "msgs"}` : ""} · {new Date(thread.updatedAt).toLocaleDateString(isRTL ? "ar" : "en", { month: "short", day: "numeric" })}
+                              </div>
                             </div>
-                            {isEditing ? (
-                              <div className="flex items-center gap-1 flex-1 min-w-0">
-                                <input
-                                  autoFocus
-                                  value={editTitle}
-                                  onChange={e => setEditTitle(e.target.value)}
-                                  onKeyDown={e => { if (e.key === "Enter") renameThread(thread.id, editTitle); if (e.key === "Escape") setEditingThreadId(null); }}
-                                  onClick={e => e.stopPropagation()}
-                                  className="flex-1 min-w-0 bg-[#161b22] border border-[#30363d] rounded px-1.5 py-0.5 text-[10px] text-[#e1e4e8] focus:outline-none focus:border-cyan-500/50"
-                                />
-                                <button onClick={(e) => { e.stopPropagation(); renameThread(thread.id, editTitle); }} className="p-0.5 text-green-400 hover:text-green-300">
-                                  <Check className="w-3 h-3" />
-                                </button>
-                              </div>
-                            ) : (
-                              <span className="flex-1 min-w-0 text-[11px] text-[#c9d1d9] truncate">
-                                {thread.title}
-                              </span>
-                            )}
-                            {!isEditing && (
-                              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); setEditingThreadId(thread.id); setEditTitle(thread.title); }}
-                                  className="p-0.5 text-[#484f58] hover:text-[#e1e4e8] rounded"
-                                >
-                                  <Pencil className="w-2.5 h-2.5" />
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); deleteThread(thread.id); }}
-                                  className="p-0.5 text-[#484f58] hover:text-red-400 rounded"
-                                >
-                                  <Trash2 className="w-2.5 h-2.5" />
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                          <div className="text-[9px] text-[#484f58] mt-0.5 truncate" style={{ paddingInlineStart: "18px" }}>
-                            {thread.messages.length > 0 ? `${thread.messages.length} ${isRTL ? "رسالة" : "msgs"}` : ""} · {new Date(thread.updatedAt).toLocaleDateString(isRTL ? "ar" : "en", { month: "short", day: "numeric" })}
-                          </div>
-                        </div>
-                      );
-                    })}
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                </>
+              ) : (
+                <div className="flex-1 overflow-y-auto">
+                  {savedFiles.length === 0 ? (
+                    <div className="p-3 text-center">
+                      <FolderOpen className="w-5 h-5 mx-auto text-[#30363d] mb-2" />
+                      <p className="text-[10px] text-[#484f58]">{isRTL ? "لا توجد ملفات محفوظة" : "No saved files"}</p>
+                      <p className="text-[9px] text-[#30363d] mt-1">{isRTL ? "اضغط 'حفظ' في أي كود" : "Click 'Save' on any code block"}</p>
+                    </div>
+                  ) : (
+                    <div className="py-1">
+                      {savedFiles.map(file => {
+                        const isRenaming = renamingFileId === file.id;
+                        const isPreviewing = previewFileId === file.id;
+                        const fileColor = AGENT_COLORS[file.agentKey] || "text-[#8b949e]";
+                        return (
+                          <div key={file.id}>
+                            <div className={`group relative px-2 py-1.5 mx-1 rounded-lg transition-colors hover:bg-white/5`}>
+                              <div className="flex items-center gap-1.5">
+                                <File className={`w-3 h-3 flex-shrink-0 ${fileColor}`} />
+                                {isRenaming ? (
+                                  <div className="flex items-center gap-1 flex-1 min-w-0">
+                                    <input
+                                      autoFocus
+                                      value={renameFileName}
+                                      onChange={e => setRenameFileName(e.target.value)}
+                                      onKeyDown={e => { if (e.key === "Enter") renameFile(file.id, renameFileName); if (e.key === "Escape") setRenamingFileId(null); }}
+                                      className="flex-1 min-w-0 bg-[#161b22] border border-[#30363d] rounded px-1.5 py-0.5 text-[10px] text-[#e1e4e8] focus:outline-none focus:border-cyan-500/50"
+                                    />
+                                    <button onClick={() => renameFile(file.id, renameFileName)} className="p-0.5 text-green-400 hover:text-green-300">
+                                      <Check className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="flex-1 min-w-0 text-[11px] text-[#c9d1d9] truncate cursor-pointer" onClick={() => setPreviewFileId(isPreviewing ? null : file.id)}>
+                                    {file.name}
+                                  </span>
+                                )}
+                                {!isRenaming && (
+                                  <div className="relative">
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); setFileMenuId(fileMenuId === file.id ? null : file.id); }}
+                                      className="p-0.5 text-[#484f58] hover:text-[#e1e4e8] rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                      <MoreHorizontal className="w-3 h-3" />
+                                    </button>
+                                    {fileMenuId === file.id && (
+                                      <div className={`absolute ${isRTL ? "start-0" : "end-0"} top-full mt-1 w-36 bg-[#161b22] border border-[#30363d] rounded-lg shadow-2xl z-50 py-1`}>
+                                        <button
+                                          onClick={() => { setPreviewFileId(isPreviewing ? null : file.id); setFileMenuId(null); }}
+                                          className="w-full flex items-center gap-2 px-3 py-1.5 text-start text-[11px] text-[#c9d1d9] hover:bg-white/5"
+                                        >
+                                          <Eye className="w-3 h-3 text-blue-400" />
+                                          {isRTL ? "معاينة" : "Preview"}
+                                        </button>
+                                        <button
+                                          onClick={() => { copyFileContent(file.content); setFileMenuId(null); }}
+                                          className="w-full flex items-center gap-2 px-3 py-1.5 text-start text-[11px] text-[#c9d1d9] hover:bg-white/5"
+                                        >
+                                          <Copy className="w-3 h-3 text-[#8b949e]" />
+                                          {isRTL ? "نسخ المحتوى" : "Copy content"}
+                                        </button>
+                                        <button
+                                          onClick={() => { downloadFile(file); setFileMenuId(null); }}
+                                          className="w-full flex items-center gap-2 px-3 py-1.5 text-start text-[11px] text-[#c9d1d9] hover:bg-white/5"
+                                        >
+                                          <Download className="w-3 h-3 text-green-400" />
+                                          {isRTL ? "تحميل" : "Download"}
+                                        </button>
+                                        <button
+                                          onClick={() => { setRenamingFileId(file.id); setRenameFileName(file.name); setFileMenuId(null); }}
+                                          className="w-full flex items-center gap-2 px-3 py-1.5 text-start text-[11px] text-[#c9d1d9] hover:bg-white/5"
+                                        >
+                                          <Pencil className="w-3 h-3 text-amber-400" />
+                                          {isRTL ? "إعادة تسمية" : "Rename"}
+                                        </button>
+                                        <div className="border-t border-[#30363d] my-1" />
+                                        <button
+                                          onClick={() => deleteFile(file.id)}
+                                          className="w-full flex items-center gap-2 px-3 py-1.5 text-start text-[11px] text-red-400 hover:bg-red-500/10"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                          {isRTL ? "حذف" : "Delete"}
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="text-[9px] text-[#484f58] mt-0.5 truncate" style={{ paddingInlineStart: "18px" }}>
+                                {file.lang} · {new Date(file.savedAt).toLocaleDateString(isRTL ? "ar" : "en", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                              </div>
+                            </div>
+                            {isPreviewing && (
+                              <div className="mx-2 mb-1 rounded border border-[#30363d] bg-[#0d1117] overflow-hidden">
+                                <pre className="p-2 text-[10px] text-[#e1e4e8] overflow-x-auto max-h-[150px] overflow-y-auto" dir="ltr"><code>{file.content}</code></pre>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
