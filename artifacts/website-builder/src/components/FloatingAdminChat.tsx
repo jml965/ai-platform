@@ -164,7 +164,7 @@ function FloatingChatInner() {
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [statusLines, setStatusLines] = useState<string[]>([]);
-  const [toolResults, setToolResults] = useState<Array<{ name: string; result: string }>>([]);
+  const [toolResults, setToolResults] = useState<Array<{ name: string; result: string; hasScreenshot?: boolean; screenshotBase64?: string | null }>>([]);
   const [expandedToolIdx, setExpandedToolIdx] = useState<number | null>(null);
   const [wandMode, setWandMode] = useState(false);
   const [wandHighlight, setWandHighlight] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
@@ -760,7 +760,12 @@ function FloatingChatInner() {
             const event = JSON.parse(line.slice(6));
             if (event.type === "chunk") { streamedContent += event.text; typewriterFlush(); }
             else if (event.type === "tool_result") {
-              setToolResults(prev => [...prev, { name: event.name, result: event.result }]);
+              setToolResults(prev => [...prev, {
+                name: event.name,
+                result: event.result,
+                hasScreenshot: event.hasScreenshot || false,
+                screenshotBase64: event.screenshotBase64 || null,
+              }]);
             }
             else if (event.type === "status") {
               setStatusLines(prev => [...prev, event.message || event.messageEn]);
@@ -979,10 +984,29 @@ function FloatingChatInner() {
                         <div className="mt-1 rounded-lg border border-[#30363d] bg-[#0d1117] overflow-hidden">
                           <div className="flex items-center gap-2 px-2 py-1 bg-[#161b22] border-b border-[#30363d]">
                             <span className="text-[10px] text-cyan-400 font-mono">{selectedTool}</span>
+                            {result?.hasScreenshot && <span className="text-[9px] text-green-400">📸</span>}
                           </div>
-                          <pre className="p-2 text-[10px] text-[#8b949e] overflow-x-auto max-h-[150px] overflow-y-auto whitespace-pre-wrap break-all" dir="ltr">
-                            {result ? result.result : (isRTL ? "لا توجد نتيجة محفوظة" : "No result stored")}
-                          </pre>
+                          {result?.hasScreenshot && result?.screenshotBase64 ? (
+                            <div className="p-2">
+                              <img
+                                src={`data:image/png;base64,${result.screenshotBase64}`}
+                                alt={`Screenshot from ${selectedTool}`}
+                                className="w-full rounded border border-[#30363d] cursor-pointer hover:opacity-90 transition-opacity"
+                                onClick={() => {
+                                  const win = window.open();
+                                  if (win) {
+                                    win.document.write(`<img src="data:image/png;base64,${result.screenshotBase64}" style="max-width:100%;background:#000" />`);
+                                    win.document.title = `Screenshot - ${selectedTool}`;
+                                  }
+                                }}
+                              />
+                              <p className="text-[9px] text-[#8b949e] mt-1">{isRTL ? "اضغط للتكبير" : "Click to enlarge"}</p>
+                            </div>
+                          ) : (
+                            <pre className="p-2 text-[10px] text-[#8b949e] overflow-x-auto max-h-[150px] overflow-y-auto whitespace-pre-wrap break-all" dir="ltr">
+                              {result ? result.result : (isRTL ? "لا توجد نتيجة محفوظة" : "No result stored")}
+                            </pre>
+                          )}
                         </div>
                       );
                     })()}

@@ -190,7 +190,14 @@ router.post("/strategic/chat-stream", async (req, res) => {
         res.write(`data: ${JSON.stringify({ type: "chunk", text: chunk })}\n\n`);
       },
       (toolName: string, toolResult: string) => {
-        res.write(`data: ${JSON.stringify({ type: "tool_result", name: toolName, result: toolResult.slice(0, 5000) })}\n\n`);
+        let parsed: any = null;
+        try { parsed = JSON.parse(toolResult); } catch {}
+        if (parsed?.type === "screenshot" && parsed?.base64) {
+          const previewBase64 = parsed.base64.slice(0, 200) + "...[truncated]";
+          res.write(`data: ${JSON.stringify({ type: "tool_result", name: toolName, result: JSON.stringify({ ...parsed, base64: previewBase64 }), hasScreenshot: true, screenshotBase64: parsed.base64 })}\n\n`);
+        } else {
+          res.write(`data: ${JSON.stringify({ type: "tool_result", name: toolName, result: toolResult.slice(0, 5000) })}\n\n`);
+        }
       },
       attachments
     );

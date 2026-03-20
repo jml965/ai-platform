@@ -6,6 +6,17 @@ import type { AgentConfig } from "@workspace/db/schema";
 import * as fs from "fs";
 import * as path from "path";
 import { execSync } from "child_process";
+import {
+  screenshotPage,
+  clickElement,
+  typeIntoElement,
+  inspectStyles,
+  getPageStructure,
+  scrollAndScreenshot,
+  hoverElement,
+  getConsoleErrors,
+  getNetworkRequests,
+} from "./browser-tools";
 
 interface ModelSlot {
   provider: string;
@@ -1016,23 +1027,133 @@ export const INFRA_TOOLS = [
     },
   },
   {
-    name: "browse_page",
-    description: "Fetch a live page from the running website and return its visible text content, links, buttons, inputs, and structure. Use this to 'see' what the user sees on any page. Returns a structured text representation of the rendered page.",
+    name: "screenshot_page",
+    description: "Take a REAL screenshot of any page on the live website. Returns a base64 PNG image that you can see visually. Use this to inspect colors, layout, design, and visual appearance of any page.",
     input_schema: {
       type: "object" as const,
       properties: {
-        path: { type: "string", description: "URL path to browse, e.g. / or /billing or /agents. Relative to the running site." },
+        path: { type: "string", description: "URL path or full URL to screenshot. e.g. / or /billing or https://mrcodeai.com" },
+        width: { type: "number", description: "Viewport width in pixels (default: 1280)" },
+        height: { type: "number", description: "Viewport height in pixels (default: 720)" },
+        fullPage: { type: "boolean", description: "Capture the full scrollable page (default: false)" },
+        selector: { type: "string", description: "CSS selector to screenshot only a specific element" },
+      },
+      required: ["path"],
+    },
+  },
+  {
+    name: "click_element",
+    description: "Navigate to a page and CLICK on a real element in the browser. Returns a screenshot after clicking. Use this to test buttons, links, menus, and interactive elements.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        path: { type: "string", description: "URL path to navigate to first" },
+        selector: { type: "string", description: "CSS selector of the element to click, e.g. 'button.submit' or '#login-btn' or 'a[href=\"/billing\"]'" },
+      },
+      required: ["path", "selector"],
+    },
+  },
+  {
+    name: "type_text",
+    description: "Navigate to a page and TYPE text into an input field. Returns a screenshot after typing.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        path: { type: "string", description: "URL path to navigate to" },
+        selector: { type: "string", description: "CSS selector of the input/textarea" },
+        text: { type: "string", description: "Text to type" },
+      },
+      required: ["path", "selector", "text"],
+    },
+  },
+  {
+    name: "hover_element",
+    description: "Navigate to a page and HOVER over an element to see hover states, tooltips, dropdown menus.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        path: { type: "string", description: "URL path to navigate to" },
+        selector: { type: "string", description: "CSS selector to hover over" },
+      },
+      required: ["path", "selector"],
+    },
+  },
+  {
+    name: "inspect_styles",
+    description: "Get the computed CSS styles of any element — colors, fonts, sizes, borders, spacing. See the EXACT colors and design values.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        path: { type: "string", description: "URL path" },
+        selector: { type: "string", description: "CSS selector of element to inspect" },
+      },
+      required: ["path", "selector"],
+    },
+  },
+  {
+    name: "get_page_structure",
+    description: "Get the full interactive structure of a page — all headings, links, buttons, inputs, images, and colors. Like an accessibility tree.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        path: { type: "string", description: "URL path to analyze" },
+      },
+      required: ["path"],
+    },
+  },
+  {
+    name: "scroll_page",
+    description: "Scroll a page up/down or to a specific element, and take a screenshot of the result.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        path: { type: "string", description: "URL path" },
+        direction: { type: "string", enum: ["down", "up", "to-element"], description: "Scroll direction" },
+        target: { type: "string", description: "CSS selector (for to-element) or pixels to scroll (for up/down, default 600)" },
+      },
+      required: ["path", "direction"],
+    },
+  },
+  {
+    name: "get_console_errors",
+    description: "Open a page and capture ALL browser console errors, warnings, and logs. Use to debug JavaScript issues.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        path: { type: "string", description: "URL path to check" },
+      },
+      required: ["path"],
+    },
+  },
+  {
+    name: "get_network_requests",
+    description: "Open a page and monitor ALL network requests — see every API call, resource load, status codes, and sizes.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        path: { type: "string", description: "URL path to monitor" },
+      },
+      required: ["path"],
+    },
+  },
+  {
+    name: "browse_page",
+    description: "Fetch a live page and return its visible text content, links, buttons, inputs, and structure as text. Lighter than screenshot.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        path: { type: "string", description: "URL path to browse, e.g. / or /billing" },
       },
       required: ["path"],
     },
   },
   {
     name: "site_health",
-    description: "Check the health and accessibility of the live website. Returns HTTP status, response time, page title, and basic diagnostics.",
+    description: "Check the health and accessibility of the live website. Returns HTTP status, response time, and basic diagnostics.",
     input_schema: {
       type: "object" as const,
       properties: {
-        url: { type: "string", description: "Full URL or path to check. If path, uses the dev domain. Examples: / or https://mrcodeai.com" },
+        url: { type: "string", description: "Full URL or path to check." },
       },
       required: ["url"],
     },
@@ -1249,86 +1370,81 @@ export async function executeInfraTool(toolName: string, input: any): Promise<st
         try { body = JSON.parse(text); } catch { body = text; }
         return JSON.stringify({ status: res.status, body: typeof body === "object" ? JSON.stringify(body).slice(0, 50000) : (body as string).slice(0, 50000) });
       }
+      case "screenshot_page": {
+        const result = await screenshotPage(input.path, {
+          width: input.width,
+          height: input.height,
+          fullPage: input.fullPage,
+          selector: input.selector,
+        });
+        return JSON.stringify({
+          type: "screenshot",
+          message: `Screenshot captured (${result.width}x${result.height})`,
+          base64: result.base64,
+          width: result.width,
+          height: result.height,
+        });
+      }
+      case "click_element": {
+        const result = await clickElement(input.path, input.selector);
+        return JSON.stringify({
+          type: "screenshot",
+          success: result.success,
+          message: result.message,
+          base64: result.screenshotAfter,
+        });
+      }
+      case "type_text": {
+        const result = await typeIntoElement(input.path, input.selector, input.text);
+        return JSON.stringify({
+          type: "screenshot",
+          success: result.success,
+          message: result.message,
+          base64: result.screenshotAfter,
+        });
+      }
+      case "hover_element": {
+        const result = await hoverElement(input.path, input.selector);
+        return JSON.stringify({
+          type: "screenshot",
+          success: result.success,
+          message: result.message,
+          base64: result.screenshotAfter,
+        });
+      }
+      case "inspect_styles": {
+        const result = await inspectStyles(input.path, input.selector);
+        return JSON.stringify(result, null, 2);
+      }
+      case "get_page_structure": {
+        const result = await getPageStructure(input.path);
+        return result;
+      }
+      case "scroll_page": {
+        const target = input.target;
+        const selectorOrPixels = input.direction === "to-element"
+          ? target
+          : (target ? parseInt(target, 10) || 600 : 600);
+        const result = await scrollAndScreenshot(input.path, input.direction, selectorOrPixels);
+        return JSON.stringify({
+          type: "screenshot",
+          message: `Scrolled ${input.direction}. ScrollY: ${result.scrollY}px, Page height: ${result.pageHeight}px`,
+          base64: result.base64,
+          scrollY: result.scrollY,
+          pageHeight: result.pageHeight,
+        });
+      }
+      case "get_console_errors": {
+        const result = await getConsoleErrors(input.path);
+        return JSON.stringify(result, null, 2);
+      }
+      case "get_network_requests": {
+        const result = await getNetworkRequests(input.path);
+        return JSON.stringify(result, null, 2);
+      }
       case "browse_page": {
-        const devDomain = process.env.REPLIT_DEV_DOMAIN || process.env.REPLIT_DOMAINS || "localhost:5173";
-        const pagePath = (input.path || "/").startsWith("/") ? input.path : `/${input.path}`;
-        const pageUrl = `https://${devDomain}${pagePath}`;
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000);
-        try {
-          const res = await fetch(pageUrl, {
-            signal: controller.signal,
-            headers: { "User-Agent": "MrCodeAI-Agent/1.0", Accept: "text/html,*/*" },
-          });
-          clearTimeout(timeout);
-          const html = await res.text();
-
-          const title = html.match(/<title[^>]*>(.*?)<\/title>/si)?.[1]?.trim() || "(no title)";
-
-          const stripped = html
-            .replace(/<script[\s\S]*?<\/script>/gi, "")
-            .replace(/<style[\s\S]*?<\/style>/gi, "")
-            .replace(/<noscript[\s\S]*?<\/noscript>/gi, "")
-            .replace(/<!--[\s\S]*?-->/g, "");
-
-          const links: string[] = [];
-          const linkRe = /<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
-          let m: RegExpExecArray | null;
-          while ((m = linkRe.exec(stripped)) !== null) {
-            const linkText = m[2].replace(/<[^>]+>/g, "").trim();
-            if (linkText) links.push(`[${linkText}](${m[1]})`);
-          }
-
-          const buttons: string[] = [];
-          const btnRe = /<button[^>]*>([\s\S]*?)<\/button>/gi;
-          while ((m = btnRe.exec(stripped)) !== null) {
-            const btnText = m[1].replace(/<[^>]+>/g, "").trim();
-            if (btnText) buttons.push(btnText);
-          }
-
-          const inputs: string[] = [];
-          const inputRe = /<input[^>]*>/gi;
-          while ((m = inputRe.exec(stripped)) !== null) {
-            const typeMatch = m[0].match(/type=["']([^"']+)["']/i);
-            const nameMatch = m[0].match(/name=["']([^"']+)["']/i);
-            const placeholder = m[0].match(/placeholder=["']([^"']+)["']/i);
-            inputs.push(`<input type="${typeMatch?.[1] || "text"}" name="${nameMatch?.[1] || ""}" placeholder="${placeholder?.[1] || ""}">`);
-          }
-
-          const imgs: string[] = [];
-          const imgRe = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
-          while ((m = imgRe.exec(stripped)) !== null) {
-            const alt = m[0].match(/alt=["']([^"']+)["']/i)?.[1] || "";
-            imgs.push(`[img: ${alt || m[1].split("/").pop()}]`);
-          }
-
-          const headings: string[] = [];
-          const hRe = /<h([1-6])[^>]*>([\s\S]*?)<\/h\1>/gi;
-          while ((m = hRe.exec(stripped)) !== null) {
-            const hText = m[2].replace(/<[^>]+>/g, "").trim();
-            if (hText) headings.push(`${"#".repeat(parseInt(m[1]))} ${hText}`);
-          }
-
-          const visibleText = stripped.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 8000);
-
-          const result = [
-            `Page: ${pageUrl}`,
-            `Status: ${res.status}`,
-            `Title: ${title}`,
-            "",
-            headings.length ? `## Headings:\n${headings.join("\n")}` : "",
-            links.length ? `## Links (${links.length}):\n${links.slice(0, 50).join("\n")}` : "",
-            buttons.length ? `## Buttons:\n${buttons.join(", ")}` : "",
-            inputs.length ? `## Inputs:\n${inputs.join("\n")}` : "",
-            imgs.length ? `## Images:\n${imgs.join("\n")}` : "",
-            `## Visible Text:\n${visibleText}`,
-          ].filter(Boolean).join("\n");
-
-          return result.slice(0, 30000);
-        } catch (err: any) {
-          clearTimeout(timeout);
-          return JSON.stringify({ error: `Failed to browse page: ${err.message}` });
-        }
+        const structure = await getPageStructure(input.path);
+        return `Page structure for ${input.path}:\n${structure}`;
       }
       case "site_health": {
         const rawUrl = input.url || "/";
@@ -1340,46 +1456,32 @@ export async function executeInfraTool(toolName: string, input: any): Promise<st
           const p = rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`;
           checkUrl = `https://${devDomain}${p}`;
         }
-
-        const results: any[] = [];
-        const urls = [checkUrl];
-        if (checkUrl.includes("mrcodeai") && !checkUrl.includes("/api/")) {
-          urls.push(checkUrl.replace(/\/$/, "") + "/api/health");
+        const start = Date.now();
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+        try {
+          const res = await fetch(checkUrl, {
+            signal: controller.signal,
+            headers: { "User-Agent": "MrCodeAI-HealthCheck/1.0" },
+            redirect: "follow",
+          });
+          clearTimeout(timeout);
+          const elapsed = Date.now() - start;
+          const text = await res.text();
+          const title = text.match(/<title[^>]*>(.*?)<\/title>/si)?.[1]?.trim();
+          return JSON.stringify({
+            url: checkUrl,
+            status: res.status,
+            statusText: res.statusText,
+            responseTime: `${elapsed}ms`,
+            contentLength: text.length,
+            title: title || undefined,
+            contentType: res.headers.get("content-type"),
+          }, null, 2);
+        } catch (err: any) {
+          clearTimeout(timeout);
+          return JSON.stringify({ url: checkUrl, error: err.message, responseTime: `${Date.now() - start}ms` });
         }
-
-        for (const u of urls) {
-          const start = Date.now();
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 15000);
-          try {
-            const res = await fetch(u, {
-              signal: controller.signal,
-              headers: { "User-Agent": "MrCodeAI-HealthCheck/1.0" },
-              redirect: "follow",
-            });
-            clearTimeout(timeout);
-            const elapsed = Date.now() - start;
-            const text = await res.text();
-            const title = text.match(/<title[^>]*>(.*?)<\/title>/si)?.[1]?.trim();
-            const contentLen = text.length;
-            results.push({
-              url: u,
-              status: res.status,
-              statusText: res.statusText,
-              responseTime: `${elapsed}ms`,
-              contentLength: contentLen,
-              title: title || undefined,
-              headers: {
-                server: res.headers.get("server"),
-                contentType: res.headers.get("content-type"),
-              },
-            });
-          } catch (err: any) {
-            clearTimeout(timeout);
-            results.push({ url: u, error: err.message, responseTime: `${Date.now() - start}ms` });
-          }
-        }
-        return JSON.stringify({ health: results }, null, 2);
       }
       default:
         return JSON.stringify({ error: `Unknown tool: ${toolName}` });
@@ -1580,7 +1682,25 @@ export async function streamStrategicAgent(
         fullReply += `\n\n...*${tool.name}*...\n`;
         const result = await executeInfraTool(tool.name, tool.input);
         if (onToolResult) onToolResult(tool.name, result);
-        toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: result });
+
+        let parsedResult: any = null;
+        try { parsedResult = JSON.parse(result); } catch {}
+
+        if (parsedResult?.type === "screenshot" && parsedResult?.base64) {
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: tool.id,
+            content: [
+              {
+                type: "image",
+                source: { type: "base64", media_type: "image/png", data: parsedResult.base64 },
+              },
+              { type: "text", text: parsedResult.message || `Screenshot from ${tool.name}` },
+            ],
+          });
+        } else {
+          toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: result });
+        }
       }
 
       chatMsgs.push({ role: "user", content: toolResults });

@@ -726,8 +726,37 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
           res.write(`data: ${JSON.stringify({ type: "chunk", text: `\n\n...*${tool.name}*...\n` })}\n\n`);
           fullReply += `\n\n...*${tool.name}*...\n`;
           const result = await executeInfraTool(tool.name, tool.input);
-          res.write(`data: ${JSON.stringify({ type: "tool_result", name: tool.name, result: result.slice(0, 5000) })}\n\n`);
-          toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: result });
+
+          let parsedResult: any = null;
+          try { parsedResult = JSON.parse(result); } catch {}
+
+          if (parsedResult?.type === "screenshot" && parsedResult?.base64) {
+            const ssePayload = { ...parsedResult };
+            const previewBase64 = parsedResult.base64.slice(0, 200) + "...[truncated]";
+            res.write(`data: ${JSON.stringify({ type: "tool_result", name: tool.name, result: JSON.stringify({ ...ssePayload, base64: previewBase64 }), hasScreenshot: true, screenshotBase64: parsedResult.base64 })}\n\n`);
+
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: tool.id,
+              content: [
+                {
+                  type: "image",
+                  source: {
+                    type: "base64",
+                    media_type: "image/png",
+                    data: parsedResult.base64,
+                  },
+                },
+                {
+                  type: "text",
+                  text: parsedResult.message || `Screenshot from ${tool.name}`,
+                },
+              ],
+            });
+          } else {
+            res.write(`data: ${JSON.stringify({ type: "tool_result", name: tool.name, result: result.slice(0, 5000) })}\n\n`);
+            toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: result });
+          }
         }
         chatMsgs.push({ role: "user", content: toolResults });
       }

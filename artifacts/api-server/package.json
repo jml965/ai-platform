@@ -26,6 +26,7 @@
     "multer": "^2.1.1",
     "openai": "^6.27.0",
     "openid-client": "^6.8.2",
+    "puppeteer-core": "^24.39.1",
     "uuid": "^11.1.0",
     "ws": "^8.19.0"
   },
