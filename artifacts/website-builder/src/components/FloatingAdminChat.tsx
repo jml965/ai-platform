@@ -164,6 +164,8 @@ function FloatingChatInner() {
   const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
   const [statusLines, setStatusLines] = useState<string[]>([]);
+  const [toolResults, setToolResults] = useState<Array<{ name: string; result: string }>>([]);
+  const [expandedToolIdx, setExpandedToolIdx] = useState<number | null>(null);
   const [wandMode, setWandMode] = useState(false);
   const [wandHighlight, setWandHighlight] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
 
@@ -757,6 +759,9 @@ function FloatingChatInner() {
           try {
             const event = JSON.parse(line.slice(6));
             if (event.type === "chunk") { streamedContent += event.text; typewriterFlush(); }
+            else if (event.type === "tool_result") {
+              setToolResults(prev => [...prev, { name: event.name, result: event.result }]);
+            }
             else if (event.type === "status") {
               setStatusLines(prev => [...prev, event.message || event.messageEn]);
               scrollToBottom();
@@ -927,22 +932,63 @@ function FloatingChatInner() {
                   })}
                 </span>
               )}
-              {toolLines.length > 0 && (
-                <div className="flex items-center gap-1 my-1 flex-wrap">
-                  {toolLines.map((tool, ti) => {
-                    const t = TOOL_ICONS[tool];
-                    const icon = t === "db" ? <Database className="w-3 h-3" /> :
-                      t === "terminal" ? <Terminal className="w-3 h-3" /> :
-                      t === "file" ? <FileText className="w-3 h-3" /> :
-                      t === "folder" ? <FolderOpen className="w-3 h-3" /> :
-                      t === "rocket" ? <Rocket className="w-3 h-3" /> :
-                      t === "list" ? <Settings className="w-3 h-3" /> :
-                      <Activity className="w-3 h-3" />;
-                    return <div key={ti} className="text-[#30363d] hover:text-[#484f58] transition-colors cursor-default" title={tool}>{icon}</div>;
-                  })}
-                  <span className="text-[9px] text-[#30363d]">{toolLines.length} {isRTL ? "إجراء" : "actions"}</span>
-                </div>
-              )}
+              {toolLines.length > 0 && (() => {
+                const toolGroupKey = `tg-${i}`;
+                return (
+                  <div className="my-1">
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {toolLines.map((tool, ti) => {
+                        const globalIdx = toolResults.findIndex((tr, idx) => tr.name === tool && !toolLines.slice(0, ti).some((prev, pi) => prev === tool && toolResults.findIndex((r, ri) => r.name === prev && ri >= 0) >= 0));
+                        const matchedResult = toolResults.find((tr, idx) => tr.name === tool);
+                        const expandKey = `${toolGroupKey}-${ti}`;
+                        const isOpen = expandedToolIdx !== null && expandedToolIdx === ti && expandedBlocks[`tool-expand-${toolGroupKey}`];
+                        const t = TOOL_ICONS[tool];
+                        const icon = t === "db" ? <Database className="w-3 h-3" /> :
+                          t === "terminal" ? <Terminal className="w-3 h-3" /> :
+                          t === "file" ? <FileText className="w-3 h-3" /> :
+                          t === "folder" ? <FolderOpen className="w-3 h-3" /> :
+                          t === "rocket" ? <Rocket className="w-3 h-3" /> :
+                          t === "list" ? <Settings className="w-3 h-3" /> :
+                          <Activity className="w-3 h-3" />;
+                        return (
+                          <button
+                            key={ti}
+                            onClick={() => {
+                              const key = `tool-expand-${toolGroupKey}`;
+                              if (expandedToolIdx === ti && expandedBlocks[key]) {
+                                setExpandedToolIdx(null);
+                                setExpandedBlocks(prev => ({ ...prev, [key]: false }));
+                              } else {
+                                setExpandedToolIdx(ti);
+                                setExpandedBlocks(prev => ({ ...prev, [key]: true }));
+                              }
+                            }}
+                            className={`text-[#30363d] hover:text-cyan-400 transition-colors ${isOpen ? "text-cyan-400" : ""}`}
+                            title={tool}
+                          >
+                            {icon}
+                          </button>
+                        );
+                      })}
+                      <span className="text-[9px] text-[#30363d]">{toolLines.length} {isRTL ? "إجراء" : "actions"}</span>
+                    </div>
+                    {expandedToolIdx !== null && expandedBlocks[`tool-expand-${toolGroupKey}`] && (() => {
+                      const selectedTool = toolLines[expandedToolIdx];
+                      const result = toolResults.find(tr => tr.name === selectedTool);
+                      return (
+                        <div className="mt-1 rounded-lg border border-[#30363d] bg-[#0d1117] overflow-hidden">
+                          <div className="flex items-center gap-2 px-2 py-1 bg-[#161b22] border-b border-[#30363d]">
+                            <span className="text-[10px] text-cyan-400 font-mono">{selectedTool}</span>
+                          </div>
+                          <pre className="p-2 text-[10px] text-[#8b949e] overflow-x-auto max-h-[150px] overflow-y-auto whitespace-pre-wrap break-all" dir="ltr">
+                            {result ? result.result : (isRTL ? "لا توجد نتيجة محفوظة" : "No result stored")}
+                          </pre>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                );
+              })()}
             </React.Fragment>
           );
         })}

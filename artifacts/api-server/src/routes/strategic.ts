@@ -189,6 +189,9 @@ router.post("/strategic/chat-stream", async (req, res) => {
       (chunk: string) => {
         res.write(`data: ${JSON.stringify({ type: "chunk", text: chunk })}\n\n`);
       },
+      (toolName: string, toolResult: string) => {
+        res.write(`data: ${JSON.stringify({ type: "tool_result", name: toolName, result: toolResult.slice(0, 5000) })}\n\n`);
+      },
       attachments
     );
 
