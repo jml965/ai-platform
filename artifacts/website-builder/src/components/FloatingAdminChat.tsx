@@ -1326,17 +1326,6 @@ function FloatingChatInner() {
               </div>
             )}
 
-            {statusLines.length > 0 && (
-              <div className="px-3 py-1.5 border-t border-[#1c2333] flex-shrink-0 space-y-0.5">
-                {statusLines.map((line, i) => (
-                  <div key={i} className="flex items-center gap-1.5">
-                    <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${i === statusLines.length - 1 ? "bg-cyan-400 animate-pulse" : "bg-[#30363d]"}`} />
-                    <span className={`text-[10px] ${i === statusLines.length - 1 ? "text-[#8b949e]" : "text-[#484f58]"}`}>{line}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
             <div className="border-t border-[#1c2333] px-3 py-2 flex-shrink-0">
               {pendingImages.length > 0 && (
                 <div className="flex gap-2 mb-2 overflow-x-auto pb-1">
