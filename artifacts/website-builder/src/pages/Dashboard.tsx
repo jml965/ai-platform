@@ -177,7 +177,7 @@ export default function Dashboard() {
         <HomeSidebar t={t} lang={lang} userName={userName} isAdmin={isAdmin} onSelectInfraAgent={setInfraChatAgent} onToggleFiles={() => setShowFilesPanel(!showFilesPanel)} />
 
         {isAdmin && showFilesPanel && (
-          <div className="hidden lg:flex flex-col w-[260px] min-w-[260px] border-r border-white/7 rtl:border-r-0 rtl:border-l bg-[#0d1117]">
+          <div className="hidden lg:flex flex-col w-[280px] min-w-[280px] border-r border-white/7 rtl:border-r-0 rtl:border-l bg-[#0d1117]">
             <AdminFilesPanel onClose={() => setShowFilesPanel(false)} />
           </div>
         )}
