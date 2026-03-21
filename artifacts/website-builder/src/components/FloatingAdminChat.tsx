@@ -590,6 +590,7 @@ function FloatingChatInner() {
         const dataUrl = rendered.toDataURL("image/png");
         if (dataUrl && dataUrl.length > 100) {
           setPendingImages(prev => [...prev, { data: dataUrl, name }]);
+          if (!open) setOpen(true);
         }
       } catch (err) {
         console.error("Crop screenshot failed:", err);
@@ -597,8 +598,36 @@ function FloatingChatInner() {
         if (chatEl) chatEl.style.visibility = "";
       }
       setScreenshotMode("off");
+      setTimeout(() => textareaRef.current?.focus(), 300);
     })();
-  }, [screenshotMode]);
+  }, [screenshotMode, open]);
+
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      if (!open) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.startsWith("image/")) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (!file) continue;
+          const reader = new FileReader();
+          reader.onload = () => {
+            const dataUrl = reader.result as string;
+            if (dataUrl) {
+              const name = `paste_${new Date().toISOString().slice(0,19).replace(/[T:]/g, "-")}.png`;
+              setPendingImages(prev => [...prev, { data: dataUrl, name }]);
+            }
+          };
+          reader.readAsDataURL(file);
+          break;
+        }
+      }
+    };
+    document.addEventListener("paste", handlePaste);
+    return () => document.removeEventListener("paste", handlePaste);
+  }, [open]);
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -1438,21 +1467,29 @@ function FloatingChatInner() {
 
             <div className="border-t border-[#1c2333] px-3 py-2 flex-shrink-0">
               {pendingImages.length > 0 && (
-                <div className="flex gap-2 mb-2 overflow-x-auto pb-1">
-                  {pendingImages.map((img, idx) => (
-                    <div key={idx} className="relative flex-shrink-0 group">
-                      <img src={img.data} alt={img.name} className="h-16 w-auto rounded-lg border border-[#30363d] object-cover" />
-                      <button
-                        onClick={() => removePendingImage(idx)}
-                        className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X className="w-2.5 h-2.5 text-white" />
-                      </button>
-                      <div className="absolute bottom-0 inset-x-0 bg-black/60 text-[8px] text-white text-center py-0.5 rounded-b-lg truncate px-1">
-                        {img.name.length > 12 ? img.name.slice(0, 12) + "…" : img.name}
+                <div className="mb-2 p-2 bg-cyan-500/5 border border-cyan-500/20 rounded-lg">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <Camera className="w-3 h-3 text-cyan-400" />
+                    <span className="text-[10px] text-cyan-400 font-medium">
+                      {isRTL ? `${pendingImages.length} صورة مرفقة — ستُرسل مع رسالتك` : `${pendingImages.length} image(s) attached — will be sent with your message`}
+                    </span>
+                  </div>
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {pendingImages.map((img, idx) => (
+                      <div key={idx} className="relative flex-shrink-0 group">
+                        <img src={img.data} alt={img.name} className="h-20 w-auto rounded-lg border-2 border-cyan-500/30 object-cover shadow-lg shadow-cyan-500/10" />
+                        <button
+                          onClick={() => removePendingImage(idx)}
+                          className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center shadow-md"
+                        >
+                          <X className="w-3 h-3 text-white" />
+                        </button>
+                        <div className="absolute bottom-0 inset-x-0 bg-black/70 text-[8px] text-white text-center py-0.5 rounded-b-lg truncate px-1">
+                          {img.name.length > 15 ? img.name.slice(0, 15) + "…" : img.name}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
               <div className="relative">
@@ -1460,10 +1497,25 @@ function FloatingChatInner() {
                   ref={textareaRef}
                   value={prompt}
                   onChange={e => setPrompt(e.target.value)}
-                  placeholder={isRTL ? "اكتب أمرك..." : "Type command..."}
+                  placeholder={isRTL ? "اكتب أمرك... (Ctrl+V للصق صورة)" : "Type command... (Ctrl+V to paste image)"}
                   className="w-full bg-[#161b22] border border-[#30363d] rounded-xl px-10 py-2.5 pe-12 text-[13px] text-[#e1e4e8] placeholder-[#484f58] resize-none focus:outline-none focus:border-cyan-500/50 transition-colors"
                   rows={prompt.split("\n").length > 3 ? 4 : prompt.includes("\n") ? 3 : 1}
                   onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doSend(); } }}
+                  onDrop={e => {
+                    e.preventDefault();
+                    const files = e.dataTransfer?.files;
+                    if (!files) return;
+                    for (const file of files) {
+                      if (!file.type.startsWith("image/")) continue;
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        const dataUrl = reader.result as string;
+                        if (dataUrl) setPendingImages(prev => [...prev, { data: dataUrl, name: file.name }]);
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  onDragOver={e => e.preventDefault()}
                 />
                 <div className="absolute start-1.5 bottom-1.5 flex items-center">
                   <div className="relative">
