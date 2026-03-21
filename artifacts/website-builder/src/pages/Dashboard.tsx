@@ -945,9 +945,9 @@ function HomeSidebar({ t, lang, userName, isAdmin, onSelectInfraAgent, onToggleF
         <button
           className="flex items-center gap-2 w-full px-3 py-2 rounded-md text-[12px] font-semibold text-start relative overflow-hidden transition-all duration-200 hover:brightness-110 active:scale-[0.98] group/createbtn"
           style={{
-            background: "linear-gradient(135deg, rgba(52,211,153,0.75) 0%, rgba(16,185,129,0.85) 40%, rgba(110,231,183,0.7) 70%, rgba(6,148,112,0.9) 100%)",
-            border: "1px solid rgba(110,231,183,0.55)",
-            boxShadow: "0 0 20px rgba(52,211,153,0.35), 0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 0 rgba(0,100,60,0.2)",
+            background: "linear-gradient(135deg, #f5c518 0%, #e6a817 25%, #ffd700 50%, #c8860a 75%, #f5c518 100%)",
+            border: "1px solid rgba(255,215,0,0.8)",
+            boxShadow: "0 0 24px rgba(255,200,0,0.55), 0 2px 10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,200,0.5), inset 0 -1px 0 rgba(120,80,0,0.3)",
             backdropFilter: "blur(10px)",
           }}
         >
@@ -960,7 +960,7 @@ function HomeSidebar({ t, lang, userName, isAdmin, onSelectInfraAgent, onToggleF
           />
           {/* Gold sparkle dot */}
           <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#fff8dc", boxShadow: "0 0 6px rgba(255,255,220,0.9)" }} />
-          <span className="text-[#1a0f00] font-bold drop-shadow-sm">
+          <span className="text-blue-600 font-bold drop-shadow-sm">
             {t.home_create_app}
           </span>
           <Plus className="w-3.5 h-3.5 text-[#1a0f00] ms-auto flex-shrink-0 opacity-80" />

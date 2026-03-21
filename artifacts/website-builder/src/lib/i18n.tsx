@@ -1345,7 +1345,7 @@ const ar = {
   home_import_figma: "استيراد تصميم Figma",
   home_import_project: "استيراد مشروع موجود",
   home_workspace: "مساحة عمل {name}",
-  home_create_app: "اوكي",
+  home_create_app: "مراحب",
   home_import_code: "استيراد كود أو تصميم",
   home_nav_home: "الرئيسية",
   home_nav_apps: "التطبيقات",
