@@ -1866,11 +1866,102 @@ export async function executeInfraTool(toolName: string, input: any, callerRole?
           params.forEach((p: string, i: number) => {
             finalQuery = finalQuery.replace(`$${i + 1}`, `'${p.replace(/'/g, "''")}'`);
           });
-          const result = await db.execute(rawSql.raw(finalQuery));
-          const rows = Array.isArray(result) ? result : (result as any).rows || [];
-          return JSON.stringify({ success: true, rowCount: rows.length, rows: rows.slice(0, 100) });
+
+          const isWrite = /^\s*(UPDATE|INSERT|DELETE)/i.test(query);
+          const isSelect = /^\s*SELECT/i.test(query);
+
+          if (isWrite) {
+            const whereMatch = query.match(/WHERE\s+(.+?)(?:\s+RETURNING|\s*;?\s*$)/i);
+            const tableMatch = query.match(/(?:UPDATE|INTO|FROM)\s+(\w+)/i);
+            const tableName = tableMatch?.[1] || null;
+            const whereClause = whereMatch?.[1] || null;
+
+            let beforeValue: any = null;
+            if (tableName && whereClause && /^\s*UPDATE/i.test(query)) {
+              try {
+                const preCheck = await db.execute(rawSql.raw(`SELECT * FROM ${tableName} WHERE ${whereClause} LIMIT 5`));
+                const preRows = Array.isArray(preCheck) ? preCheck : (preCheck as any).rows || [];
+                beforeValue = preRows.length > 0 ? preRows : null;
+                console.log("[run_sql] PRE-CHECK:", { table: tableName, where: whereClause, matchedRows: preRows.length, before: JSON.stringify(preRows).slice(0, 500) });
+                if (preRows.length === 0) {
+                  console.log("[run_sql] WARNING: WHERE clause matched 0 rows BEFORE execution — UPDATE will affect nothing");
+                  return JSON.stringify({
+                    success: false,
+                    error: "NO_MATCHING_ROWS",
+                    message: `لا يوجد صفوف تطابق الشرط: WHERE ${whereClause}`,
+                    query: finalQuery,
+                    rowsAffected: 0,
+                    table: tableName,
+                    whereClause,
+                  });
+                }
+              } catch (preErr: any) {
+                console.log("[run_sql] Pre-check failed (non-fatal):", preErr?.message);
+              }
+            }
+
+            const result = await db.execute(rawSql.raw(finalQuery));
+            const rawResult = result as any;
+            const rowCount = rawResult.rowCount ?? rawResult.changes ?? (Array.isArray(rawResult) ? rawResult.length : (rawResult.rows?.length ?? 0));
+
+            console.log("[run_sql] DB RESULT:", { rowCount, query: finalQuery.slice(0, 300), params });
+
+            if (rowCount === 0) {
+              console.log("[run_sql] FAIL: rowCount === 0 — NO_ROWS_AFFECTED");
+              return JSON.stringify({
+                success: false,
+                error: "NO_ROWS_AFFECTED",
+                message: "لم يتم تعديل أي صف — العملية فشلت",
+                query: finalQuery,
+                rowsAffected: 0,
+                before: beforeValue,
+              });
+            }
+
+            let afterValue: any = null;
+            if (tableName && whereClause && /^\s*UPDATE/i.test(query)) {
+              try {
+                const postCheck = await db.execute(rawSql.raw(`SELECT * FROM ${tableName} WHERE ${whereClause} LIMIT 5`));
+                const postRows = Array.isArray(postCheck) ? postCheck : (postCheck as any).rows || [];
+                afterValue = postRows.length > 0 ? postRows : null;
+                console.log("[run_sql] POST-CHECK:", { table: tableName, after: JSON.stringify(postRows).slice(0, 500) });
+
+                if (beforeValue && afterValue && JSON.stringify(beforeValue) === JSON.stringify(afterValue)) {
+                  console.log("[run_sql] WARNING: before === after — data did NOT actually change");
+                  return JSON.stringify({
+                    success: false,
+                    error: "NO_ACTUAL_CHANGE",
+                    message: "البيانات لم تتغير فعلياً — القيمة القديمة تساوي الجديدة",
+                    rowsAffected: rowCount,
+                    before: beforeValue,
+                    after: afterValue,
+                    query: finalQuery,
+                  });
+                }
+              } catch (postErr: any) {
+                console.log("[run_sql] Post-check failed (non-fatal):", postErr?.message);
+              }
+            }
+
+            const rows = Array.isArray(rawResult) ? rawResult : (rawResult.rows || []);
+            return JSON.stringify({
+              success: true,
+              message: `تم التنفيذ بنجاح — ${rowCount} صف تأثر`,
+              rowsAffected: rowCount,
+              before: beforeValue,
+              after: afterValue,
+              rows: rows.slice(0, 50),
+              query: finalQuery,
+            });
+
+          } else {
+            const result = await db.execute(rawSql.raw(finalQuery));
+            const rows = Array.isArray(result) ? result : (result as any).rows || [];
+            return JSON.stringify({ success: true, rowCount: rows.length, rows: rows.slice(0, 100) });
+          }
         } catch (e: any) {
-          return JSON.stringify({ error: e?.message || "SQL execution failed" });
+          console.log("[run_sql] ERROR:", e?.message);
+          return JSON.stringify({ success: false, error: e?.message || "SQL execution failed" });
         }
       }
       default:

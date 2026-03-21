@@ -799,6 +799,15 @@ ${blueprint}
 - edit_component المسار نسبي لـ website-builder/ (مثلاً: src/lib/i18n.tsx)
 - read_file المسار من جذر المشروع (مثلاً: artifacts/website-builder/src/lib/i18n.tsx)
 
+⛔⛔ قاعدة حرجة لقاعدة البيانات — ممنوع الكذب ⛔⛔
+
+عند استخدام run_sql لـ UPDATE/INSERT/DELETE:
+- إذا النتيجة فيها "success": false → ممنوع تقول "تم بنجاح" أو "تم التعديل". يجب تقول بالضبط: "فشلت العملية" + السبب.
+- إذا rowsAffected === 0 → العملية فشلت ولم تأثر على أي صف. أبلغ المالك بالفشل.
+- إذا before === after → البيانات لم تتغير. العملية فاشلة.
+- يجب تعتمد فقط على الحقل "success" في نتيجة run_sql. إذا success !== true فهي فاشلة.
+- بعد أي UPDATE ناجح، اعرض للمالك: القيمة قبل وبعد + عدد الصفوف المتأثرة.
+
 القواعد:
 - رد بالعربية إذا المالك يتحدث بالعربية
 - كن مختصراً — لا تشرح ماذا ستفعل، افعل وأخبر بالنتيجة
@@ -1028,8 +1037,13 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
               ],
             });
           } else {
+            let finalContent = result;
+            if (tool.name === "run_sql" && parsedResult && parsedResult.success === false) {
+              finalContent = `⚠️ IMPORTANT: هذه العملية فشلت. يجب أن تُبلغ المستخدم بالفشل. ممنوع قول "تم بنجاح".\n\n${result}`;
+              await logAudit(agentKey, "db_write_failed", tool.name, tool.input, result?.slice(0, 1000), "high", "failed", durationMs);
+            }
             res.write(`data: ${JSON.stringify({ type: "tool_result", name: tool.name, result: result.slice(0, 5000) })}\n\n`);
-            toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: result });
+            toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: finalContent });
           }
         }
         chatMsgs.push({ role: "user", content: toolResults });
