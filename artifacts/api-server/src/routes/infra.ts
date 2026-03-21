@@ -731,7 +731,7 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
         for (const tool of toolUseBlocks) {
           res.write(`data: ${JSON.stringify({ type: "chunk", text: `\n\n...*${tool.name}*...\n` })}\n\n`);
           fullReply += `\n\n...*${tool.name}*...\n`;
-          const result = await executeInfraTool(tool.name, tool.input);
+          const result = await executeInfraTool(tool.name, tool.input, "admin");
 
           let parsedResult: any = null;
           try { parsedResult = JSON.parse(result); } catch {}

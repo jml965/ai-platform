@@ -199,7 +199,8 @@ router.post("/strategic/chat-stream", async (req, res) => {
           res.write(`data: ${JSON.stringify({ type: "tool_result", name: toolName, result: toolResult.slice(0, 5000) })}\n\n`);
         }
       },
-      attachments
+      attachments,
+      user?.role || "user"
     );
 
     history.push({ role: "user", content: message });

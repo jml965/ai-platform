@@ -1197,9 +1197,12 @@ export function setInfraAccessEnabled(enabled: boolean): void {
   _infraAccessEnabled = enabled;
 }
 
-export async function executeInfraTool(toolName: string, input: any): Promise<string> {
+export async function executeInfraTool(toolName: string, input: any, callerRole?: string): Promise<string> {
   if (!_infraAccessEnabled) {
     return JSON.stringify({ error: "Infrastructure access is currently DISABLED by admin. Enable it from the dashboard toggle to allow tool execution." });
+  }
+  if (callerRole && callerRole !== "admin") {
+    return JSON.stringify({ error: "Only admin users can execute infrastructure tools." });
   }
   try {
     switch (toolName) {
@@ -1606,7 +1609,8 @@ export async function streamStrategicAgent(
   longTermMemory: any[],
   onChunk: (text: string) => void,
   onToolResult?: (toolName: string, result: string) => void,
-  attachments?: FileAttachment[]
+  attachments?: FileAttachment[],
+  callerRole?: string
 ): Promise<{ tokensUsed: number; modelsUsed: string[]; cost: number; fullReply: string }> {
   const [config] = await db.select().from(agentConfigsTable)
     .where(eq(agentConfigsTable.agentKey, "strategic"))
@@ -1766,7 +1770,7 @@ export async function streamStrategicAgent(
       for (const tool of toolUseBlocks) {
         onChunk(`\n\n...*${tool.name}*...\n`);
         fullReply += `\n\n...*${tool.name}*...\n`;
-        const result = await executeInfraTool(tool.name, tool.input);
+        const result = await executeInfraTool(tool.name, tool.input, callerRole);
         if (onToolResult) onToolResult(tool.name, result);
 
         let parsedResult: any = null;
