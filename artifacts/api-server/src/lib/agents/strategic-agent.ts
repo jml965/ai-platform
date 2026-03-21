@@ -1922,37 +1922,112 @@ export async function executeInfraTool(toolName: string, input: any, callerRole?
           const searchText = input.text as string;
           const pagePath = input.path || "/";
           const prodUrl = `https://mrcodeai.com${pagePath}`;
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 15000);
           const fetchStart = Date.now();
-          const res = await fetch(prodUrl, {
-            signal: controller.signal,
+          const htmlRes = await fetch(prodUrl, {
             headers: { "User-Agent": "MrCodeAI-Verifier/1.0" },
+            signal: AbortSignal.timeout(15000),
           });
-          clearTimeout(timeout);
           const fetchDuration = Date.now() - fetchStart;
-          if (!res.ok) {
-            return JSON.stringify({ success: false, found: false, error: `HTTP ${res.status}`, url: prodUrl, responseTimeMs: fetchDuration });
+          if (!htmlRes.ok) {
+            return JSON.stringify({ success: false, found: false, error: `HTTP ${htmlRes.status}`, url: prodUrl, responseTimeMs: fetchDuration });
           }
-          const html = await res.text();
-          const found = html.includes(searchText);
-          const occurrences = found ? html.split(searchText).length - 1 : 0;
-          const htmlSnippet = found
+          const html = await htmlRes.text();
+          const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
+          const scriptMatches = [...html.matchAll(/src="([^"]*\.js)"/g)].map(m => m[1]);
+          const cssMatches = [...html.matchAll(/href="([^"]*\.css)"/g)].map(m => m[1]);
+          const htmlFound = html.includes(searchText);
+          const htmlOccurrences = htmlFound ? html.split(searchText).length - 1 : 0;
+          const htmlSnippet = htmlFound
             ? (() => { const idx = html.indexOf(searchText); return html.slice(Math.max(0, idx - 100), idx + searchText.length + 100); })()
             : html.slice(0, 500);
-          const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
+          let bundleFound = false;
+          let bundleOccurrences = 0;
+          let bundleSnippet = "";
+          let bundleFile = "";
+          let bundleSize = 0;
+          let bundleChecked = false;
+          for (const src of scriptMatches) {
+            try {
+              const bundleUrl = src.startsWith("http") ? src : `https://mrcodeai.com${src}`;
+              const bRes = await fetch(bundleUrl, { signal: AbortSignal.timeout(20000) });
+              if (!bRes.ok) continue;
+              const js = await bRes.text();
+              bundleChecked = true;
+              bundleSize += js.length;
+              if (js.includes(searchText)) {
+                bundleFound = true;
+                bundleOccurrences += js.split(searchText).length - 1;
+                const idx = js.indexOf(searchText);
+                bundleSnippet = js.slice(Math.max(0, idx - 80), idx + searchText.length + 80);
+                bundleFile = src;
+              }
+            } catch {}
+          }
+          const overallFound = htmlFound || bundleFound;
+          const status = htmlFound ? "HTML_CONFIRMED" : bundleFound ? "SPA_BUNDLE_CONFIRMED" : "NOT_FOUND";
+          const ghToken = await getGitHubToken();
+          let deployInfo: any = {};
+          if (ghToken) {
+            try {
+              const repo = process.env.GITHUB_REPOSITORY || "jml965/ai-platform";
+              const runsRes = await fetch(`https://api.github.com/repos/${repo}/actions/runs?per_page=1&status=completed&conclusion=success`, {
+                headers: { Authorization: `token ${ghToken}`, Accept: "application/vnd.github.v3+json" },
+                signal: AbortSignal.timeout(10000),
+              });
+              const runsData = await runsRes.json();
+              const latestRun = (runsData.workflow_runs || [])[0];
+              if (latestRun) {
+                deployInfo = {
+                  deployId: latestRun.id,
+                  runUrl: latestRun.html_url,
+                  commitSHA: latestRun.head_sha,
+                  commitShort: latestRun.head_sha?.slice(0, 7),
+                  commitLink: `https://github.com/${repo}/commit/${latestRun.head_sha}`,
+                  deployedAt: latestRun.updated_at,
+                };
+              }
+            } catch {}
+          }
+          const gcpProject = process.env.GCP_PROJECT || "oktamam-ai-platform";
+          const gcpService = process.env.GCP_SERVICE || "mrcodeai";
+          const gcpRegion = process.env.GCP_REGION || "me-central1";
           return JSON.stringify({
             success: true,
-            found,
+            found: overallFound,
+            status,
             url: prodUrl,
-            message: found ? `✅ النص "${searchText}" موجود في الصفحة (${occurrences} مرة)` : `❌ النص "${searchText}" غير موجود في الصفحة`,
-            snippet: htmlSnippet.slice(0, 500),
-            occurrences,
-            pageTitle: titleMatch?.[1] || "",
-            htmlLength: html.length,
+            message: overallFound
+              ? `✅ "${searchText}" — ${status} (HTML: ${htmlOccurrences}, Bundle: ${bundleOccurrences})`
+              : `❌ "${searchText}" غير موجود في HTML أو Bundle`,
+            htmlChecked: true,
+            bundleChecked,
+            htmlFindings: {
+              found: htmlFound,
+              occurrences: htmlOccurrences,
+              snippet: htmlSnippet.slice(0, 500),
+              pageTitle: titleMatch?.[1] || "",
+              htmlLength: html.length,
+              scripts: scriptMatches,
+              stylesheets: cssMatches,
+            },
+            bundleFindings: {
+              found: bundleFound,
+              occurrences: bundleOccurrences,
+              snippet: bundleSnippet.slice(0, 300),
+              file: bundleFile,
+              totalBundleSize: bundleSize,
+            },
+            deploy: deployInfo,
+            cloudRun: {
+              project: gcpProject,
+              service: gcpService,
+              region: gcpRegion,
+              consoleUrl: `https://console.cloud.google.com/run/detail/${gcpRegion}/${gcpService}/revisions?project=${gcpProject}`,
+            },
             responseTimeMs: fetchDuration,
-            httpStatus: res.status,
-            server: res.headers.get("server") || "",
+            httpStatus: htmlRes.status,
+            server: htmlRes.headers.get("server") || "",
+            timestamp: new Date().toISOString(),
           });
         } catch (e: any) {
           return JSON.stringify({ success: false, found: false, error: e.message?.slice(0, 500), url: `https://mrcodeai.com${input.path || "/"}` });
