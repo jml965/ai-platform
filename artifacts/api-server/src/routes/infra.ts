@@ -1110,32 +1110,52 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
           break;
         }
 
-        if (toolActionCount >= MAX_ACTIONS_WITHOUT_EDIT && !hasEdited) {
-          const failMsg = `\n\n❌ لم أتمكن من تحديد المكان بدقة — ${toolActionCount} خطوات بدون تعديل.\n\nالعمليات: ${searchQueries.join(" → ")}\n`;
+        const dynamicMaxActions = targetState.found ? 3 : (hasDOMInspection ? 12 : MAX_ACTIONS_WITHOUT_EDIT);
+        if (toolActionCount >= dynamicMaxActions && !hasEdited) {
+          const failMsg = `\n\n❌ لم أتمكن من تحديد المكان بدقة — ${toolActionCount} خطوات بدون تعديل (حد=${dynamicMaxActions}).\n\nالعمليات: ${searchQueries.join(" → ")}\n`;
           res.write(`data: ${JSON.stringify({ type: "chunk", text: failMsg })}\n\n`);
           fullReply += failMsg;
-          console.log(`[Agent] STOPPED: ${toolActionCount} tool actions without edit. searchCount=${searchCount}, queries=${JSON.stringify(searchQueries)}`);
-          await logAudit(agentKey, "agent_stopped_no_edit", "system", { toolActionCount, searchCount, searchQueries, searchWithNoResults }, failMsg, "medium", "stopped");
+          console.log(`[Agent] STOPPED: ${toolActionCount}/${dynamicMaxActions} tool actions without edit. targetFound=${targetState.found}, hasDOM=${hasDOMInspection}`);
+          await logAudit(agentKey, "agent_stopped_no_edit", "system", { toolActionCount, dynamicMaxActions, targetFound: targetState.found, hasDOM: hasDOMInspection, searchCount, searchQueries, searchWithNoResults }, failMsg, "medium", "stopped");
           break;
         }
 
-        const stream = client.messages.stream({
-          model: slot.model,
-          max_tokens: Math.min(slot.maxTokens || 32000, 64000),
-          system: infraSystemPrompt,
-          messages: chatMsgs,
-          ...(filteredTools.length > 0 ? { tools: filteredTools as any } : {}),
-          temperature: Math.min(parseFloat(String(config.creativity)) || 0.5, 1.0),
-        });
-
+        let response: any = null;
         let currentText = "";
-        stream.on("text", (text: string) => {
-          currentText += text;
-          fullReply += text;
-          res.write(`data: ${JSON.stringify({ type: "chunk", text })}\n\n`);
-        });
+        const MAX_RETRIES = 3;
+        for (let retryAttempt = 0; retryAttempt < MAX_RETRIES; retryAttempt++) {
+          try {
+            const stream = client.messages.stream({
+              model: slot.model,
+              max_tokens: Math.min(slot.maxTokens || 32000, 64000),
+              system: infraSystemPrompt,
+              messages: chatMsgs,
+              ...(filteredTools.length > 0 ? { tools: filteredTools as any } : {}),
+              temperature: Math.min(parseFloat(String(config.creativity)) || 0.5, 1.0),
+            });
 
-        const response = await stream.finalMessage();
+            currentText = "";
+            stream.on("text", (text: string) => {
+              currentText += text;
+              fullReply += text;
+              res.write(`data: ${JSON.stringify({ type: "chunk", text })}\n\n`);
+            });
+
+            response = await stream.finalMessage();
+            break;
+          } catch (retryErr: any) {
+            const isOverloaded = retryErr.message?.includes("Overloaded") || retryErr.message?.includes("overloaded") || retryErr.status === 529;
+            if (isOverloaded && retryAttempt < MAX_RETRIES - 1) {
+              const waitSec = (retryAttempt + 1) * 5;
+              console.log(`[Agent] Overloaded — retry ${retryAttempt + 1}/${MAX_RETRIES} after ${waitSec}s`);
+              res.write(`data: ${JSON.stringify({ type: "chunk", text: `\n⏳ الخادم محمّل — إعادة المحاولة بعد ${waitSec} ثانية...\n` })}\n\n`);
+              await new Promise(r => setTimeout(r, waitSec * 1000));
+              continue;
+            }
+            throw retryErr;
+          }
+        }
+        if (!response) throw new Error("Failed after retries");
         tokensUsed += (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0);
 
         const toolUseBlocks = response.content.filter((b: any) => b.type === "tool_use");
@@ -1302,6 +1322,12 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
             hasDOMInspection = true;
             domSource = "tool";
             console.log(`[Agent] DOM inspection done via ${tool.name} — DOM_SOURCE=tool ✓`);
+
+            if (decisionState.domText && !targetState.found) {
+              const domSearchHint = `\n\n✅ DOM_TO_SEARCH — تم اكتشاف النص "${decisionState.domText.slice(0, 40)}" في الصفحة.\n\n🔧 الخطوة التالية المطلوبة:\nsearch_text text="${decisionState.domText.slice(0, 30)}" للعثور على الملف الذي يحتوي هذا النص في الكود.\n\n⛔ لا تتصفح الصفحة مرة أخرى.`;
+              console.log(`[Agent] DOM_TO_SEARCH: injecting search hint for domText="${decisionState.domText.slice(0, 30)}"`);
+              result = (result || "") + domSearchHint;
+            }
           }
 
           if (tool.name === "edit_component" && !hasDOMInspection) {
