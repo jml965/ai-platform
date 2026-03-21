@@ -1048,6 +1048,33 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
       const MAX_DOM_BLOCKS = 3;
       let searchWithNoResults = 0;
 
+      const decisionState = {
+        domTextDetected: false,
+        domText: null as string | null,
+        uiSearchAttempted: false,
+        i18nSearchAttempted: false,
+        componentSearchAttempted: false,
+        dbAllowed: false,
+        failedSearchCount: 0,
+      };
+
+      function extractDOMText(msg: string): string | null {
+        const textMatch = msg.match(/النص:\s*["']?(.+?)["']?\s*\n/);
+        if (textMatch) return textMatch[1].trim();
+        const selectedMatch = msg.match(/العنصر المحدد[^:]*:\s*(.+)/);
+        if (selectedMatch) return selectedMatch[1].trim();
+        const contentMatch = msg.match(/المحتوى:\s*["']?(.+?)["']?\s*\n/);
+        if (contentMatch) return contentMatch[1].trim();
+        return null;
+      }
+
+      const domText = extractDOMText(userMsg);
+      if (domText) {
+        decisionState.domTextDetected = true;
+        decisionState.domText = domText;
+        console.log(`[Decision] DOM text detected: "${domText.slice(0, 50)}"`);
+      }
+
       const userDOMPatterns = [
         /class[=:]\s*["']([^"']+)["']/i,
         /\bclass(?:Name)?\s*[:=]\s*["']([^"']+)["']/i,
@@ -1113,6 +1140,28 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
         for (const tool of toolUseBlocks) {
           const riskCfg = TOOL_RISK_CONFIG[tool.name] || { risk: "medium", category: "unknown", requiresApproval: false, sandboxed: false };
           const toolStart = Date.now();
+
+          if (decisionState.domTextDetected) {
+            if ((tool.name === "run_sql" || tool.name === "db_query") && !decisionState.dbAllowed) {
+              const blocked = `⛔ DECISION_ENFORCEMENT — ممنوع استخدام DB قبل استنفاد البحث في UI.\n\nالنص المكتشف: "${(decisionState.domText || "").slice(0, 50)}"\n\n✅ المطلوب أولاً:\n1. search_text (النص في الكود)\n2. search_text (i18n/ترجمة)\n3. search_text (components/layout)\n\nبعدها يُسمح بـ DB.`;
+              console.log(`[Decision] BLOCKED: ${tool.name} — DB not allowed yet. State: ui=${decisionState.uiSearchAttempted}, i18n=${decisionState.i18nSearchAttempted}, comp=${decisionState.componentSearchAttempted}`);
+              await logAudit(agentKey, "decision_blocked_db", tool.name, { input: tool.input, decisionState }, blocked, "medium", "blocked");
+              res.write(`data: ${JSON.stringify({ type: "chunk", text: `\n\n${blocked}\n` })}\n\n`);
+              fullReply += `\n\n${blocked}\n`;
+              toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: blocked });
+              continue;
+            }
+
+            if ((tool.name === "edit_component" || tool.name === "write_file") && !decisionState.componentSearchAttempted && !decisionState.i18nSearchAttempted) {
+              const blocked = `⛔ DECISION_ENFORCEMENT — يجب البحث في الكود أولاً قبل التعديل.\n\nالنص المكتشف: "${(decisionState.domText || "").slice(0, 50)}"\n\n✅ ابحث أولاً:\n1. search_text عن النص\n2. search_text في i18n أو components`;
+              console.log(`[Decision] BLOCKED: ${tool.name} — search not attempted yet. State: i18n=${decisionState.i18nSearchAttempted}, comp=${decisionState.componentSearchAttempted}`);
+              await logAudit(agentKey, "decision_blocked_edit", tool.name, { input: tool.input, decisionState }, blocked, "medium", "blocked");
+              res.write(`data: ${JSON.stringify({ type: "chunk", text: `\n\n${blocked}\n` })}\n\n`);
+              fullReply += `\n\n${blocked}\n`;
+              toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: blocked });
+              continue;
+            }
+          }
 
           const EXECUTOR_ONLY_TOOLS = new Set(["edit_component", "write_file", "create_component", "delete_file", "git_push", "trigger_deploy", "run_sql", "exec_command", "run_command", "set_env"]);
           const EXECUTOR_AGENTS = new Set(["infra_builder", "infra_deploy", "execution_engine"]);
@@ -1217,6 +1266,15 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
             hasDOMInspection = true;
             domSource = "tool";
             console.log(`[Agent] DOM inspection done via ${tool.name} — DOM_SOURCE=tool ✓`);
+
+            if (!decisionState.domTextDetected && result) {
+              const toolDomText = extractDOMText(result);
+              if (toolDomText) {
+                decisionState.domTextDetected = true;
+                decisionState.domText = toolDomText;
+                console.log(`[Decision] DOM text extracted from ${tool.name}: "${toolDomText.slice(0, 50)}"`);
+              }
+            }
           }
 
           if (tool.name === "edit_component" && !hasDOMInspection) {
@@ -1312,6 +1370,43 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
             } else {
               searchWithNoResults++;
               console.log(`[Agent] search_text returned no useful results — searchWithNoResults=${searchWithNoResults}/3`);
+            }
+
+            if (decisionState.domTextDetected) {
+              const searchText = ((tool.input as any)?.text || "").toLowerCase();
+              const searchPath = ((tool.input as any)?.path || "").toLowerCase();
+
+              if (decisionState.domText && searchText.includes(decisionState.domText.toLowerCase().slice(0, 20))) {
+                decisionState.uiSearchAttempted = true;
+                console.log(`[Decision] UI search attempted ✓`);
+              }
+
+              if (searchPath.includes("i18n") || searchPath.includes("locale") || searchPath.includes("translation") || searchText.includes("t(") || searchText.includes("useTranslation")) {
+                decisionState.i18nSearchAttempted = true;
+                console.log(`[Decision] i18n search attempted ✓`);
+              }
+
+              if (searchPath.includes("component") || searchPath.includes("layout") || searchPath.includes("sidebar") || searchPath.includes("header") || searchPath.includes("footer") || searchPath.includes("page")) {
+                decisionState.componentSearchAttempted = true;
+                console.log(`[Decision] Component search attempted ✓`);
+              }
+
+              if (!hasFileMatch) {
+                decisionState.failedSearchCount++;
+                console.log(`[Decision] Failed search count: ${decisionState.failedSearchCount}/3`);
+              }
+
+              if (decisionState.uiSearchAttempted && decisionState.i18nSearchAttempted && decisionState.componentSearchAttempted) {
+                decisionState.dbAllowed = true;
+                console.log(`[Decision] All searches done — DB ALLOWED ✓`);
+              }
+
+              if (decisionState.failedSearchCount >= 3) {
+                decisionState.dbAllowed = true;
+                const fallbackMsg = `⚠️ تم السماح باستخدام DB بعد فشل البحث في UI (${decisionState.failedSearchCount} محاولات فاشلة)`;
+                console.log(`[Decision] FALLBACK: ${fallbackMsg}`);
+                await logAudit(agentKey, "decision_db_fallback", tool.name, { decisionState }, fallbackMsg, "medium", "override");
+              }
             }
           }
 

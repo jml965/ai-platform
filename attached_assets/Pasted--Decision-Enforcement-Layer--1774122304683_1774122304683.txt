@@ -1,0 +1,159 @@
+المطلوب: تنفيذ Decision Enforcement Layer (نسخة نهائية محسّنة)
+
+========================================
+
+1. Decision State (State Engine)
+   ========================================
+
+const decisionState = {
+domTextDetected: false,
+domText: null,
+
+uiSearchAttempted: false,
+i18nSearchAttempted: false,
+componentSearchAttempted: false,
+
+dbAllowed: false,
+failedSearchCount: 0
+}
+
+========================================
+2) DOM Text Detection (محسّن)
+=============================
+
+function extractDOMText(message, toolResult) {
+// من رسالة العصا السحرية
+const match = message.match(/النص:\s*["']?(.+?)["']?\n/)
+if (match) return match[1].trim()
+
+// fallback: من tool result
+if (toolResult?.text) return toolResult.text
+
+return null
+}
+
+// عند استقبال رسالة المستخدم:
+const domText = extractDOMText(message, lastToolResult)
+
+if (domText) {
+decisionState.domTextDetected = true
+decisionState.domText = domText
+}
+
+========================================
+3) Enforcement Middleware (القلب الحقيقي)
+=========================================
+
+function enforceDecisionFlow(tool, input) {
+
+// 🔴 منع DB مبكراً
+if (tool === "run_sql" || tool === "db_query") {
+if (!decisionState.dbAllowed) {
+throw new Error("⛔ ممنوع استخدام DB قبل استنفاد البحث في UI")
+}
+}
+
+// 🔴 منع edit بدون بحث
+if (tool === "edit_component" || tool === "write_file") {
+if (!decisionState.componentSearchAttempted && !decisionState.i18nSearchAttempted) {
+throw new Error("⛔ يجب البحث في الكود أولاً قبل التعديل")
+}
+}
+
+return true
+}
+
+========================================
+4) Search Tracking Engine (ذكي)
+===============================
+
+function trackSearch(tool, input, result) {
+if (tool !== "search_text") return
+
+const text = input.text?.toLowerCase() || ""
+const path = input.path || ""
+
+// UI search
+if (decisionState.domText && text.includes(decisionState.domText.toLowerCase())) {
+decisionState.uiSearchAttempted = true
+}
+
+// i18n search
+if (path.includes("i18n") || text.includes("t(")) {
+decisionState.i18nSearchAttempted = true
+}
+
+// component search
+if (
+path.includes("components") ||
+path.includes("layout") ||
+path.includes("sidebar") ||
+path.includes("header")
+) {
+decisionState.componentSearchAttempted = true
+}
+
+// إذا لم يجد نتيجة
+if (!result?.found) {
+decisionState.failedSearchCount++
+}
+
+// 🔓 السماح بـ DB بعد استنفاد البحث
+if (
+decisionState.uiSearchAttempted &&
+decisionState.i18nSearchAttempted &&
+decisionState.componentSearchAttempted
+) {
+decisionState.dbAllowed = true
+}
+
+// 🔓 fallback ذكي
+if (decisionState.failedSearchCount >= 3) {
+decisionState.dbAllowed = true
+}
+}
+
+========================================
+5) Tool Execution Wrapper
+=========================
+
+async function executeTool(tool, input) {
+
+// enforce
+enforceDecisionFlow(tool, input)
+
+const result = await runTool(tool, input)
+
+// track
+trackSearch(tool, input, result)
+
+// logging
+logDecision(tool, input, result)
+
+return result
+}
+
+========================================
+6) Audit Logging (مهم جداً)
+===========================
+
+function logDecision(tool, input, result) {
+db.insert("ai_audit_logs", {
+action: "decision_enforcement",
+tool,
+input,
+result,
+decisionState: JSON.stringify(decisionState),
+status: result?.error ? "blocked" : "success"
+})
+}
+
+========================================
+7) ملاحظات مهمة (لا تعدّل)
+==========================
+
+❌ لا تعدّل system prompt (القوانين موجودة)
+✔ هذا layer يفرض التنفيذ برمجياً
+
+========================================
+ابدأ التنفيذ الآن
