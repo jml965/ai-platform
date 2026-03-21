@@ -943,26 +943,26 @@ function HomeSidebar({ t, lang, userName, isAdmin, onSelectInfraAgent, onToggleF
 
       <div className="p-2 flex flex-col gap-1 relative z-10">
         <button
-          className="flex items-center gap-2 w-full px-3 py-2 rounded-md text-[12px] font-semibold text-white text-start relative overflow-hidden transition-all duration-200 hover:brightness-110 active:scale-[0.98] group/createbtn"
+          className="flex items-center gap-2 w-full px-3 py-2 rounded-md text-[12px] font-semibold text-start relative overflow-hidden transition-all duration-200 hover:brightness-110 active:scale-[0.98] group/createbtn"
           style={{
-            background: "linear-gradient(135deg, #1c2d4a 0%, #162236 50%, #1a2d45 100%)",
-            border: "1px solid rgba(88,166,255,0.35)",
-            boxShadow: "0 0 10px rgba(88,166,255,0.12), inset 0 1px 0 rgba(88,166,255,0.08)",
+            background: "linear-gradient(135deg, #f5c518 0%, #e6a800 40%, #ffd700 70%, #c8960c 100%)",
+            border: "1px solid rgba(255,215,0,0.7)",
+            boxShadow: "0 0 16px rgba(255,200,0,0.45), 0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,200,0.3)",
           }}
         >
-          {/* Subtle blue hover glow */}
+          {/* Golden shimmer on hover */}
           <div
             className="absolute inset-0 opacity-0 group-hover/createbtn:opacity-100 transition-opacity duration-300 pointer-events-none"
             style={{
-              background: "linear-gradient(135deg, rgba(88,166,255,0.08) 0%, transparent 60%)",
+              background: "linear-gradient(135deg, rgba(255,255,255,0.18) 0%, transparent 60%)",
             }}
           />
-          {/* Blue dot */}
-          <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#58a6ff", boxShadow: "0 0 5px rgba(88,166,255,0.7)" }} />
-          <span className="text-[#c9d1d9] group-hover/createbtn:text-white transition-colors">
+          {/* Gold sparkle dot */}
+          <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: "#fff8dc", boxShadow: "0 0 6px rgba(255,255,220,0.9)" }} />
+          <span className="text-[#1a0f00] font-bold drop-shadow-sm">
             {t.home_create_app}
           </span>
-          <Plus className="w-3.5 h-3.5 text-[#58a6ff] ms-auto flex-shrink-0" />
+          <Plus className="w-3.5 h-3.5 text-[#1a0f00] ms-auto flex-shrink-0 opacity-80" />
         </button>
       </div>
 
