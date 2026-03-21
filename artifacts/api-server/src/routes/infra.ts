@@ -1289,6 +1289,16 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
           }
 
           if (["get_page_structure", "browse_page", "inspect_styles"].includes(tool.name)) {
+            domBlockCount++;
+            if (domBlockCount > 1) {
+              const blocked = `⛔ DOM_INSPECTION_LIMIT — تم تصفح الصفحة بالفعل. النص غير موجود في DOM.\n\n✅ الخطوة التالية:\n1. search_text للبحث عن النص في ملفات الكود\n2. read_file لقراءة الملف\n3. edit_component لتنفيذ التعديل`;
+              console.log(`[Agent] BLOCKED: repeated DOM inspection (${domBlockCount}). Redirecting to search.`);
+              await logAudit(agentKey, "dom_repeated_blocked", tool.name, tool.input, blocked, "low", "blocked");
+              hasDOMInspection = true;
+              domSource = "forced_override";
+              toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: blocked });
+              continue;
+            }
             hasDOMInspection = true;
             domSource = "tool";
             console.log(`[Agent] DOM inspection done via ${tool.name} — DOM_SOURCE=tool ✓`);
