@@ -281,8 +281,8 @@ INFRASTRUCTURE TOOLS:
 - set_env: Set/delete environment variables. Input: { key, value }
 - list_components: Browse frontend components and files. Input: { directory: "src" }
 - view_page_source: Read component source code. Input: { path: "src/pages/Home.tsx" }
-- edit_component: Surgical code edits. Input: { path, find, replace }
-- create_component: Create new files. Input: { path, content }
+- edit_component: Surgical code edits. Input: { componentPath: "src/lib/i18n.tsx", old_text: "exact text to find", new_text: "replacement text" }. componentPath is relative to website-builder/. old_text MUST match exactly.
+- create_component: Create new files. Input: { componentPath: "src/components/NewFile.tsx", content: "full file content" }
 - trigger_deploy: Deploy to Cloud Run via GitHub Actions
 - deploy_status: Check deployment status
 - github_api: Any GitHub API call. Input: { method, endpoint, body }
@@ -1454,12 +1454,17 @@ export async function executeInfraTool(toolName: string, input: any, callerRole?
       }
       case "edit_component": {
         const webBuilderRoot = path.resolve(PROJECT_ROOT, "artifacts/website-builder");
-        const resolved = path.resolve(webBuilderRoot, input.componentPath);
+        const compPath = input.componentPath || input.path || input.filePath || input.file;
+        if (!compPath) return JSON.stringify({ error: "Missing componentPath. Use: { componentPath: 'src/lib/i18n.tsx', old_text: '...', new_text: '...' }" });
+        const resolved = path.resolve(webBuilderRoot, compPath);
         if (!resolved.startsWith(webBuilderRoot)) return JSON.stringify({ error: "Path outside website-builder" });
-        if (!fs.existsSync(resolved)) return JSON.stringify({ error: "Component not found", path: input.componentPath });
+        if (!fs.existsSync(resolved)) return JSON.stringify({ error: "Component not found", path: compPath });
         const currentContent = fs.readFileSync(resolved, "utf-8");
         
-        let oldText = input.old_text;
+        let oldText = input.old_text || input.find || input.search || input.oldText || input.original;
+        if (!oldText) return JSON.stringify({ error: "Missing old_text. Use: { componentPath: '...', old_text: 'text to find', new_text: 'replacement' }" });
+        const newText = input.new_text !== undefined ? input.new_text : (input.replace !== undefined ? input.replace : (input.newText !== undefined ? input.newText : input.replacement));
+        if (newText === undefined) return JSON.stringify({ error: "Missing new_text. Use: { componentPath: '...', old_text: '...', new_text: '...' }" });
         let matchFound = currentContent.includes(oldText);
         
         if (!matchFound) {
@@ -1517,7 +1522,7 @@ export async function executeInfraTool(toolName: string, input: any, callerRole?
           });
         }
         const count = currentContent.split(oldText).length - 1;
-        const newContent = currentContent.replace(oldText, input.new_text);
+        const newContent = currentContent.replace(oldText, newText);
         fs.writeFileSync(resolved, newContent, "utf-8");
         if (IS_PRODUCTION) {
           let buildResult = "skipped";
@@ -1527,11 +1532,11 @@ export async function executeInfraTool(toolName: string, input: any, callerRole?
           } catch (buildErr: any) {
             buildResult = `failed: ${(buildErr?.stderr || buildErr?.message || "").slice(0, 500)}`;
           }
-          const ghPath = `artifacts/website-builder/${input.componentPath}`;
-          const ghResult = await pushFileToGitHub(ghPath, newContent, `Agent edit: ${input.componentPath}`);
+          const ghPath = `artifacts/website-builder/${compPath}`;
+          const ghResult = await pushFileToGitHub(ghPath, newContent, `Agent edit: ${compPath}`);
           return JSON.stringify({
             success: buildResult === "success",
-            path: input.componentPath,
+            path: compPath,
             matchesReplaced: count,
             production: true,
             liveRebuilt: buildResult === "success",
@@ -1543,7 +1548,7 @@ export async function executeInfraTool(toolName: string, input: any, callerRole?
               : `Build failed: ${buildResult}. Changes pushed to GitHub for next deploy.`,
           });
         }
-        return JSON.stringify({ success: true, path: input.componentPath, matchesReplaced: count, newSize: Buffer.byteLength(newContent) });
+        return JSON.stringify({ success: true, path: compPath, matchesReplaced: count, newSize: Buffer.byteLength(newContent) });
       }
       case "create_component": {
         const webBuilderRoot = path.resolve(PROJECT_ROOT, "artifacts/website-builder");
