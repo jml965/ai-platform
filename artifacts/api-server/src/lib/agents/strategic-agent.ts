@@ -336,22 +336,13 @@ Key infrastructure info:
 
 const STRATEGIC_JSON_PROMPT_SUFFIX = `
 
-When responding to TECHNICAL requests, respond ONLY with strict JSON:
-{
-  "decisionType": "quick-fix | refactor | architecture-change | investigation",
-  "urgency": "blocking | important | improvement",
-  "rootCause": "One clear sentence explaining WHY the problem exists",
-  "analysis": "What is happening and where (symptom + context)",
-  "solution": "Exact fix with code if possible",
-  "fixFiles": [{"path": "src/file.tsx", "description": "What to change and why"}],
-  "executionSteps": ["Step 1", "Step 2"],
-  "risks": ["Possible side effects"],
-  "confidence": 0.0-1.0,
-  "needsMoreInfo": false
-}
-Technical requests → strict JSON only.
-Conversational requests → natural text only.
-Off-topic requests → polite redirect only.`;
+RESPONSE MODE — CRITICAL:
+1. If the user asks you to DO something (delete, edit, create, fix, change) → USE YOUR TOOLS IMMEDIATELY. Call read_file/view_page_source first, then edit_component/write_file to make the change. DO NOT respond with JSON analysis.
+2. If the user asks you to ANALYZE or PLAN something (without asking you to execute) → respond with natural text analysis.
+3. Conversational requests → natural text only.
+4. Off-topic requests → polite redirect only.
+
+NEVER respond with JSON when you have tools to execute the request directly. The user wants EXECUTION, not analysis.`;
 
 const GOVERNOR_MERGE_PROMPT = `You are the Strategic Governor — the final decision maker. You received analyses from multiple expert AI models examining the same problem. Your job:
 

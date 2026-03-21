@@ -38,6 +38,13 @@ RUN pnpm install --frozen-lockfile --prod --ignore-scripts || pnpm install --no-
 COPY --from=build-backend /app/artifacts/api-server/dist ./artifacts/api-server/dist
 COPY --from=build-frontend /app/artifacts/website-builder/dist/public ./artifacts/website-builder/dist
 
+COPY artifacts/api-server/src/ ./artifacts/api-server/src/
+COPY artifacts/website-builder/src/ ./artifacts/website-builder/src/
+COPY artifacts/website-builder/index.html ./artifacts/website-builder/index.html
+COPY artifacts/website-builder/vite.config.ts ./artifacts/website-builder/vite.config.ts
+COPY artifacts/website-builder/tsconfig.json ./artifacts/website-builder/tsconfig.json
+COPY artifacts/api-server/tsconfig.json ./artifacts/api-server/tsconfig.json
+
 ENV NODE_ENV=production
 ENV PORT=8080
 EXPOSE 8080
