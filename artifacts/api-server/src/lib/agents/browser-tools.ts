@@ -53,6 +53,47 @@ function resolveUrl(pathOrUrl: string): string {
   return `https://${domain}${p}`;
 }
 
+let cachedAdminId: string | null = null;
+
+async function getAdminUserId(): Promise<string | null> {
+  if (cachedAdminId) return cachedAdminId;
+  if (process.env.ADMIN_USER_ID) {
+    cachedAdminId = process.env.ADMIN_USER_ID;
+    return cachedAdminId;
+  }
+  try {
+    const { db } = await import("@workspace/db");
+    const { usersTable } = await import("@workspace/db/schema");
+    const { eq } = await import("drizzle-orm");
+    const [admin] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.role, "admin")).limit(1);
+    if (admin) {
+      cachedAdminId = String(admin.id);
+      return cachedAdminId;
+    }
+  } catch {}
+  return null;
+}
+
+async function injectAuthCookie(page: Page, url: string): Promise<void> {
+  if (process.env.NODE_ENV !== "production") return;
+  try {
+    const adminId = await getAdminUserId();
+    if (!adminId) return;
+    const { createSessionToken } = await import("../session");
+    const token = createSessionToken(adminId);
+    const urlObj = new URL(url);
+    await page.setCookie({
+      name: "session_token",
+      value: token,
+      domain: urlObj.hostname,
+      path: "/",
+      httpOnly: true,
+      secure: false,
+      sameSite: "Lax",
+    });
+  } catch {}
+}
+
 export async function screenshotPage(
   pathOrUrl: string,
   opts?: { width?: number; height?: number; fullPage?: boolean; selector?: string }
@@ -63,7 +104,9 @@ export async function screenshotPage(
   const h = opts?.height || 720;
   try {
     await page.setViewport({ width: w, height: h });
-    await page.goto(resolveUrl(pathOrUrl), {
+    const targetUrl = resolveUrl(pathOrUrl);
+    await injectAuthCookie(page, targetUrl);
+    await page.goto(targetUrl, {
       waitUntil: "networkidle2",
       timeout: 20000,
     });
