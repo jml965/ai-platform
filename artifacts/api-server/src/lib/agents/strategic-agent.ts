@@ -1208,13 +1208,23 @@ export const INFRA_TOOLS = [
     },
   },
   {
+    name: "git_commit",
+    description: "Git add and commit all changes locally. Use after editing files to save changes. Input: { message: 'commit message' }",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        message: { type: "string", description: "Commit message describing the change" },
+      },
+      required: ["message"],
+    },
+  },
+  {
     name: "git_push",
-    description: "Git commit and push changes to GitHub. IMPORTANT: Only use when explicitly requested by admin.",
+    description: "Git commit (if needed) and push to GitHub. This triggers CI/CD deployment to production (mrcodeai.com). Use after edit_component to deploy changes to the live site. Input: { message: 'commit message' }",
     input_schema: {
       type: "object" as const,
       properties: {
         message: { type: "string", description: "Commit message" },
-        branch: { type: "string", description: "Branch to push to. Default: main" },
       },
       required: ["message"],
     },
@@ -1782,13 +1792,31 @@ export async function executeInfraTool(toolName: string, input: any, callerRole?
           return JSON.stringify({ url, error: err.message });
         }
       }
-      case "git_push": {
-        const branch = input.branch || "main";
+      case "git_commit": {
         try {
           execSync("git add -A", { cwd: PROJECT_ROOT, encoding: "utf-8" });
-          execSync(`git commit -m "${input.message.replace(/"/g, '\\"')}"`, { cwd: PROJECT_ROOT, encoding: "utf-8" });
-          const pushOut = execSync(`git push origin ${branch}`, { cwd: PROJECT_ROOT, encoding: "utf-8", timeout: 30000 });
-          return JSON.stringify({ success: true, message: `Pushed to ${branch}`, output: pushOut.slice(0, 5000) });
+          const commitMsg = (input.message || "Agent auto-commit").replace(/"/g, '\\"');
+          const commitOut = execSync(`git commit -m "${commitMsg}"`, { cwd: PROJECT_ROOT, encoding: "utf-8" });
+          return JSON.stringify({ success: true, message: `Committed: ${commitMsg}`, output: commitOut.slice(0, 2000) });
+        } catch (e: any) {
+          const errMsg = (e?.stderr || e?.message || "").slice(0, 2000);
+          if (errMsg.includes("nothing to commit")) {
+            return JSON.stringify({ success: true, message: "لا توجد تغييرات للحفظ (already committed)", nothingToCommit: true });
+          }
+          return JSON.stringify({ success: false, error: errMsg });
+        }
+      }
+      case "git_push": {
+        try {
+          execSync("git add -A", { cwd: PROJECT_ROOT, encoding: "utf-8" });
+          const commitMsg = (input.message || "Agent push").replace(/"/g, '\\"');
+          try {
+            execSync(`git commit -m "${commitMsg}"`, { cwd: PROJECT_ROOT, encoding: "utf-8" });
+          } catch (ce: any) {
+            if (!(ce?.stderr || ce?.message || "").includes("nothing to commit")) throw ce;
+          }
+          const pushOut = execSync(`git push github master:main --force`, { cwd: PROJECT_ROOT, encoding: "utf-8", timeout: 30000 });
+          return JSON.stringify({ success: true, message: `Pushed to GitHub (master → main)`, output: pushOut.slice(0, 5000) });
         } catch (e: any) {
           return JSON.stringify({ success: false, error: (e?.stderr || e?.message || "").slice(0, 5000) });
         }

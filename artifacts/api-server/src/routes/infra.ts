@@ -40,6 +40,7 @@ const TOOL_RISK_CONFIG: Record<string, { risk: string; category: string; require
   get_network_requests: { risk: "low", category: "browser", requiresApproval: false, sandboxed: false },
   browse_page: { risk: "low", category: "browser", requiresApproval: false, sandboxed: false },
   site_health: { risk: "low", category: "browser", requiresApproval: false, sandboxed: false },
+  git_commit: { risk: "medium", category: "deploy", requiresApproval: false, sandboxed: false },
   git_push: { risk: "high", category: "deploy", requiresApproval: true, sandboxed: false },
   trigger_deploy: { risk: "critical", category: "deploy", requiresApproval: true, sandboxed: false },
   deploy_status: { risk: "low", category: "deploy", requiresApproval: false, sandboxed: false },
@@ -848,7 +849,31 @@ ${blueprint}
 - read_file المسار من جذر المشروع (مثلاً: artifacts/website-builder/src/lib/i18n.tsx)
 
 ⛔ ممنوع ترجع JSON مثل {"decisionType": ...}. المالك يريد تنفيذ.
-⛔ في الإنتاج: edit_component يبني الواجهة فوراً. التغييرات فورية!
+
+⛔⛔⛔ القانون الثامن: النشر الإجباري (Deploy Chain) ⛔⛔⛔
+
+بعد أي edit_component أو write_file ناجح (matchesReplaced > 0):
+
+خطوة 1: edit_component / write_file ← (تم)
+خطوة 2: git_push مع message يصف التغيير (يشمل commit + push + يشغّل CI/CD)
+خطوة 3: انتظر 60 ثانية ثم deploy_status للتأكد
+خطوة 4: browse_page على mrcodeai.com للتحقق البصري
+
+⚠️ git_push يتطلب موافقة المالك (approval) — بعد الموافقة، يتم Push + Deploy تلقائياً.
+⚠️ النشر عبر GitHub Actions CI/CD → يأخذ ~3 دقائق حتى يظهر التغيير على mrcodeai.com
+
+الرد النهائي بعد كل تعديل UI:
+✔ تم التعديل والنشر:
+  الملف: [path]
+  قبل: [old] → بعد: [new]
+  matchesReplaced: [N]
+  النشر: تم الدفع لـ GitHub → CI/CD قيد التنفيذ
+  الرابط: https://mrcodeai.com
+
+❌ فشل:
+  السبب: [التعديل فشل / النشر فشل / لم يظهر في الموقع]
+
+⚠️ أهم قاعدة: التعديل في dev فقط لا يكفي! يجب git_push ثم التحقق.
 
 القواعد العامة:
 - رد بالعربية إذا المالك يتحدث بالعربية
@@ -1187,7 +1212,8 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
                   }
                 }
 
-                finalContent = `✅ EDIT_SUCCESS: تم التعديل بنجاح!\n📁 الملف: ${editPath}\n🔄 matchesReplaced: ${matchesReplaced}\n📝 قبل: "${oldText}"\n📝 بعد: "${newText}"${uiVerification}\n\n${result}`;
+                const deployHint = `\n\n🚀 الخطوة التالية: نفّذ git_push مع message يصف التغيير لنشره على mrcodeai.com. التعديل في dev فقط لا يكفي!`;
+                finalContent = `✅ EDIT_SUCCESS: تم التعديل بنجاح!\n📁 الملف: ${editPath}\n🔄 matchesReplaced: ${matchesReplaced}\n📝 قبل: "${oldText}"\n📝 بعد: "${newText}"${uiVerification}${deployHint}\n\n${result}`;
                 console.log(`[Agent] EDIT SUCCESS: matchesReplaced=${matchesReplaced} in ${editPath} | before="${oldText}" → after="${newText}"`);
                 await logAudit(agentKey, "edit_success", tool.name, { path: editPath, oldText, newText, matchesReplaced }, result?.slice(0, 500), "medium", "success", durationMs);
               }
@@ -1213,7 +1239,8 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
                     }
                   } catch {}
                 }
-                finalContent = `✅ WRITE_SUCCESS: تم كتابة الملف بنجاح!\n📁 الملف: ${writePath}\n📏 الحجم: ${parsedResult.size || parsedResult.newSize || "unknown"}${writeVerification}\n\n${result}`;
+                const writeDeployHint = `\n\n🚀 الخطوة التالية: نفّذ git_push مع message يصف التغيير لنشره على mrcodeai.com.`;
+                finalContent = `✅ WRITE_SUCCESS: تم كتابة الملف بنجاح!\n📁 الملف: ${writePath}\n📏 الحجم: ${parsedResult.size || parsedResult.newSize || "unknown"}${writeVerification}${writeDeployHint}\n\n${result}`;
                 console.log(`[Agent] WRITE SUCCESS: ${writePath}`);
                 await logAudit(agentKey, "write_success", tool.name, { path: writePath }, result?.slice(0, 500), "medium", "success", durationMs);
               }
@@ -1249,7 +1276,21 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
               }
             }
 
-            const enrichedTools = ["edit_component", "write_file", "search_text", "run_sql"];
+            if (tool.name === "git_push" && parsedResult?.success) {
+              finalContent = `${result}\n\n✅ تم الدفع لـ GitHub بنجاح! CI/CD يعمل الآن.\n⏳ النشر على mrcodeai.com يستغرق ~3 دقائق.\n💡 نفّذ deploy_status بعد دقيقة للتحقق، ثم browse_page على https://mrcodeai.com للتأكد.`;
+              console.log(`[Agent] GIT_PUSH SUCCESS`);
+              await logAudit(agentKey, "git_push_success", tool.name, tool.input, result?.slice(0, 500), "high", "success", durationMs);
+            } else if (tool.name === "git_push" && parsedResult?.success === false) {
+              finalContent = `${result}\n\n❌ فشل الدفع لـ GitHub: ${parsedResult.error?.slice(0, 200)}`;
+              console.log(`[Agent] GIT_PUSH FAILED: ${parsedResult.error?.slice(0, 200)}`);
+              await logAudit(agentKey, "git_push_failed", tool.name, tool.input, parsedResult.error?.slice(0, 500), "high", "failed", durationMs);
+            } else if (tool.name === "git_commit" && parsedResult) {
+              finalContent = parsedResult.nothingToCommit
+                ? `${result}\n\n📝 لا توجد تغييرات جديدة. نفّذ git_push مباشرة.`
+                : `${result}\n\n✅ تم حفظ التغييرات محلياً. نفّذ git_push الآن لنشرها.`;
+            }
+
+            const enrichedTools = ["edit_component", "write_file", "search_text", "run_sql", "git_push", "git_commit"];
             const sseContent = enrichedTools.includes(tool.name) ? finalContent.slice(0, 5000) : result.slice(0, 5000);
             res.write(`data: ${JSON.stringify({ type: "tool_result", name: tool.name, result: sseContent })}\n\n`);
             toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: finalContent });
