@@ -1382,11 +1382,66 @@ export async function executeInfraTool(toolName: string, input: any, callerRole?
         if (!resolved.startsWith(webBuilderRoot)) return JSON.stringify({ error: "Path outside website-builder" });
         if (!fs.existsSync(resolved)) return JSON.stringify({ error: "Component not found", path: input.componentPath });
         const currentContent = fs.readFileSync(resolved, "utf-8");
-        if (!currentContent.includes(input.old_text)) {
-          return JSON.stringify({ error: "old_text not found in file. Make sure the text matches exactly including whitespace.", path: input.componentPath, fileLines: currentContent.split("\n").length });
+        
+        let oldText = input.old_text;
+        let matchFound = currentContent.includes(oldText);
+        
+        if (!matchFound) {
+          const normalizedSearch = oldText.replace(/\s+/g, " ").trim();
+          const lines = currentContent.split("\n");
+          for (let i = 0; i < lines.length; i++) {
+            for (let len = 1; len <= Math.min(30, lines.length - i); len++) {
+              const chunk = lines.slice(i, i + len).join("\n");
+              const normalizedChunk = chunk.replace(/\s+/g, " ").trim();
+              if (normalizedChunk === normalizedSearch) {
+                oldText = chunk;
+                matchFound = true;
+                break;
+              }
+            }
+            if (matchFound) break;
+          }
         }
-        const count = currentContent.split(input.old_text).length - 1;
-        const newContent = currentContent.replace(input.old_text, input.new_text);
+        
+        if (!matchFound) {
+          const searchLines = oldText.split("\n").map((l: string) => l.trim()).filter((l: string) => l.length > 10);
+          if (searchLines.length > 0) {
+            const firstLine = searchLines[0];
+            const lastLine = searchLines[searchLines.length - 1];
+            const contentLines = currentContent.split("\n");
+            let startIdx = -1;
+            let endIdx = -1;
+            for (let i = 0; i < contentLines.length; i++) {
+              if (contentLines[i].trim().includes(firstLine)) { startIdx = i; break; }
+            }
+            if (startIdx >= 0) {
+              for (let i = startIdx; i < Math.min(startIdx + 50, contentLines.length); i++) {
+                if (contentLines[i].trim().includes(lastLine)) { endIdx = i; break; }
+              }
+            }
+            if (startIdx >= 0 && endIdx >= startIdx) {
+              oldText = contentLines.slice(startIdx, endIdx + 1).join("\n");
+              matchFound = true;
+            }
+          }
+        }
+        
+        if (!matchFound) {
+          const nearLines = currentContent.split("\n");
+          const searchTerms = oldText.split("\n").map((l: string) => l.trim()).filter((l: string) => l.length > 15);
+          const matchingLines = searchTerms.length > 0 
+            ? nearLines.map((l: string, i: number) => ({ line: i + 1, content: l.trim() })).filter((x: any) => searchTerms.some((s: string) => x.content.includes(s))).slice(0, 5)
+            : [];
+          return JSON.stringify({ 
+            error: "old_text not found in file. Make sure text matches exactly including whitespace and indentation.", 
+            path: input.componentPath, 
+            fileLines: nearLines.length,
+            hint: "Copy the EXACT text from read_file output. Whitespace and indentation must match perfectly.",
+            nearMatches: matchingLines,
+          });
+        }
+        const count = currentContent.split(oldText).length - 1;
+        const newContent = currentContent.replace(oldText, input.new_text);
         fs.writeFileSync(resolved, newContent, "utf-8");
         if (IS_PRODUCTION) {
           let buildResult = "skipped";

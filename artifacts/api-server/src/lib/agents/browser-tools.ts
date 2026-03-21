@@ -1,7 +1,22 @@
 import puppeteer, { type Browser, type Page } from "puppeteer-core";
+import * as fs from "fs";
 
-const CHROMIUM_PATH =
-  "/nix/store/5afrhwm7zqn1vb7p5z1mc2rkh2grsfgz-ungoogled-chromium-138.0.7204.100/bin/chromium";
+function findChromiumPath(): string {
+  const candidates = [
+    process.env.PUPPETEER_EXECUTABLE_PATH,
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/nix/store/5afrhwm7zqn1vb7p5z1mc2rkh2grsfgz-ungoogled-chromium-138.0.7204.100/bin/chromium",
+  ];
+  for (const p of candidates) {
+    if (p && fs.existsSync(p)) return p;
+  }
+  return "/usr/bin/chromium";
+}
+
+const CHROMIUM_PATH = findChromiumPath();
 
 let browserInstance: Browser | null = null;
 
@@ -26,11 +41,15 @@ async function getBrowser(): Promise<Browser> {
 
 function resolveUrl(pathOrUrl: string): string {
   if (pathOrUrl.startsWith("http")) return pathOrUrl;
+  const p = pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`;
+  if (process.env.NODE_ENV === "production") {
+    const port = process.env.PORT || "8080";
+    return `http://localhost:${port}${p}`;
+  }
   const domain =
     process.env.REPLIT_DEV_DOMAIN ||
     process.env.REPLIT_DOMAINS ||
     "localhost:5173";
-  const p = pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`;
   return `https://${domain}${p}`;
 }
 

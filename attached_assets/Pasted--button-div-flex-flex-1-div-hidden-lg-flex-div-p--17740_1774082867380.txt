@@ -1,0 +1,36 @@
+[عصا سحرية] العنصر المحدد:
+• النوع: <button>
+• المسار: div.flex.flex-1 > div.hidden.lg:flex > div.p-2.flex > button.flex.items-center
+• النص: "يوحنا"
+• الحجم: 183×36px
+• الموقع: (1321, 153)
+• اللون: rgb(201, 209, 217)
+• الخلفية: oklab(0.999994 0.0000455678 0.0000200868 / 0.1)
+• الخط: 12px 500
+
+غير اسمها الى اوكي تمام
+الآن أرى الكود! دعني أبحث عن زر "يوحنا" وأغير اسمه إلى "اوكي تمام":
+
+دعني أبحث عن الجزء الصحيح في الكود:
+
+دعني أبحث أيضاً في الجزء الآخر من الكود:
+
+دعني أبحث عن المتغير userName وأغير قيمته:
+
+
+
+
+4 إجراء
+edit_component
+{"error":"old_text not found in file. Make sure the text matches exactly including whitespace.","path":"src/pages/Dashboard.tsx","fileLines":1497}
+نفذ
+دعني أفحص الموقع أولاً لأرى الأيقونة التي تقصدها:
+
+دعني أفحص الكود مباشرة لأرى الأيقونات:
+
+أرى الكود الآن! أرى أن الأيقونة التي تقصدها هي أيقونة LayoutTemplate في الهيدر (السطر 130). دعني أحذفها:
+
+
+2 إجراء
+view_page_source
+{"path":"src/pages/Dashboard.tsx","lines":1497,"size":68599,"content":"import React, { useState, useRef, useEffect, useCallback } from \"react\";\nimport { createPortal } from \"react-dom\";\nimport { Link, useLocation } from \"wouter\";\nimport { format } from \"date-fns\";\nimport { motion, AnimatePresence } from \"framer-motion\";\nimport { Plus, LayoutTemplate, Trash2, Loader2, Coins, LogOut, CreditCard, Users, ShieldCheck, Activity, Globe, ExternalLink, Square, RefreshCw, Rocket, Bell, Palette, Home, Smartphone, Play, BarChart2, Gamepad2, FileText, Settings, BookOpen, Gift, Search, ChevronDown, Upload, UploadCloud, Download, Cpu, Wand2, Camera, ArrowRight, Check, X, Bot, FolderGit2, Plug, ChevronRight, Shield, Crown, Lock, Database, Crosshair, FlaskConical, Send, Copy, Server, Maximize2, Minimize2, MousePointer2 } from \"lucide-react\";\nimport AdminFilesPanel from \"@/components/AdminFilesPanel\";\nimport { useI18n } from \"@/lib/i18n\";\nimport { LanguageToggle } from \"@/components/LanguageToggle\";\nimport type { Project, ProjectStatus as ProjectStatusType } from \"@workspace/api-client-react\";\nimport type { DeploymentResponse } from \"@workspace/api-client-react\";\nimport { \n  useListProjects, \n  useCreateProject, \n  useDeleteProject, \n  useGetTokenSummary,\n  useAuthLogout,\n  useGetMe,\n  useListDeployments,\n  useUndeployProject,\n  useRedeployProject,\n} from \"@workspace/api-client-react\";\n\nfunction FigmaIcon() {\n  return (\n    <svg width=\"16\" height=\"16\" viewBox=\"0 0 38 57\" fill=\"none\">\n      <path d=\"M19 28.5a9.5 9.5 0 1 1 19 0 9.5 9.5 0 0 1-19 0z\" fill=\"#1ABCFE\"/>\n      <path d=\"M0 47.5A9.5 9.5 0 0 1 9.5 38H19v9.5a9.5 9.5 0 0 1-19 0z\" fill=\"#0ACF83\"/>\n      <path d=\"M19 0v19h9.5a9.5 9.5 0 0 0 0-19H19z\" fill=\"#FF7262\"/>\n      <path d=\"M0 9.5A9.5 9.5 0 0 0 9.5 19H19V0H9.5A9.5 9.5 0 0 0 0 9.5z\" fill=\"#F24E1E\"/>\n      <path d=\"M0 28.5A9.5 9.5 0 0 0 9.5 38H19V19H9.5A9.5 9.5 0 0 0 0 28.5z\" fill=\"#A259FF\"/>\n    </svg>\n  );\n}\n\nfunction ReplitLogo() {\n  return (\n    <svg width=\"20\" height=\"20\" viewBox=\"0 0 20 20\" fill=\"none\">\n      <path d=\"M4 4H10V10H4V4Z\" fill=\"#F26207\"/>\n      <path d=\"M10 4H16V10H10V4Z\" fill=\"#F26207\" fillOpacity=\"0.6\"/>\n      <path d=\"M4 10H10V16H4V10Z\" fill=\"#F26207\" fillOpacity=\"0.6\"/>\n      <path d=\"M10 10H16V16H10V10Z\" fill=\"#F26207\"/>\n    </svg>\n  );\n}\n\nexport default function Dashboard() {\n  const { t, lang } = useI18n();\n  const [isModalOpen, setIsModalOpen] = useState(false);\n  const [infraChatAgent, setInfraChatAgent] = useState<SidebarInfraAgent | null>(null);\n  const [showFilesPanel, setShowFilesPanel] = useState(false);\n  \n  const { data: projectsData, isLoading: loadingProjects, refetch } = useListProjects();\n  const { data: tokenSummary } = useGetTokenSummary();\n  const { data: deploymentsData, refetch: refetchDeployments } = useListDeployments();\n  const { data: me } = useGetMe({ query: { queryKey: [\"getMe\"], retry: false } });\n  const isAdmin = (me as any)?.role === \"admin\";\n  const logout = useAuthLogout();\n  const userName = (me as any)?.name || (me as any)?.displayName || (me as any)?.email?.split(\"@\")[0] || \"User\";\n\n  const [infraAccessEnabled, setInfraAccessEnabled] = useState(true);\n  const [infraToggleLoading, setInfraToggleLoading] = useState(false);\n\n  useEffect(() => {\n    if (!isAdmin) return;\n    fetch(\"/api/infra/access-status\", { credentials: \"include\" })\n      .then(r => r.json())\n      .then(d => { if (typeof d.enabled === \"boolean\") setInfraAccessEnabled(d.enabled); })\n      .catch(() => {});\n  }, [isAdmin]);\n\n  const toggleInfraAccess = async () => {\n    setInfraToggleLoading(true);\n    try {\n      const res = await fetch(\"/api/infra/access-toggle\", {\n        method: \"POST\",\n        headers: { \"Content-Type\": \"application/json\" },\n        credentials: \"include\",\n        body: JSON.stringify({ enabled: !infraAccessEnabled }),\n      });\n      const data = await res.json();\n      if (typeof data.enabled === \"boolean\") setInfraAccessEnabled(data.enabled);\n    } catch {}\n    setInfraToggleLoading(false);\n  };\n\n  const [, navigate] = useLocation();\n  const createProjectMut = useCreateProject();\n\n  const handleLogout = async () => {\n    await logout.mutateAsync();\n    window.location.href = \"/\";\n  };\n\n  const handleStartProject = async (idea: string) => {\n    if (!idea.trim()) return;\n    try {\n      const projName = idea.length > 40 ? idea.substring(0, 40) + \"...\" : idea;\n      const result = await createProjectMut.mutateAsync({ data: { name: projName, description: idea } });\n      const newProjectId = (result as any)?.id;\n      if (newProjectId) {\n        navigate(`/project/${newProjectId}?prompt=${encodeURIComponent(idea)}`);\n      }\n    } catch (err) {\n      console.error(\"Failed to create project for idea:\", err);\n    }\n  };\n\n  return (\n    <div className=\"h-scree
