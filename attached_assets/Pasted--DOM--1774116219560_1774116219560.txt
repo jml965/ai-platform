@@ -1,0 +1,124 @@
+المطلوب: إصلاح نهائي لنظام DOM + منع التعليق + الحفاظ على الأمان
+
+========================================
+
+1. تعريف مصادر التحقق (Source of Truth)
+   ========================================
+
+ALLOW_EDIT_IF:
+
+* hasDOMInspection === true
+  OR
+* search_text وجد النص (file + line)
+  OR
+* المستخدم قدم DOM (class / path / text)
+
+========================================
+2) قبول search_text كبديل DOM
+=============================
+
+إذا search_text returns match:
+
+* file path موجود
+* النص مطابق
+
+→ set hasDOMInspection = true
+→ DOM_SOURCE = "search"
+
+========================================
+3) قبول DOM من المستخدم
+=======================
+
+إذا رسالة المستخدم تحتوي:
+
+* element path
+* class
+* text
+
+→ set hasDOMInspection = true
+→ DOM_SOURCE = "user_input"
+
+========================================
+4) فك الحظر الذكي (NO DEADLOCK)
+===============================
+
+إذا:
+
+DOM مطلوب
+AND الأدوات غير متاحة
+
+→ لا block
+→ استخدم search_text مباشرة
+
+========================================
+5) تقليل صرامة DOM
+==================
+
+DOM check = protection
+NOT = blocker
+
+========================================
+6) Anti-Loop System (الإضافة الجديدة)
+=====================================
+
+let domBlockCount = 0
+
+عند كل:
+
+DOM_INSPECTION_REQUIRED:
+
+→ domBlockCount++
+
+إذا:
+
+domBlockCount >= 3
+
+→ فك الحظر تلقائياً
+→ allow edit_component
+
+مع:
+
+⚠️ تحذير:
+"تم تجاوز شرط DOM بعد 3 محاولات لتجنب التعليق"
+
+→ DOM_SOURCE = "forced_override"
+
+========================================
+7) Logging
+==========
+
+سجل:
+
+* domInspected: true/false
+* DOM_SOURCE:
+
+  * tool
+  * search
+  * user_input
+  * forced_override
+* domBlockCount
+
+========================================
+8) حماية الأمان
+===============
+
+حتى مع فك الحظر:
+
+* لا تسمح بتعديل أكثر من ملف واحد
+* لا تسمح بـ delete_file
+* لا تسمح بـ db_write
+
+========================================
+9) المسار النهائي
+=================
+
+UI_CHANGE:
+
+DOM أو search أو user_input
+→ read_file
+→ edit_component
+→ screenshot
+→ verify
+
+========================================
+ابدأ التنفيذ الآن

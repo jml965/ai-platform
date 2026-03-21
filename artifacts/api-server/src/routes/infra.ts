@@ -961,11 +961,33 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
       let hasReadAfterSearch = true;
       let hasEdited = false;
       let hasDOMInspection = false;
+      let domSource: "none" | "tool" | "search" | "user_input" | "forced_override" = "none";
+      let domBlockCount = 0;
+      let searchFoundFile = false;
+      let editFileCount = 0;
       let toolActionCount = 0;
       const searchQueriesSet = new Set<string>();
       const searchQueries: string[] = [];
       const MAX_SEARCHES = 3;
       const MAX_ACTIONS_WITHOUT_EDIT = 4;
+      const MAX_DOM_BLOCKS = 3;
+
+      const userDOMPatterns = [
+        /class[=:]\s*["']([^"']+)["']/i,
+        /\bclass(?:Name)?\s*[:=]\s*["']([^"']+)["']/i,
+        /\bid\s*[:=]\s*["']([^"']+)["']/i,
+        /(?:div|span|button|section|nav|header|footer|aside|main|ul|li|a|p|h[1-6])\.[\w.-]+/i,
+        /المسار:\s*[^\n]+/,
+        /النوع:\s*<\w+>/,
+        /العنصر المحدد/,
+      ];
+      const userMsg = typeof message === "string" ? message : "";
+      const hasUserDOMInfo = userDOMPatterns.some(p => p.test(userMsg));
+      if (hasUserDOMInfo) {
+        hasDOMInspection = true;
+        domSource = "user_input";
+        console.log(`[Agent] DOM info detected from user message — DOM_SOURCE=user_input`);
+      }
 
       for (let loop = 0; loop < maxLoops; loop++) {
 
@@ -1115,7 +1137,8 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
 
           if (["get_page_structure", "browse_page", "inspect_styles"].includes(tool.name)) {
             hasDOMInspection = true;
-            console.log(`[Agent] DOM inspection done via ${tool.name} — source of truth check ✓`);
+            domSource = "tool";
+            console.log(`[Agent] DOM inspection done via ${tool.name} — DOM_SOURCE=tool ✓`);
           }
 
           if (tool.name === "edit_component" && !hasDOMInspection) {
@@ -1124,13 +1147,31 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
             const oldText = (tool.input as any)?.old_text || "";
             const hasTextChange = oldText.length > 0 && /[\u0600-\u06FFa-zA-Z]/.test(oldText);
             if (isUIFile && hasTextChange) {
-              const blocked = `❌ DOM_INSPECTION_REQUIRED — ممنوع تعديل نص واجهة بدون فحص DOM أولاً!\n\nالمطلوب قبل edit_component:\n1. get_page_structure → حدد العنصر (class/id)\n2. search_text → ابحث عن النص في الكود\n3. حدد المصدر (i18n / component / API)\n4. ثم edit_component\n\nنفّذ get_page_structure أولاً.`;
-              res.write(`data: ${JSON.stringify({ type: "chunk", text: `\n\n${blocked}\n` })}\n\n`);
-              fullReply += `\n\n${blocked}\n`;
-              console.log(`[Agent] BLOCKED: edit_component on UI file "${editPath}" without DOM inspection`);
-              await logAudit(agentKey, "blocked_no_dom_inspection", tool.name, tool.input, blocked, "medium", "blocked");
-              toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: blocked });
-              continue;
+              if (searchFoundFile) {
+                hasDOMInspection = true;
+                domSource = "search";
+                console.log(`[Agent] DOM bypassed via search_text match — DOM_SOURCE=search ✓`);
+              } else if (domBlockCount >= MAX_DOM_BLOCKS) {
+                hasDOMInspection = true;
+                domSource = "forced_override";
+                const overrideMsg = `⚠️ تم تجاوز شرط DOM بعد ${domBlockCount} محاولات لتجنب التعليق — DOM_SOURCE=forced_override`;
+                res.write(`data: ${JSON.stringify({ type: "chunk", text: `\n\n${overrideMsg}\n` })}\n\n`);
+                fullReply += `\n\n${overrideMsg}\n`;
+                console.log(`[Agent] DOM forced override after ${domBlockCount} blocks — DOM_SOURCE=forced_override`);
+                await logAudit(agentKey, "dom_forced_override", tool.name, { editPath, domBlockCount }, overrideMsg, "medium", "override");
+              } else {
+                domBlockCount++;
+                const hint = searchCount === 0
+                  ? `💡 جرّب search_text للبحث عن النص "${oldText.slice(0, 30)}" في الكود — يكفي كبديل عن DOM.`
+                  : `💡 نتائج البحث موجودة — اقرأ الملف بـ read_file ثم نفّذ edit_component.`;
+                const blocked = `❌ DOM_INSPECTION_REQUIRED (${domBlockCount}/${MAX_DOM_BLOCKS})\n\nالمطلوب:\n• get_page_structure أو browse_page\n• أو search_text يجد النص في ملف\n• أو المستخدم يرسل معلومات DOM\n\n${hint}`;
+                res.write(`data: ${JSON.stringify({ type: "chunk", text: `\n\n${blocked}\n` })}\n\n`);
+                fullReply += `\n\n${blocked}\n`;
+                console.log(`[Agent] BLOCKED: edit_component on UI file "${editPath}" without DOM (block ${domBlockCount}/${MAX_DOM_BLOCKS})`);
+                await logAudit(agentKey, "blocked_no_dom_inspection", tool.name, { ...tool.input, domBlockCount, domSource }, blocked, "medium", "blocked");
+                toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: blocked });
+                continue;
+              }
             }
           }
 
@@ -1184,6 +1225,14 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
           const durationMs = Date.now() - toolStart;
 
           await logAudit(agentKey, "tool_executed", tool.name, tool.input, result?.slice(0, 1000), riskCfg.risk, "success", durationMs);
+
+          if (tool.name === "search_text" && result) {
+            const hasFileMatch = /\.(tsx|jsx|ts|js|css|html|vue|svelte)/.test(result) && result.length > 10;
+            if (hasFileMatch) {
+              searchFoundFile = true;
+              console.log(`[Agent] search_text found file match — searchFoundFile=true, DOM alternative ✓`);
+            }
+          }
 
           let parsedResult: any = null;
           try { parsedResult = JSON.parse(result); } catch {}
@@ -1248,13 +1297,14 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
                   }
                 }
 
+                const domSourceLabels: Record<string, string> = { tool: "أداة DOM", search: "بحث نصي", user_input: "معلومات المستخدم", forced_override: "تجاوز تلقائي" };
                 const domNote = hasDOMInspection
-                  ? `\n📍 مصدر الحقيقة: تم فحص DOM قبل التعديل ✓`
+                  ? `\n📍 مصدر الحقيقة: ${domSourceLabels[domSource] || domSource} ✓`
                   : ``;
                 const deployHint = `\n\n🚀 الخطوة التالية: نفّذ git_push مع message يصف التغيير لنشره على mrcodeai.com. التعديل في dev فقط لا يكفي!`;
                 finalContent = `✅ EDIT_SUCCESS: تم التعديل بنجاح!\n📁 الملف: ${editPath}\n🔄 matchesReplaced: ${matchesReplaced}\n📝 قبل: "${oldText}"\n📝 بعد: "${newText}"${domNote}${uiVerification}${deployHint}\n\n${result}`;
-                console.log(`[Agent] EDIT SUCCESS: matchesReplaced=${matchesReplaced} in ${editPath} | before="${oldText}" → after="${newText}" | domInspected=${hasDOMInspection}`);
-                await logAudit(agentKey, "edit_success", tool.name, { path: editPath, oldText, newText, matchesReplaced, domInspected: hasDOMInspection }, result?.slice(0, 500), "medium", "success", durationMs);
+                console.log(`[Agent] EDIT SUCCESS: matchesReplaced=${matchesReplaced} in ${editPath} | before="${oldText}" → after="${newText}" | domInspected=${hasDOMInspection} | domSource=${domSource} | domBlocks=${domBlockCount}`);
+                await logAudit(agentKey, "edit_success", tool.name, { path: editPath, oldText, newText, matchesReplaced, domInspected: hasDOMInspection, domSource, domBlockCount }, result?.slice(0, 500), "medium", "success", durationMs);
               }
             } else if (tool.name === "write_file" && parsedResult) {
               const writePath = parsedResult.path || (tool.input as any)?.path || "";
