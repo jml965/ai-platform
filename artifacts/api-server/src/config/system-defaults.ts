@@ -130,6 +130,10 @@ export const SYSTEM_DEFAULTS = {
     manage_users: ["run_sql", "db_query"],
     view_secrets: ["get_env"],
     manage_agents: ["read_file", "write_file", "edit_component"],
+    monitor_projects: ["get_project_status", "get_project_logs", "list_project_files"],
+    get_project_status: ["get_project_status"],
+    get_project_logs: ["get_project_logs"],
+    list_project_files: ["list_project_files"],
   } as Record<string, string[]>,
 
   sqlSafety: {
@@ -144,7 +148,7 @@ export const SYSTEM_DEFAULTS = {
     "db_read", "db_write", "db_tables", "manage_schema",
     "install_package", "restart_service", "deploy_status",
     "git_push", "trigger_deploy", "rollback_deploy", "verify_production",
-    "set_env", "get_env", "system_status", "site_health", "manage_agents",
+    "set_env", "get_env", "system_status", "site_health", "manage_agents", "monitor_projects",
   ],
 };
 

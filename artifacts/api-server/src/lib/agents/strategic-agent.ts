@@ -1302,6 +1302,40 @@ export const INFRA_TOOLS = [
       required: ["command"],
     },
   },
+  {
+    name: "get_project_status",
+    description: "Get current status of a user project — stage, progress, active agent, errors. Use when user is on /project/:id or asks about project status.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        projectId: { type: "string", description: "Project UUID from URL or context" },
+      },
+      required: ["projectId"],
+    },
+  },
+  {
+    name: "get_project_logs",
+    description: "Get execution logs for a project — shows what agents did, errors, and timeline. Use to monitor or debug project build process.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        projectId: { type: "string", description: "Project UUID" },
+        limit: { type: "number", description: "Max number of logs to return. Default: 20" },
+      },
+      required: ["projectId"],
+    },
+  },
+  {
+    name: "list_project_files",
+    description: "List all generated files in a user project. Shows file paths and types.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        projectId: { type: "string", description: "Project UUID" },
+      },
+      required: ["projectId"],
+    },
+  },
 ];
 
 function findWorkspaceRoot(): string {
@@ -2242,6 +2276,71 @@ export async function executeInfraTool(toolName: string, input: any, callerRole?
         } catch (e: any) {
           console.log("[run_sql] ERROR:", e?.message);
           return JSON.stringify({ success: false, error: e?.message || "SQL execution failed" });
+        }
+      }
+      case "get_project_status": {
+        try {
+          const { db } = await import("@workspace/db");
+          const { sql: rawSql } = await import("drizzle-orm");
+          const pid = input.projectId as string;
+          const projResult = await db.execute(rawSql.raw(`SELECT id, name, status, prompt, created_at, updated_at FROM projects WHERE id = '${pid.replace(/'/g, "''")}'`));
+          const projRows = Array.isArray(projResult) ? projResult : (projResult as any).rows || [];
+          if (projRows.length === 0) return JSON.stringify({ success: false, error: "المشروع غير موجود", projectId: pid });
+          const proj = projRows[0];
+          const filesResult = await db.execute(rawSql.raw(`SELECT COUNT(*) as count FROM project_files WHERE project_id = '${pid.replace(/'/g, "''")}'`));
+          const filesRows = Array.isArray(filesResult) ? filesResult : (filesResult as any).rows || [];
+          const fileCount = parseInt(filesRows[0]?.count || "0");
+          const logsResult = await db.execute(rawSql.raw(`SELECT agent_type, action, status, created_at FROM execution_logs WHERE project_id = '${pid.replace(/'/g, "''")}' ORDER BY created_at DESC LIMIT 5`));
+          const logRows = Array.isArray(logsResult) ? logsResult : (logsResult as any).rows || [];
+          const lastError = logRows.find((l: any) => l.status === "failed");
+          const activeAgent = logRows.length > 0 ? logRows[0].agent_type : null;
+          const stage = proj.status || "unknown";
+          return JSON.stringify({
+            success: true,
+            project: { id: proj.id, name: proj.name, status: stage, prompt: (proj.prompt || "").slice(0, 200), createdAt: proj.created_at, updatedAt: proj.updated_at },
+            fileCount,
+            activeAgent,
+            hasError: !!lastError,
+            lastError: lastError ? { agent: lastError.agent_type, action: lastError.action, time: lastError.created_at } : null,
+            recentActivity: logRows.map((l: any) => ({ agent: l.agent_type, action: l.action, status: l.status, time: l.created_at })),
+          });
+        } catch (e: any) {
+          return JSON.stringify({ success: false, error: e.message });
+        }
+      }
+      case "get_project_logs": {
+        try {
+          const { db } = await import("@workspace/db");
+          const { sql: rawSql } = await import("drizzle-orm");
+          const pid = input.projectId as string;
+          const limit = Math.min(input.limit || 20, 50);
+          const result = await db.execute(rawSql.raw(`SELECT id, agent_type, action, status, tokens_used, duration_ms, created_at FROM execution_logs WHERE project_id = '${pid.replace(/'/g, "''")}' ORDER BY created_at DESC LIMIT ${limit}`));
+          const rows = Array.isArray(result) ? result : (result as any).rows || [];
+          const logs = rows.map((r: any) => ({
+            time: r.created_at,
+            agent: r.agent_type,
+            action: r.action,
+            status: r.status,
+            tokens: r.tokens_used,
+            durationMs: r.duration_ms,
+            type: r.status === "failed" ? "error" : r.status === "warning" ? "warning" : "info",
+          }));
+          return JSON.stringify({ success: true, projectId: pid, count: logs.length, logs });
+        } catch (e: any) {
+          return JSON.stringify({ success: false, error: e.message });
+        }
+      }
+      case "list_project_files": {
+        try {
+          const { db } = await import("@workspace/db");
+          const { sql: rawSql } = await import("drizzle-orm");
+          const pid = input.projectId as string;
+          const result = await db.execute(rawSql.raw(`SELECT file_path, file_type, version, updated_at FROM project_files WHERE project_id = '${pid.replace(/'/g, "''")}' ORDER BY file_path`));
+          const rows = Array.isArray(result) ? result : (result as any).rows || [];
+          const files = rows.map((r: any) => ({ path: r.file_path, type: r.file_type, version: r.version, updatedAt: r.updated_at }));
+          return JSON.stringify({ success: true, projectId: pid, count: files.length, files });
+        } catch (e: any) {
+          return JSON.stringify({ success: false, error: e.message });
         }
       }
       default:

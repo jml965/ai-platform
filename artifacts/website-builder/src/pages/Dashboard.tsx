@@ -494,7 +494,12 @@ function InfraInlineChat({ agent, lang, onClose }: { agent: SidebarInfraAgent; l
       setMessages(prev => [...prev, { id: streamMsgId, role: "assistant", content: "", timestamp: new Date() }]);
 
       const endpoint = "/api/infra/chat-stream";
-      const body = { agentKey: agent.agentKey, message: currentPrompt };
+      const pageContext = {
+        currentPage: window.location.pathname,
+        projectId: window.location.pathname.match(/\/project\/([^/]+)/)?.[1] || null,
+        mode: "dashboard" as const,
+      };
+      const body = { agentKey: agent.agentKey, message: currentPrompt, context: pageContext };
 
       const res = await fetch(endpoint, {
         method: "POST",

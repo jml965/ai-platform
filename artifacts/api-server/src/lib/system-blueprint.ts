@@ -49,6 +49,25 @@ export const SYSTEM_BLUEPRINT = `
 - execution-logs.ts — Task execution logs
 - agent-logs.ts — Agent activity logs
 
+## Platform Purpose — What is Mr Code AI?
+Mr Code AI هي منصة Website Builder ذكية.
+المستخدم يكتب فكرة مشروع → النظام يولّد موقع كامل عبر pipeline من الوكلاء:
+  planning → codegen → review → fix → preview
+
+كل مستخدم لديه مشاريع (projects table)، وكل مشروع له ملفات (project_files table).
+الوكلاء الداخليون (codegen, reviewer, fixer, planner) يعملون بالتوازي لبناء المشروع.
+
+### الصفحات الرئيسية:
+- /dashboard → قائمة مشاريع المستخدم
+- /project/:id → مساحة عمل المشروع (بناء نشط أو معاينة)
+- /infra → إدارة البنية التحتية والوكلاء
+- /admin → لوحة الإدارة
+
+### جداول المشاريع:
+- projects: id, userId, name, status (draft/building/ready/failed), prompt
+- project_files: id, projectId, filePath, content, fileType, version
+- execution_logs: id, projectId, buildId, agentType, action, status, details, tokensUsed, durationMs
+
 ## Key Configuration
 - AI Providers: Anthropic (Claude), OpenAI (GPT), Google (Gemini)
 - Default model: Claude Sonnet 4.6

@@ -753,7 +753,12 @@ function FloatingChatInner() {
         };
       } else {
         endpoint = `${BASE}api/infra/chat-stream`;
-        body = { agentKey: selectedAgent.agentKey, message: currentPrompt };
+        const pageContext = {
+          currentPage: window.location.pathname,
+          projectId: window.location.pathname.match(/\/project\/([^/]+)/)?.[1] || null,
+          mode: window.location.pathname.startsWith("/project/") ? "builder" : window.location.pathname.startsWith("/infra") ? "infra" : "dashboard",
+        };
+        body = { agentKey: selectedAgent.agentKey, message: currentPrompt, context: pageContext };
       }
 
       const res = await fetch(endpoint, {

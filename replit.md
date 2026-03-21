@@ -44,7 +44,7 @@ The platform employs a pnpm workspace monorepo structure, separating deployable 
 - **Real-time Updates:** Server-Sent Events (SSE) for build process and sandbox execution updates.
 - **Real-time Collaboration:** WebSocket-based system for simultaneous multi-user project work.
 - **Custom Domains:** Allows linking custom domains with automatic DNS verification and SSL.
-- **Infrastructure Agents Panel:** A dedicated admin panel at `/infra` for platform owner to manage and develop the platform via AI agents (System Director, Bug Fixer, Feature Builder, Security Guard, Deployment Agent). Features a Controlled AI Runtime with approval engine, audit logs, tool risk configuration, DB safety measures, and a kill switch.
+- **Infrastructure Agents Panel:** A dedicated admin panel at `/infra` for platform owner to manage and develop the platform via AI agents (System Director, Bug Fixer, Feature Builder, Security Guard, Deployment Agent). Features a Controlled AI Runtime with approval engine, audit logs, tool risk configuration, DB safety measures, and a kill switch. Includes System Awareness: page context injection (currentPage, projectId, mode), platform purpose in system blueprint, and project monitoring tools (get_project_status, get_project_logs, list_project_files) with auto-monitoring mode.
 - **Authentication:** Environment-aware authentication, requiring real auth in production and auto-injecting an admin user in development.
 - **Admin Dashboard:** A separate dashboard at `/admin` for platform-wide statistics and cost analysis.
 - **Analytics Dashboard:** Provides per-project analytics including visitor stats and traffic sources.

@@ -48,6 +48,9 @@ const TOOL_RISK_CONFIG: Record<string, { risk: string; category: string; require
   remote_server_api: { risk: "high", category: "deploy", requiresApproval: true, sandboxed: false },
   rollback_deploy: { risk: "high", category: "deploy", requiresApproval: true, sandboxed: false },
   verify_production: { risk: "medium", category: "deploy", requiresApproval: false, sandboxed: false },
+  get_project_status: { risk: "low", category: "monitoring", requiresApproval: false, sandboxed: false },
+  get_project_logs: { risk: "low", category: "monitoring", requiresApproval: false, sandboxed: false },
+  list_project_files: { risk: "low", category: "monitoring", requiresApproval: false, sandboxed: false },
 };
 
 function isSafeSQL(query: string): { safe: boolean; reason?: string } {
@@ -154,7 +157,7 @@ const DEFAULT_INFRA_AGENTS = [
 - ممنوع كتابة مسارات مطلقة مثل /app/... أو /home/runner/... — دائماً مسارات نسبية من جذر المشروع.
 - مثال: read_file({ path: "artifacts/website-builder/src/pages/Dashboard.tsx" })
 - مثال: exec_command({ command: "ls artifacts/website-builder/src/pages/" })`,
-    permissions: ["manage_agents", "read_all_files", "database_read", "view_logs", "check_health", "monitor_performance", "approvals", "kill_switch", "system_status"],
+    permissions: ["manage_agents", "read_all_files", "database_read", "view_logs", "check_health", "monitor_performance", "approvals", "kill_switch", "system_status", "monitor_projects"],
     pipelineOrder: 1,
     receivesFrom: "owner_input",
     sendsTo: "all_agents",
@@ -487,6 +490,20 @@ DATABASE:
    ✔ تم: الملف + قبل/بعد + التغيير
    أو ❌ فشل: السبب بوضوح
 
+═══════════════════════════════════════
+وضع المراقبة التلقائي (Auto Monitoring)
+═══════════════════════════════════════
+إذا المستخدم قال "راقب" أو "تابع" أو "monitor" أو "status":
+  1. اقرأ السياق (📍) — استخرج projectId
+  2. إذا فيه projectId → نفّذ get_project_status فوراً
+  3. ثم get_project_logs(limit: 10)
+  4. قدّم تقرير مختصر:
+     - حالة المشروع (stage)
+     - الوكيل النشط
+     - آخر 5 عمليات
+     - أي أخطاء
+  5. إذا ما فيه projectId → قل "أنت لست في صفحة مشروع. أعطني رقم المشروع أو انتقل لصفحة /project/:id"
+
 أجب بالعربية دائماً.`,
     instructions: `## محرك التنفيذ — التعليمات التشغيلية
 
@@ -529,7 +546,7 @@ DATABASE:
 2. DOM → search (text) → search (class) → read_file → edit_component
 3. تحقق من النتيجة بـ screenshot_page
 4. أبلغ بالتفاصيل: ملف + قبل/بعد + النتيجة`,
-    permissions: ["read_file", "search_text", "list_files", "list_components", "view_page_source", "get_page_structure", "browse_page", "screenshot_page", "scroll_page", "get_console_errors", "write_file", "edit_component", "create_component", "delete_file", "modify_styles", "db_read", "db_write", "db_tables", "manage_schema", "install_package", "restart_service", "deploy_status", "git_push", "trigger_deploy", "rollback_deploy", "verify_production", "set_env", "get_env", "system_status", "site_health", "manage_agents"],
+    permissions: ["read_file", "search_text", "list_files", "list_components", "view_page_source", "get_page_structure", "browse_page", "screenshot_page", "scroll_page", "get_console_errors", "write_file", "edit_component", "create_component", "delete_file", "modify_styles", "db_read", "db_write", "db_tables", "manage_schema", "install_package", "restart_service", "deploy_status", "git_push", "trigger_deploy", "rollback_deploy", "verify_production", "set_env", "get_env", "system_status", "site_health", "manage_agents", "monitor_projects"],
     pipelineOrder: 6,
     receivesFrom: "infra_sysadmin",
     sendsTo: "infra_sysadmin",
@@ -702,7 +719,7 @@ router.get("/infra/agents", requireInfraAdmin, async (_req, res) => {
 router.post("/infra/chat-stream", requireInfraAdmin, async (req, res) => {
   try {
     const userId = req.user!.id;
-    const { agentKey, message } = req.body as { agentKey: string; message: string };
+    const { agentKey, message, context } = req.body as { agentKey: string; message: string; context?: { currentPage?: string; projectId?: string | null; mode?: string } };
 
     if (!message?.trim()) {
       res.status(400).json({ error: { message: "Message is required" } });
@@ -972,6 +989,10 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
       manage_users: ["run_sql", "db_query"],
       view_secrets: ["get_env"],
       manage_agents: ["read_file", "write_file", "edit_component"],
+      monitor_projects: ["get_project_status", "get_project_logs", "list_project_files"],
+      get_project_status: ["get_project_status"],
+      get_project_logs: ["get_project_logs"],
+      list_project_files: ["list_project_files"],
     };
 
     const agentPerms = config.permissions || [];
@@ -989,9 +1010,18 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
     const EMERGENCY_ONLY_TOOLS = new Set(["run_command", "exec_command"]);
     filteredTools = filteredTools.filter((t: any) => !EMERGENCY_ONLY_TOOLS.has(t.name));
 
+    let enrichedMessage = message;
+    if (context?.currentPage) {
+      const ctxLines: string[] = [`📍 السياق:`];
+      ctxLines.push(`• الصفحة: ${context.currentPage}`);
+      if (context.projectId) ctxLines.push(`• المشروع: ${context.projectId}`);
+      ctxLines.push(`• الوضع: ${context.mode || "unknown"}`);
+      enrichedMessage = `${ctxLines.join("\n")}\n\n📝 رسالة المستخدم:\n${message}`;
+    }
+
     const conversationMessages = [
       ...history.slice(-20),
-      { role: "user" as const, content: message },
+      { role: "user" as const, content: enrichedMessage },
     ];
 
     if (slot.provider === "anthropic") {
