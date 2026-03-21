@@ -765,32 +765,40 @@ ${blueprint}
 
 ⛔⛔⛔ قواعد مطلقة — انتهاك أي منها = فشل ⛔⛔⛔
 
-1. ممنوع ترجع JSON مثل {"decisionType": "investigation", ...}. هذا ممنوع تماماً. المالك يريد تنفيذ، مو تحليل.
+1. ممنوع ترجع JSON مثل {"decisionType": "investigation", ...}. المالك يريد تنفيذ، مو تحليل.
 
-2. لما يُطلب تعديل/حذف/إيجاد أي نص → الخطوات بالترتيب:
-   خطوة 1: search_text({text: "النص المطلوب"}) ← يعطيك الملف والسطر
-   خطوة 2: read_file({path: "المسار"}) ← تقرأ الملف
-   خطوة 3: edit_component({componentPath: "المسار النسبي", old_text: "القديم", new_text: "الجديد"}) ← تعدّل
+2. لما يُطلب تعديل/حذف/إيجاد أي نص → 3 خطوات فقط:
+   خطوة 1: search_text ← يعطيك الملف والسطر
+   خطوة 2: read_file ← تقرأ الملف وتفهم السياق
+   خطوة 3: edit_component ← تعدّل مباشرة
+   لا تزيد عن 3 خطوات! بحث → قراءة → تعديل → انتهى.
 
-3. مثال عملي:
+3. ⛔⛔ قاعدة حد البحث (مهمة جداً!) ⛔⛔
+   - ممنوع search_text أكثر من 3 مرات في المحادثة الواحدة.
+   - بعد أول نتيجة بحث ناجحة → يجب read_file فوراً. ممنوع بحث آخر قبل قراءة ملف.
+   - ممنوع تكرار نفس البحث مرتين. إذا بحثت عن "displayName" مرة → لا تبحث عنها ثانية.
+   - إذا وصلت 3 عمليات بحث ولم تنفذ edit → توقف واطلب توجيه المالك.
+   - النظام سيمنعك تلقائياً من تجاوز هذا الحد.
+
+4. ⛔ قاعدة التنفيذ الإجباري ⛔
+   - إذا مرت 5 خطوات (loops) بدون edit_component أو write_file → النظام يوقفك تلقائياً.
+   - لا تبحث أكثر ← اقرأ ← نفّذ ← أبلغ.
+   - بعد read_file إذا وجدت النص المطلوب → نفّذ edit_component فوراً.
+
+5. مثال عملي:
    المالك: "غيّر يوحنا إلى تمام"
-   ✅ الصحيح:
-     → search_text({text: "يوحنا"}) → يلقاها في artifacts/website-builder/src/lib/i18n.tsx:1348
+   ✅ الصحيح (3 خطوات):
+     → search_text({text: "يوحنا"}) → لقاها في i18n.tsx
      → read_file({path: "artifacts/website-builder/src/lib/i18n.tsx"})
-     → edit_component({componentPath: "src/lib/i18n.tsx", old_text: 'home_create_app: "يوحنا"', new_text: 'home_create_app: "تمام"'})
-     → رد: "تم التغيير ✅"
-   ❌ الغلط:
-     → JSON: {"decisionType": "investigation"} ← هذا فشل!
+     → edit_component({componentPath: "src/lib/i18n.tsx", old_text: '"يوحنا"', new_text: '"تمام"'})
+     → رد: "تم ✅"
+   ❌ الغلط: 10+ عمليات search بعبارات مختلفة بدون تعديل
 
-4. دائماً search_text أولاً! لا تخمن أين النص. ابحث ← لقى ← عدّل.
+6. إذا search_text ما لقت في الملفات → جرب db_query مرة واحدة فقط.
 
-5. إذا search_text ما لقت شيء → جرب db_query("SELECT * FROM users WHERE display_name LIKE '%يوحنا%'")
+7. ممنوع تقول "تم" بدون استدعاء أداة فعلاً.
 
-6. ممنوع تقول "حذفته" أو "تم" بدون ما تستدعي أداة فعلاً.
-
-7. ممنوع أوامر bash وهمية. استخدم أدواتك الحقيقية.
-
-8. في الإنتاج: edit_component يبني الواجهة فوراً ويرفع GitHub. التغييرات فورية!
+8. في الإنتاج: edit_component يبني الواجهة فوراً. التغييرات فورية!
 
 ⚠️ بنية المسارات:
 - الواجهة: artifacts/website-builder/src/
@@ -897,8 +905,27 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
         .filter(m => m.role !== "system")
         .map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
 
-      const maxLoops = 15;
+      const maxLoops = 10;
+      let searchCount = 0;
+      let hasReadAfterSearch = true;
+      let hasEdited = false;
+      let toolActionCount = 0;
+      const searchQueriesSet = new Set<string>();
+      const searchQueries: string[] = [];
+      const MAX_SEARCHES = 3;
+      const MAX_ACTIONS_WITHOUT_EDIT = 6;
+
       for (let loop = 0; loop < maxLoops; loop++) {
+
+        if (toolActionCount >= MAX_ACTIONS_WITHOUT_EDIT && !hasEdited) {
+          const failMsg = `\n\n⚠️ تم إيقاف الوكيل — ${toolActionCount} أداة بدون تنفيذ تعديل. يرجى توجيه المالك.\n`;
+          res.write(`data: ${JSON.stringify({ type: "chunk", text: failMsg })}\n\n`);
+          fullReply += failMsg;
+          console.log(`[Agent] STOPPED: ${toolActionCount} tool actions without edit. searchCount=${searchCount}, queries=${JSON.stringify(searchQueries)}`);
+          await logAudit(agentKey, "agent_stopped_no_edit", "system", { toolActionCount, searchCount, searchQueries }, failMsg, "medium", "stopped");
+          break;
+        }
+
         const stream = client.messages.stream({
           model: slot.model,
           max_tokens: Math.min(slot.maxTokens || 32000, 64000),
@@ -965,6 +992,53 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
               toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: blocked });
               continue;
             }
+          }
+
+          toolActionCount++;
+
+          if (tool.name === "search_text") {
+            const query = (tool.input as any)?.text || "";
+            const normalizedQuery = query.trim().toLowerCase();
+
+            if (searchQueriesSet.has(normalizedQuery)) {
+              const blocked = `⛔ REPEATED_SEARCH_BLOCKED — البحث عن "${query}" تم من قبل. النتائج السابقة لا تزال صالحة. اقرأ الملف باستخدام read_file ثم نفّذ edit_component.`;
+              console.log(`[Agent] BLOCKED: Repeated search query="${query}" (already searched: ${JSON.stringify(searchQueries)})`);
+              await logAudit(agentKey, "search_repeated_blocked", tool.name, tool.input, blocked, "low", "blocked");
+              toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: blocked });
+              continue;
+            }
+
+            if (!hasReadAfterSearch && searchCount > 0) {
+              const blocked = `⛔ MUST_READ_FIRST — يجب أن تقرأ ملف أولاً (read_file) قبل بحث جديد. آخر بحث أعطاك نتائج — اقرأ الملف ونفّذ التعديل.`;
+              console.log(`[Agent] BLOCKED: Search without read_file after previous search. searchCount=${searchCount}`);
+              await logAudit(agentKey, "search_without_read_blocked", tool.name, tool.input, blocked, "low", "blocked");
+              toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: blocked });
+              continue;
+            }
+
+            if (searchCount >= MAX_SEARCHES) {
+              const blocked = `⛔ SEARCH_LIMIT_REACHED — بحثت ${searchCount} مرات (الحد الأقصى ${MAX_SEARCHES}). ممنوع بحث إضافي. اقرأ الملف أو نفّذ التعديل مباشرة. عمليات البحث السابقة: ${searchQueries.join(", ")}`;
+              console.log(`[Agent] BLOCKED: Search limit reached (${searchCount}/${MAX_SEARCHES})`);
+              await logAudit(agentKey, "search_limit_reached", tool.name, { searchCount, queries: searchQueries }, blocked, "low", "blocked");
+              toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: blocked });
+              continue;
+            }
+
+            searchCount++;
+            searchQueriesSet.add(normalizedQuery);
+            searchQueries.push(query);
+            hasReadAfterSearch = false;
+            console.log(`[Agent] Search #${searchCount}/${MAX_SEARCHES}: "${query}"`);
+          }
+
+          if (tool.name === "read_file" || tool.name === "view_page_source") {
+            hasReadAfterSearch = true;
+            console.log(`[Agent] Read file after search — ready to edit`);
+          }
+
+          if (tool.name === "edit_component" || tool.name === "write_file" || tool.name === "create_component") {
+            hasEdited = true;
+            console.log(`[Agent] Edit executed — task progressing`);
           }
 
           if (riskCfg.requiresApproval) {
@@ -1048,6 +1122,15 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
         }
         chatMsgs.push({ role: "user", content: toolResults });
       }
+
+      console.log(`[Agent] Session complete: toolActions=${toolActionCount}, searchCount=${searchCount}, hasEdited=${hasEdited}, queries=${JSON.stringify(searchQueries)}`);
+      await logAudit(agentKey, "session_summary", "system", {
+        toolActionCount,
+        searchCount,
+        hasEdited,
+        searchQueries,
+      }, { fullReplyLength: fullReply.length }, "low", hasEdited ? "success" : "completed");
+
     } else if (slot.provider === "google") {
       const { getGoogleClient } = await import("../lib/agents/ai-clients");
       const client = await getGoogleClient();
