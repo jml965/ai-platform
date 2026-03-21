@@ -310,8 +310,8 @@ PRODUCTION SERVER TOOLS:
 3. NEVER say "I pressed the button" or "I deleted it" or "Done" WITHOUT actually calling a tool first. The user can SEE if you called a tool or not.
 4. If asked to delete a button → call edit_component with the exact code to remove. If asked to read a file → call read_file. If asked about DB → call db_query. NO EXCEPTIONS.
 5. When asked to see the site → call screenshot_page. When asked to click → call click_element. NEVER describe what you "see" without taking a real screenshot.
-6. You are a REAL executor. In DEVELOPMENT: changes take effect IMMEDIATELY via Vite HMR. In PRODUCTION: changes are automatically pushed to GitHub and trigger a redeploy (~3 min). The tool response will confirm "githubPushed: true".
-7. FOR CODE EDITS: First read_file/view_page_source → then edit_component → confirm the tool response shows success. FOR DB/SERVER/ENV tasks: use the appropriate tool directly (db_query, exec_command, set_env, etc).
+6. You are a REAL executor. In DEVELOPMENT: changes take effect IMMEDIATELY via Vite HMR. In PRODUCTION: edit_component automatically rebuilds the frontend LIVE on the server AND pushes to GitHub. The tool response will confirm "liveRebuilt: true, githubPushed: true". Changes are INSTANT.
+7. FOR CODE EDITS: First read_file/view_page_source → then edit_component → confirm the tool response shows success (liveRebuilt: true). FOR DB/SERVER/ENV tasks: use the appropriate tool directly (db_query, exec_command, set_env, etc).
 8. If you cannot do something, say "لا أستطيع" (I cannot). NEVER fake it.
 
 Key infrastructure info:
@@ -1368,12 +1368,28 @@ export async function executeInfraTool(toolName: string, input: any, callerRole?
         const newContent = currentContent.replace(input.old_text, input.new_text);
         fs.writeFileSync(resolved, newContent, "utf-8");
         if (IS_PRODUCTION) {
+          let buildResult = "skipped";
+          try {
+            execSync("pnpm --filter @workspace/website-builder run build", { cwd: PROJECT_ROOT, timeout: 120000, encoding: "utf-8", env: { ...process.env, NODE_ENV: "development" } });
+            buildResult = "success";
+          } catch (buildErr: any) {
+            buildResult = `failed: ${(buildErr?.stderr || buildErr?.message || "").slice(0, 500)}`;
+          }
           const ghPath = `artifacts/website-builder/${input.componentPath}`;
           const ghResult = await pushFileToGitHub(ghPath, newContent, `Agent edit: ${input.componentPath}`);
-          if (!ghResult.success) {
-            return JSON.stringify({ success: false, localEdit: true, githubPush: false, error: ghResult.error, path: input.componentPath, note: "File edited locally but GitHub push failed. Changes will be lost on redeploy." });
-          }
-          return JSON.stringify({ success: true, path: input.componentPath, matchesReplaced: count, newSize: Buffer.byteLength(newContent), production: true, githubPushed: true, note: "Changes pushed to GitHub. Auto-deploy will apply changes in ~3 minutes." });
+          return JSON.stringify({
+            success: buildResult === "success",
+            path: input.componentPath,
+            matchesReplaced: count,
+            production: true,
+            liveRebuilt: buildResult === "success",
+            buildResult,
+            githubPushed: ghResult.success,
+            githubError: ghResult.success ? undefined : ghResult.error,
+            note: buildResult === "success"
+              ? "Changes applied LIVE on server and pushed to GitHub."
+              : `Build failed: ${buildResult}. Changes pushed to GitHub for next deploy.`,
+          });
         }
         return JSON.stringify({ success: true, path: input.componentPath, matchesReplaced: count, newSize: Buffer.byteLength(newContent) });
       }
