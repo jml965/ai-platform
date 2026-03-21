@@ -1205,6 +1205,44 @@ export const INFRA_TOOLS = [
       required: ["query"],
     },
   },
+  {
+    name: "search_text",
+    description: "Search for ANY text/string across ALL project files. Like grep — finds every file containing the text. ALWAYS use this FIRST when you need to find where a specific text, label, variable name, translation key, CSS class, or ANY string appears in the codebase. This is your most powerful tool for locating code. Use it before read_file to know exactly which file and line to look at.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        text: { type: "string", description: "Text to search for. Can be any string — Arabic, English, code, CSS class, variable name, etc." },
+        directory: { type: "string", description: "Directory to search in (relative to project root). Default: searches entire project. Example: 'artifacts/website-builder/src'" },
+        filePattern: { type: "string", description: "File pattern filter. Example: '*.tsx' or '*.ts' or '*.css'. Default: all files" },
+      },
+      required: ["text"],
+    },
+  },
+  {
+    name: "list_files",
+    description: "List all files and folders in a directory. Use to explore project structure and find relevant files.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        directory: { type: "string", description: "Directory path relative to project root. Default: root directory" },
+        recursive: { type: "boolean", description: "List files recursively including subdirectories. Default: false" },
+        pattern: { type: "string", description: "Filter by file extension pattern, e.g. '*.tsx' or '*.ts'" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "run_command",
+    description: "Run a shell command on the server. Use for: installing packages, running builds, checking git status, or any terminal command. Returns stdout and stderr.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        command: { type: "string", description: "Shell command to execute" },
+        cwd: { type: "string", description: "Working directory. Default: project root" },
+      },
+      required: ["command"],
+    },
+  },
 ];
 
 function findWorkspaceRoot(): string {
@@ -1704,6 +1742,64 @@ export async function executeInfraTool(toolName: string, input: any, callerRole?
           return JSON.stringify({ success: true, message: `Pushed to ${branch}`, output: pushOut.slice(0, 5000) });
         } catch (e: any) {
           return JSON.stringify({ success: false, error: (e?.stderr || e?.message || "").slice(0, 5000) });
+        }
+      }
+      case "search_text": {
+        try {
+          const searchText = input.text as string;
+          const dir = input.directory ? path.resolve(PROJECT_ROOT, input.directory) : PROJECT_ROOT;
+          if (!dir.startsWith(PROJECT_ROOT)) return JSON.stringify({ error: "Access denied" });
+          const filePattern = input.filePattern || "";
+          let grepCmd = `grep -rn --include='${filePattern || "*"}' -l "${searchText.replace(/"/g, '\\"')}" "${dir}" 2>/dev/null | head -30`;
+          if (!filePattern) {
+            grepCmd = `grep -rn "${searchText.replace(/"/g, '\\"')}" "${dir}" --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git --exclude='*.lock' 2>/dev/null | head -50`;
+          }
+          const result = execSync(grepCmd, { encoding: "utf-8", timeout: 10000, cwd: PROJECT_ROOT }).trim();
+          if (!result) return JSON.stringify({ found: false, message: `No matches found for "${searchText}"` });
+          const lines = result.split("\n").map((line: string) => {
+            const rel = line.replace(PROJECT_ROOT + "/", "");
+            return rel;
+          });
+          return JSON.stringify({ found: true, matchCount: lines.length, results: lines });
+        } catch (e: any) {
+          if (e?.status === 1) return JSON.stringify({ found: false, message: `No matches found for "${input.text}"` });
+          return JSON.stringify({ error: e?.message || "Search failed" });
+        }
+      }
+      case "list_files": {
+        try {
+          const dir = input.directory ? path.resolve(PROJECT_ROOT, input.directory) : PROJECT_ROOT;
+          if (!dir.startsWith(PROJECT_ROOT)) return JSON.stringify({ error: "Access denied" });
+          if (!fs.existsSync(dir)) return JSON.stringify({ error: "Directory not found" });
+          const recursive = input.recursive || false;
+          const pattern = input.pattern || "";
+          if (recursive) {
+            let cmd = `find "${dir}" -type f -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/dist/*'`;
+            if (pattern) cmd += ` -name '${pattern}'`;
+            cmd += " | head -200";
+            const result = execSync(cmd, { encoding: "utf-8", timeout: 10000 }).trim();
+            const files = result ? result.split("\n").map((f: string) => f.replace(PROJECT_ROOT + "/", "")) : [];
+            return JSON.stringify({ directory: input.directory || "/", fileCount: files.length, files });
+          }
+          const entries = fs.readdirSync(dir, { withFileTypes: true });
+          const items = entries
+            .filter((e: any) => !e.name.startsWith(".") || [".github", ".env"].includes(e.name))
+            .filter((e: any) => e.name !== "node_modules" && e.name !== "dist")
+            .map((e: any) => ({ name: e.name, type: e.isDirectory() ? "folder" : "file" }));
+          return JSON.stringify({ directory: input.directory || "/", items });
+        } catch (e: any) {
+          return JSON.stringify({ error: e?.message || "List failed" });
+        }
+      }
+      case "run_command": {
+        try {
+          const cmd = input.command as string;
+          const cwd = input.cwd ? path.resolve(PROJECT_ROOT, input.cwd) : PROJECT_ROOT;
+          if (!cwd.startsWith(PROJECT_ROOT)) return JSON.stringify({ error: "Access denied" });
+          const result = execSync(cmd, { encoding: "utf-8", timeout: 30000, cwd, maxBuffer: 1024 * 1024 });
+          return JSON.stringify({ success: true, output: result.slice(0, 50000) });
+        } catch (e: any) {
+          return JSON.stringify({ success: false, stdout: (e?.stdout || "").slice(0, 10000), stderr: (e?.stderr || "").slice(0, 10000), error: e?.message });
         }
       }
       case "run_sql": {
