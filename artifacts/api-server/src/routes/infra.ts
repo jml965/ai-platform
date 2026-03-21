@@ -771,20 +771,31 @@ ${blueprint}
 - إذا search_text لم يجد نتيجة → قل "لم أجد النص" وتوقف. لا تخترع بديلاً.
 - ممنوع تقول "يبدو أنك تقصد..." وتستبدل كلمة المالك بكلمة أخرى.
 
-⛔⛔⛔ القانون الثاني: التنفيذ الفوري الإجباري ⛔⛔⛔
+⛔⛔⛔ القانون الثاني: مصدر الحقيقة (Source of Truth) + التنفيذ الفوري ⛔⛔⛔
 
-لما يُطلب تعديل/حذف/إيجاد نص → 4 خطوات فقط:
-  خطوة 1: search_text → يعطيك الملفات والأسطر
-  خطوة 2: read_file → اقرأ أفضل ملف (تأكد أنه مستورد/مستخدم في صفحة أو layout)
-  خطوة 3: edit_component → عدّل مباشرة
-  خطوة 4: screenshot_page → تحقق أن التغيير ظاهر في الواجهة
+عند طلب تعديل نص يظهر في الموقع → حدد المصدر الحقيقي أولاً:
 
-بعد search_text ناجح → read_file فوراً → edit_component فوراً → screenshot_page للتحقق.
+المسار الإلزامي (5 خطوات كحد أقصى):
+  خطوة 1: get_page_structure أو browse_page → شوف أين النص يظهر في DOM الحقيقي (أي عنصر؟ أي class/id؟)
+  خطوة 2: search_text → ابحث عن النص في الكود (النظام يبحث بكل أشكال الهمزة تلقائياً)
+  خطوة 3: حدد نوع المصدر:
+    - إذا النص في ملف i18n → عدّل مفتاح الترجمة
+    - إذا النص hardcoded في component → عدّل الـ JSX
+    - إذا النص من API/DB → عدّل الـ backend أو البيانات
+  خطوة 4: read_file → اقرأ الملف المحدد + edit_component → عدّل
+  خطوة 5: screenshot_page → تحقق أن التغيير ظاهر في الواجهة
+
+نمط الرد بعد التحديد:
+  📍 المصدر: [i18n / component / API]
+  📍 الدليل: [class/id من DOM + سطر في الكود]
+  📍 الملف: [path]
+
 ممنوع:
+- تعديل ملف بدون ربطه بعنصر DOM حقيقي (إلا إذا التعديل backend فقط)
 - بحث ثاني لنفس الهدف
 - قول "سأفعل" أو "دعني" بدون تنفيذ
-- إعادة تحليل نفس النتيجة
 - ممنوع search أكثر من 3 مرات في المحادثة
+- ممنوع التخمين — إذا ما لقيت النص في DOM أو الكود → توقف وقل "لم أجد"
 
 ⛔⛔⛔ القانون الثالث: التحقق من الملف المستخدم ⛔⛔⛔
 
@@ -985,6 +996,7 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
       let searchCount = 0;
       let hasReadAfterSearch = true;
       let hasEdited = false;
+      let hasDOMInspection = false;
       let toolActionCount = 0;
       const searchQueriesSet = new Set<string>();
       const searchQueries: string[] = [];
@@ -1115,12 +1127,17 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
             console.log(`[Agent] Read file after search — ready to edit`);
           }
 
+          if (["get_page_structure", "browse_page", "inspect_styles"].includes(tool.name)) {
+            hasDOMInspection = true;
+            console.log(`[Agent] DOM inspection done via ${tool.name} — source of truth check ✓`);
+          }
+
           if (tool.name === "edit_component" || tool.name === "write_file" || tool.name === "create_component") {
             hasEdited = true;
             const editPath = (tool.input as any)?.componentPath || (tool.input as any)?.path || "";
             const oldText = (tool.input as any)?.old_text || "";
             const newText = (tool.input as any)?.new_text || "";
-            console.log(`[Agent] Edit executed — file: ${editPath}, old_text: "${oldText.slice(0, 60)}", new_text: "${newText.slice(0, 60)}"`);
+            console.log(`[Agent] Edit executed — file: ${editPath}, old_text: "${oldText.slice(0, 60)}", new_text: "${newText.slice(0, 60)}", domInspected: ${hasDOMInspection}`);
           }
 
           if (riskCfg.requiresApproval) {
@@ -1229,10 +1246,13 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
                   }
                 }
 
+                const domNote = hasDOMInspection
+                  ? `\n📍 مصدر الحقيقة: تم فحص DOM قبل التعديل ✓`
+                  : `\n⚠️ تنبيه: لم يتم فحص DOM قبل التعديل — في المرة القادمة استخدم get_page_structure أولاً`;
                 const deployHint = `\n\n🚀 الخطوة التالية: نفّذ git_push مع message يصف التغيير لنشره على mrcodeai.com. التعديل في dev فقط لا يكفي!`;
-                finalContent = `✅ EDIT_SUCCESS: تم التعديل بنجاح!\n📁 الملف: ${editPath}\n🔄 matchesReplaced: ${matchesReplaced}\n📝 قبل: "${oldText}"\n📝 بعد: "${newText}"${uiVerification}${deployHint}\n\n${result}`;
-                console.log(`[Agent] EDIT SUCCESS: matchesReplaced=${matchesReplaced} in ${editPath} | before="${oldText}" → after="${newText}"`);
-                await logAudit(agentKey, "edit_success", tool.name, { path: editPath, oldText, newText, matchesReplaced }, result?.slice(0, 500), "medium", "success", durationMs);
+                finalContent = `✅ EDIT_SUCCESS: تم التعديل بنجاح!\n📁 الملف: ${editPath}\n🔄 matchesReplaced: ${matchesReplaced}\n📝 قبل: "${oldText}"\n📝 بعد: "${newText}"${domNote}${uiVerification}${deployHint}\n\n${result}`;
+                console.log(`[Agent] EDIT SUCCESS: matchesReplaced=${matchesReplaced} in ${editPath} | before="${oldText}" → after="${newText}" | domInspected=${hasDOMInspection}`);
+                await logAudit(agentKey, "edit_success", tool.name, { path: editPath, oldText, newText, matchesReplaced, domInspected: hasDOMInspection }, result?.slice(0, 500), "medium", "success", durationMs);
               }
             } else if (tool.name === "write_file" && parsedResult) {
               const writePath = parsedResult.path || (tool.input as any)?.path || "";
