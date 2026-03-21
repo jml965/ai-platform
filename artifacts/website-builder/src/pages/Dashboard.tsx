@@ -945,9 +945,10 @@ function HomeSidebar({ t, lang, userName, isAdmin, onSelectInfraAgent, onToggleF
         <button
           className="flex items-center gap-2 w-full px-3 py-2 rounded-md text-[12px] font-semibold text-start relative overflow-hidden transition-all duration-200 hover:brightness-110 active:scale-[0.98] group/createbtn"
           style={{
-            background: "linear-gradient(135deg, #f5c518 0%, #e6a800 40%, #ffd700 70%, #c8960c 100%)",
-            border: "1px solid rgba(255,215,0,0.7)",
-            boxShadow: "0 0 16px rgba(255,200,0,0.45), 0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,200,0.3)",
+            background: "linear-gradient(135deg, rgba(52,211,153,0.75) 0%, rgba(16,185,129,0.85) 40%, rgba(110,231,183,0.7) 70%, rgba(6,148,112,0.9) 100%)",
+            border: "1px solid rgba(110,231,183,0.55)",
+            boxShadow: "0 0 20px rgba(52,211,153,0.35), 0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 0 rgba(0,100,60,0.2)",
+            backdropFilter: "blur(10px)",
           }}
         >
           {/* Golden shimmer on hover */}
