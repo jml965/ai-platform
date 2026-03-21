@@ -412,6 +412,86 @@ const DEFAULT_INFRA_AGENTS = [
       "artifacts/website-builder/src/App.tsx",
     ],
   },
+  {
+    agentKey: "execution_engine",
+    displayNameEn: "Execution Engine",
+    displayNameAr: "محرك التنفيذ",
+    agentRole: "infra",
+    agentBadge: "executor",
+    description: "المنفذ الأعلى في النظام — ينفذ أي تغيير في البنية التحتية: ملفات، قاعدة بيانات، حزم، بناء، نشر. يستقبل الأوامر من المالك مباشرة أو من الوكلاء المحللين.",
+    primaryModel: { provider: "anthropic", model: "claude-sonnet-4-6", enabled: true, creativity: 0.5, timeoutSeconds: 300, maxTokens: 32000 },
+    secondaryModel: { provider: "openai", model: "gpt-4o", enabled: false, creativity: 0.5, timeoutSeconds: 240, maxTokens: 16000 },
+    tertiaryModel: null,
+    governorEnabled: false,
+    autoGovernor: false,
+    governorModel: null,
+    systemPrompt: `أنت محرك التنفيذ — المنفذ الأعلى في منصة Mr Code AI.
+أي أمر تنفيذي يمر منك. لا يوجد وكيل آخر يملك صلاحية تنفيذ مساوية لك.
+
+صلاحياتك:
+- قراءة وكتابة وإنشاء وحذف الملفات
+- تعديل قاعدة البيانات (قراءة + كتابة + schema)
+- تثبيت الحزم وتشغيل البناء
+- تنفيذ أوامر النظام (في sandbox)
+- git commit و git push
+- تشغيل النشر (trigger_deploy) والتراجع (rollback)
+- ضبط متغيرات البيئة
+
+طريقة عملك:
+1. تستقبل الأمر من المالك أو من وكيل محلل
+2. تحلل ما المطلوب وتحدد الأدوات اللازمة
+3. تنفذ خطوة بخطوة مع شرح كل إجراء
+4. تؤكد النتيجة: "تم التنفيذ" مع التفاصيل أو "فشل التنفيذ" مع السبب
+
+القواعد:
+- العمليات الخطرة (delete_files, database_write, git_push, trigger_deploy, rollback) تحتاج موافقة
+- سجّل كل عملية في audit log
+- لا تعطي تقارير وصفية — نفّذ فعلياً واعرض النتيجة
+- أجب بالعربية دائماً`,
+    instructions: `## محرك التنفيذ — التعليمات التشغيلية
+
+### الأدوات المتاحة:
+- read_file / list_files / search_text — قراءة واستعراض
+- write_file / edit_component / create_component / delete_file — كتابة
+- exec_command / run_command — تنفيذ أوامر النظام
+- db_query / run_sql — قاعدة البيانات
+- git_push — رفع للمستودع
+- trigger_deploy / deploy_status / rollback_deploy — نشر
+- verify_production — تحقق من الإنتاج
+- set_env — متغيرات البيئة
+
+### البنية المعمارية:
+- الخلفية: artifacts/api-server/src/
+- الواجهة: artifacts/website-builder/src/
+- قاعدة البيانات: lib/db/src/schema/
+- السكريبتات: scripts/
+- CI/CD: .github/workflows/
+- Docker: Dockerfile
+
+### أولويات التنفيذ:
+1. افهم المطلوب بدقة
+2. اقرأ الملفات المتأثرة أولاً
+3. نفّذ التعديل
+4. تحقق من النتيجة
+5. أبلغ بالتفاصيل`,
+    permissions: ["read_all_files", "write_files", "create_files", "delete_files", "edit_component", "create_component", "modify_styles", "database_read", "database_write", "manage_schema", "install_packages", "deploy", "restart_services", "check_health", "rollback", "git_commit", "git_push", "trigger_deploy", "verify_production", "exec_command", "run_command", "set_env"],
+    pipelineOrder: 6,
+    receivesFrom: "infra_sysadmin",
+    sendsTo: "infra_sysadmin",
+    roleOnReceive: "يستقبل أوامر التنفيذ من المالك مباشرة أو من الوكلاء المحللين",
+    roleOnSend: "يسلّم نتائج التنفيذ مع الأدلة والتفاصيل",
+    tokenLimit: 100000,
+    batchSize: 10,
+    creativity: "0.50",
+    sourceFiles: [
+      "artifacts/api-server/src/routes/infra.ts",
+      "artifacts/api-server/src/lib/agents/strategic-agent.ts",
+      "artifacts/website-builder/src/pages/AgentManagement.tsx",
+      "lib/db/src/schema/index.ts",
+      "Dockerfile",
+      ".github/workflows/deploy-cloud-run.yml",
+    ],
+  },
 ];
 
 async function seedInfraAgents() {
@@ -459,10 +539,12 @@ async function seedInfraAgents() {
         });
       } else {
         await db.update(agentConfigsTable).set({
+          agentLayer: "infra",
           displayNameEn: agent.displayNameEn,
           displayNameAr: agent.displayNameAr,
           description: agent.description,
           enabled: true,
+          primaryModel: agent.primaryModel,
           systemPrompt: agent.systemPrompt,
           instructions: agent.instructions,
           permissions: agent.permissions,
@@ -478,7 +560,7 @@ async function seedInfraAgents() {
         }).where(eq(agentConfigsTable.agentKey, agent.agentKey));
       }
     }
-    console.log("[Infra] Seeded/updated infra agents (5 active, retired:", RETIRED_AGENTS.join(", "), ")");
+    console.log("[Infra] Seeded/updated infra agents (6 active, retired:", RETIRED_AGENTS.join(", "), ")");
   } catch (err: any) {
     console.error("[Infra] Seed error:", err.message);
   }
