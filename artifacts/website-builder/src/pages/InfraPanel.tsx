@@ -948,11 +948,8 @@ export default function InfraPanel() {
 
       setMessages(prev => [...prev, { id: streamMsgId, role: "assistant", content: "", timestamp: new Date() }]);
 
-      const isDirector = selectedAgent.agentKey === "infra_sysadmin";
-      const endpoint = isDirector ? "/api/infra/director-stream" : "/api/infra/chat-stream";
-      const body = isDirector
-        ? { message: currentPrompt }
-        : { agentKey: selectedAgent.agentKey, message: currentPrompt };
+      const endpoint = "/api/infra/chat-stream";
+      const body = { agentKey: selectedAgent.agentKey, message: currentPrompt };
 
       const res = await fetch(endpoint, {
         method: "POST",
