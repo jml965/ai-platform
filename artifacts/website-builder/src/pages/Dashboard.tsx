@@ -910,10 +910,7 @@ function HomeSidebar({ t, lang, userName, isAdmin, onSelectInfraAgent }: { t: an
           <Plus className="w-3.5 h-3.5 text-[#8b949e]" />
           {t.home_create_app}
         </button>
-        <button className="flex items-center gap-2 w-full px-3 py-2 rounded-md text-[12px] text-[#8b949e] border border-white/7 hover:bg-white/5 transition-colors text-start">
-          <Upload className="w-3.5 h-3.5" />
-          {t.home_import_code}
-        </button>
+
       </div>
 
       <nav className="flex flex-col gap-0.5 px-2 py-3 flex-1 overflow-y-auto">
