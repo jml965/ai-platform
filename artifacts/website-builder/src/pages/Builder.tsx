@@ -1444,7 +1444,7 @@ export default function Builder() {
       {leftPanelOpen && <div style={{ width: leftWidth, maxWidth: "50vw" }} className="flex flex-col border-e border-[#1c2333] bg-[#0d1117] flex-shrink-0 relative overflow-hidden">
         <div className="border-b border-[#1c2333]">
           <div className="px-3 py-2 flex items-center gap-2">
-            <Link href="/dashboard" className="p-1.5 text-[#8b949e] hover:text-[#e1e4e8] transition-colors rounded hover:bg-[#1c2333]">
+            <Link href="/dashboard" className="p-1.5 text-[#b0bac5] hover:text-[#e1e4e8] transition-colors rounded hover:bg-[#1c2333]">
               <ArrowLeft className={cn("w-4 h-4", lang === "ar" && "rotate-180")} />
             </Link>
             <div className="flex-1 min-w-0">
@@ -1463,7 +1463,7 @@ export default function Builder() {
                 "text-[10px] px-2 py-1 rounded-md font-medium flex items-center gap-1 flex-shrink-0 transition-all",
                 strategicMode
                   ? "bg-amber-500/20 text-amber-400 ring-1 ring-amber-500/30"
-                  : "bg-[#1c2333] text-[#8b949e] hover:bg-[#30363d] hover:text-[#e1e4e8]"
+                  : "bg-[#1c2333] text-[#b0bac5] hover:bg-[#30363d] hover:text-[#e1e4e8]"
               )}
             >
               <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a8 8 0 0 0-8 8c0 3.4 2.1 6.3 5 7.4V20a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-2.6c2.9-1.1 5-4 5-7.4a8 8 0 0 0-8-8z"/><line x1="9" y1="22" x2="15" y2="22"/><line x1="10" y1="2" x2="10" y2="5"/><line x1="14" y1="2" x2="14" y2="5"/></svg>
@@ -1482,7 +1482,7 @@ export default function Builder() {
                 "text-[10px] px-2 py-1 rounded-md font-medium flex items-center gap-1 flex-shrink-0 transition-all",
                 showTranslationsPanel
                   ? "bg-cyan-500/20 text-cyan-400"
-                  : "bg-[#1c2333] text-[#8b949e] hover:bg-[#30363d] hover:text-[#e1e4e8]"
+                  : "bg-[#1c2333] text-[#b0bac5] hover:bg-[#30363d] hover:text-[#e1e4e8]"
               )}
             >
               <Languages className="w-3 h-3" />
@@ -1494,7 +1494,7 @@ export default function Builder() {
                 "text-[10px] px-2 py-1 rounded-md font-medium flex items-center gap-1 flex-shrink-0 transition-all",
                 showPwaPanel
                   ? "bg-purple-500/20 text-purple-400"
-                  : "bg-[#1c2333] text-[#8b949e] hover:bg-[#30363d] hover:text-[#e1e4e8]"
+                  : "bg-[#1c2333] text-[#b0bac5] hover:bg-[#30363d] hover:text-[#e1e4e8]"
               )}
             >
               <SmartphoneIcon className="w-3 h-3" />
@@ -1510,7 +1510,7 @@ export default function Builder() {
                   : isDeploying
                     ? "bg-yellow-500/20 text-yellow-400"
                     : deploymentStatus?.status === "stopped"
-                      ? "bg-[#484f58]/20 text-[#8b949e] hover:bg-[#484f58]/30"
+                      ? "bg-[#484f58]/20 text-[#b0bac5] hover:bg-[#484f58]/30"
                       : "bg-[#1f6feb]/20 text-[#58a6ff] hover:bg-[#1f6feb]/30 disabled:opacity-40"
               )}
             >
@@ -1536,7 +1536,7 @@ export default function Builder() {
             >
               <div className="p-3 bg-[#161b22] space-y-2">
                 {!canDeploy && !deploymentStatus && (
-                  <p className="text-[11px] text-[#8b949e]">{t.deploy_not_ready}</p>
+                  <p className="text-[11px] text-[#b0bac5]">{t.deploy_not_ready}</p>
                 )}
 
                 {deploymentStatus && (
@@ -1690,18 +1690,18 @@ export default function Builder() {
             <div className="px-3 py-2 border-b border-amber-500/20 bg-amber-500/5 flex items-center gap-2">
               <svg className="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a8 8 0 0 0-8 8c0 3.4 2.1 6.3 5 7.4V20a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-2.6c2.9-1.1 5-4 5-7.4a8 8 0 0 0-8-8z"/><line x1="9" y1="22" x2="15" y2="22"/></svg>
               <span className="text-xs font-medium text-amber-400 flex-1">{t.strategic_agent}</span>
-              <button onClick={() => setStrategicMode(false)} className="text-[#8b949e] hover:text-[#e1e4e8] p-0.5">
+              <button onClick={() => setStrategicMode(false)} className="text-[#b0bac5] hover:text-[#e1e4e8] p-0.5">
                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-3">
               {strategicMessages.length === 0 && (
-                <div className="text-center mt-12 text-[#8b949e]">
+                <div className="text-center mt-12 text-[#b0bac5]">
                   <div className="w-14 h-14 mx-auto bg-amber-500/10 rounded-full flex items-center justify-center mb-3">
                     <svg className="w-7 h-7 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a8 8 0 0 0-8 8c0 3.4 2.1 6.3 5 7.4V20a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-2.6c2.9-1.1 5-4 5-7.4a8 8 0 0 0-8-8z"/><line x1="9" y1="22" x2="15" y2="22"/></svg>
                   </div>
                   <p className="text-sm font-medium text-[#e1e4e8] mb-1">{t.strategic_agent}</p>
-                  <p className="text-xs text-[#8b949e]">{t.strategic_agent_desc}</p>
+                  <p className="text-xs text-[#b0bac5]">{t.strategic_agent_desc}</p>
                 </div>
               )}
               {strategicMessages.map(msg => (
@@ -1713,7 +1713,7 @@ export default function Builder() {
                     <pre className="whitespace-pre-wrap font-sans text-[13px] leading-relaxed">{msg.content}</pre>
                     {msg.thinking && msg.thinking.length > 0 && (
                       <div className="mt-2 pt-2 border-t border-[#30363d]">
-                        <div className="text-[10px] text-[#8b949e] space-y-1">
+                        <div className="text-[10px] text-[#b0bac5] space-y-1">
                           {msg.thinking.map((th, i) => (
                             <div key={i} className="flex items-center gap-1.5">
                               <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
@@ -1726,7 +1726,7 @@ export default function Builder() {
                       </div>
                     )}
                     {msg.fixApplied !== undefined && (
-                      <div className={cn("mt-2 pt-2 border-t border-[#30363d] text-[10px] flex items-center gap-1.5", msg.fixApplied ? "text-emerald-400" : "text-[#8b949e]")}>
+                      <div className={cn("mt-2 pt-2 border-t border-[#30363d] text-[10px] flex items-center gap-1.5", msg.fixApplied ? "text-emerald-400" : "text-[#b0bac5]")}>
                         {msg.fixApplied ? <Check className="w-3 h-3" /> : null}
                         <span>{msg.fixApplied ? t.strategic_fix_applied : ""}</span>
                         {msg.fixedFiles && msg.fixedFiles.length > 0 && (
@@ -1780,7 +1780,7 @@ export default function Builder() {
           <>
         <div className="flex-1 overflow-y-auto p-3 space-y-3">
           {messages.length === 0 && !startBuildMut.isPending && (
-            <div className="text-center mt-16 text-[#8b949e]">
+            <div className="text-center mt-16 text-[#b0bac5]">
               <div className="w-12 h-12 mx-auto bg-[#1c2333] rounded-full flex items-center justify-center mb-3">
                 <Code2 className="w-6 h-6 opacity-50" />
               </div>
@@ -1879,7 +1879,7 @@ export default function Builder() {
 
         <div className="p-3 border-t border-[#1c2333] bg-[#0d1117]">
           <div className="flex items-center justify-between mb-2">
-            <LanguageToggle className="!bg-[#161b22] !text-[#8b949e] hover:!bg-[#1c2333] !px-2 !py-1 !text-xs !rounded-md" />
+            <LanguageToggle className="!bg-[#161b22] !text-[#b0bac5] hover:!bg-[#1c2333] !px-2 !py-1 !text-xs !rounded-md" />
             {isBuilding && activeBuildId && (
               <button
                 onClick={async () => {
@@ -1957,7 +1957,7 @@ export default function Builder() {
           title="Expand chat"
         >
           <div className="absolute top-1/2 -translate-y-1/2 end-0 translate-x-1/2 w-4 h-8 bg-[#1c2333] border border-[#30363d] rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20">
-            <ChevronRight className={cn("w-3 h-3 text-[#8b949e]", lang === "ar" && "rotate-180")} />
+            <ChevronRight className={cn("w-3 h-3 text-[#b0bac5]", lang === "ar" && "rotate-180")} />
           </div>
         </button>
       )}
@@ -1968,21 +1968,21 @@ export default function Builder() {
             <button
               onClick={handleNavBack}
               title={t.nav_back}
-              className="p-1 rounded text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333] transition-colors"
+              className="p-1 rounded text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333] transition-colors"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={handleNavForward}
               title={t.nav_forward}
-              className="p-1 rounded text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333] transition-colors"
+              className="p-1 rounded text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333] transition-colors"
             >
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={handleRefresh}
               title={t.nav_refresh}
-              className="p-1 rounded text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333] transition-colors"
+              className="p-1 rounded text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333] transition-colors"
             >
               <RotateCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")} />
             </button>
@@ -2001,7 +2001,7 @@ export default function Builder() {
                 href={previewUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-1 rounded text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333] transition-colors"
+                className="p-1 rounded text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333] transition-colors"
                 title={t.preview_open_external}
               >
                 <ExternalLink className="w-3.5 h-3.5" />
@@ -2010,7 +2010,7 @@ export default function Builder() {
             <div className="relative">
               <button
                 onClick={() => setShowDeviceMenu(v => !v)}
-                className="flex items-center gap-1.5 px-2 py-1 rounded text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333] transition-colors text-[11px]"
+                className="flex items-center gap-1.5 px-2 py-1 rounded text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333] transition-colors text-[11px]"
                 title={t.device_selector}
               >
                 <currentDevice.Icon className="w-3.5 h-3.5" />
@@ -2063,7 +2063,7 @@ export default function Builder() {
                   "p-1 rounded transition-colors",
                   cssEditorActive
                     ? "text-[#58a6ff] bg-[#1f6feb]/20"
-                    : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
+                    : "text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
                 )}
                 title={t.css_editor_tab}
               >
@@ -2146,7 +2146,7 @@ export default function Builder() {
                 })()}
               </DevicePreviewFrame>
             ) : isBuilding ? (
-              <div className="h-full flex items-center justify-center text-[#8b949e]">
+              <div className="h-full flex items-center justify-center text-[#b0bac5]">
                 <div className="text-center">
                   <Loader2 className="w-10 h-10 mx-auto mb-3 text-[#58a6ff] animate-spin" />
                   <p className="text-sm font-medium text-[#58a6ff]">{t.preview_building}</p>
@@ -2154,7 +2154,7 @@ export default function Builder() {
                 </div>
               </div>
             ) : sandboxRunning && sandboxProxyUrl && !proxyVerified ? (
-              <div className="h-full flex items-center justify-center text-[#8b949e]">
+              <div className="h-full flex items-center justify-center text-[#b0bac5]">
                 <div className="text-center">
                   <Loader2 className="w-10 h-10 mx-auto mb-3 text-[#d2a8ff] animate-spin" />
                   <p className="text-sm font-medium text-[#d2a8ff]">{t.preview_connecting}</p>
@@ -2178,7 +2178,7 @@ export default function Builder() {
                 </div>
               </div>
             ) : sandboxRunning && !sandboxProxyUrl ? (
-              <div className="h-full flex items-center justify-center text-[#8b949e]">
+              <div className="h-full flex items-center justify-center text-[#b0bac5]">
                 <div className="text-center">
                   <Loader2 className="w-10 h-10 mx-auto mb-3 text-emerald-400 animate-spin" />
                   <p className="text-sm font-medium text-emerald-400">{t.preview_sandbox_starting}</p>
@@ -2204,7 +2204,7 @@ export default function Builder() {
           title="Expand panel"
         >
           <div className="absolute top-1/2 -translate-y-1/2 start-0 -translate-x-1/2 w-4 h-8 bg-[#1c2333] border border-[#30363d] rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20">
-            <ChevronLeft className={cn("w-3 h-3 text-[#8b949e]", lang === "ar" && "rotate-180")} />
+            <ChevronLeft className={cn("w-3 h-3 text-[#b0bac5]", lang === "ar" && "rotate-180")} />
           </div>
         </button>
       )}
@@ -2244,7 +2244,7 @@ export default function Builder() {
                   "px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1.5",
                   rightTab === "build"
                     ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
-                    : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
+                    : "text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
                 )}
               >
                 <Rocket className="w-3 h-3" />
@@ -2258,7 +2258,7 @@ export default function Builder() {
                 "px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1",
                 rightTab === "code"
                   ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
-                  : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
+                  : "text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
               )}
             >
               <Code2 className="w-3 h-3" />
@@ -2270,7 +2270,7 @@ export default function Builder() {
                 "px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors",
                 rightTab === "library"
                   ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
-                  : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
+                  : "text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
               )}
             >
               {t.library}
@@ -2281,7 +2281,7 @@ export default function Builder() {
                 "px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1",
                 rightTab === "plugins"
                   ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
-                  : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
+                  : "text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
               )}
             >
               <Puzzle className="w-3 h-3" />
@@ -2293,7 +2293,7 @@ export default function Builder() {
                 "px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1",
                 rightTab === "snapshots"
                   ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
-                  : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
+                  : "text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
               )}
             >
               <Archive className="w-3 h-3" />
@@ -2305,7 +2305,7 @@ export default function Builder() {
                 "px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1.5",
                 rightTab === "collab"
                   ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
-                  : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
+                  : "text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
               )}
             >
               <Users className="w-3 h-3" />
@@ -2322,7 +2322,7 @@ export default function Builder() {
                 "px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1",
                 rightTab === "domains"
                   ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
-                  : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
+                  : "text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
               )}
             >
               <Globe className="w-3 h-3" />
@@ -2334,7 +2334,7 @@ export default function Builder() {
                 "px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors flex items-center gap-1",
                 rightTab === "seo"
                   ? "bg-[#0d1117] text-[#e1e4e8] shadow-sm"
-                  : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
+                  : "text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
               )}
             >
               <Search className="w-3 h-3" />
@@ -2347,12 +2347,12 @@ export default function Builder() {
           ) : rightTab === "code" ? (
             <div className="flex-1 flex flex-col min-h-0">
               <div className="h-8 flex items-center justify-between px-3 border-b border-[#1c2333] bg-[#161b22]">
-                <span className="text-[11px] font-semibold text-[#8b949e] uppercase tracking-wider">{t.explorer}</span>
+                <span className="text-[11px] font-semibold text-[#b0bac5] uppercase tracking-wider">{t.explorer}</span>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={handleDownloadAll}
                     disabled={downloading || !files.length}
-                    className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-[#8b949e] hover:text-[#58a6ff] hover:bg-[#1c2333] rounded transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-[#b0bac5] hover:text-[#58a6ff] hover:bg-[#1c2333] rounded transition-colors disabled:opacity-50"
                     title={t.download_all_files}
                   >
                     {downloading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
@@ -2368,7 +2368,7 @@ export default function Builder() {
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading || !id}
-                    className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-[#8b949e] hover:text-[#58a6ff] hover:bg-[#1c2333] rounded transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-[#b0bac5] hover:text-[#58a6ff] hover:bg-[#1c2333] rounded transition-colors disabled:opacity-50"
                     title={t.upload_files}
                   >
                     {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
@@ -2400,7 +2400,7 @@ export default function Builder() {
                                 "px-2.5 py-1 text-[11px] font-mono rounded transition-colors flex items-center gap-1.5 whitespace-nowrap",
                                 selectedFileIndex === i
                                   ? "bg-[#0d1117] text-[#e1e4e8] border border-[#30363d]"
-                                  : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]",
+                                  : "text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333]",
                                 isLockedByOther && "opacity-60"
                               )}
                             >
@@ -2432,7 +2432,7 @@ export default function Builder() {
                                   ) : !currentLock ? (
                                     <button
                                       onClick={() => lockFile(currentFp)}
-                                      className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded bg-[#1c2333] text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#30363d] transition-colors"
+                                      className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded bg-[#1c2333] text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#30363d] transition-colors"
                                     >
                                       <Lock className="w-2.5 h-2.5" />
                                       {t.collab_lock}
@@ -2504,9 +2504,9 @@ function getFileIcon(filePath: string) {
     case 'css': return <FileCode2 className="w-3.5 h-3.5 text-blue-400" />;
     case 'js': case 'jsx': case 'ts': case 'tsx': return <FileCode2 className="w-3.5 h-3.5 text-yellow-400" />;
     case 'json': return <FileJson className="w-3.5 h-3.5 text-green-400" />;
-    case 'md': case 'txt': return <FileText className="w-3.5 h-3.5 text-[#8b949e]" />;
+    case 'md': case 'txt': return <FileText className="w-3.5 h-3.5 text-[#b0bac5]" />;
     case 'png': case 'jpg': case 'jpeg': case 'gif': case 'svg': return <FileImage className="w-3.5 h-3.5 text-purple-400" />;
-    default: return <File className="w-3.5 h-3.5 text-[#8b949e]" />;
+    default: return <File className="w-3.5 h-3.5 text-[#b0bac5]" />;
   }
 }
 
@@ -2774,7 +2774,7 @@ function FileContextMenu({ node, projectId, files, position, onClose, onRefresh,
         />
         <div className="flex gap-1 mt-1.5">
           <button onClick={handleRename} className="flex-1 bg-[#238636] text-white text-[11px] rounded px-2 py-1 hover:bg-[#2ea043]">OK</button>
-          <button onClick={onClose} className="flex-1 bg-[#30363d] text-[#8b949e] text-[11px] rounded px-2 py-1 hover:bg-[#3d444d]">✕</button>
+          <button onClick={onClose} className="flex-1 bg-[#30363d] text-[#b0bac5] text-[11px] rounded px-2 py-1 hover:bg-[#3d444d]">✕</button>
         </div>
       </div>
     );
@@ -2793,7 +2793,7 @@ function FileContextMenu({ node, projectId, files, position, onClose, onRefresh,
         />
         <div className="flex gap-1 mt-1.5">
           <button onClick={adding === "file" ? handleAddFile : handleAddFolder} className="flex-1 bg-[#238636] text-white text-[11px] rounded px-2 py-1 hover:bg-[#2ea043]">OK</button>
-          <button onClick={onClose} className="flex-1 bg-[#30363d] text-[#8b949e] text-[11px] rounded px-2 py-1 hover:bg-[#3d444d]">✕</button>
+          <button onClick={onClose} className="flex-1 bg-[#30363d] text-[#b0bac5] text-[11px] rounded px-2 py-1 hover:bg-[#3d444d]">✕</button>
         </div>
       </div>
     );
@@ -2907,18 +2907,18 @@ function FileLibrary({ files, projectId, onFileSelect }: { files: ProjectFile[];
       return (
         <div key={node.path}>
           <div
-            className="file-row w-full flex items-center gap-1.5 px-2 py-1 text-[12px] text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333] rounded transition-colors cursor-pointer"
+            className="file-row w-full flex items-center gap-1.5 px-2 py-1 text-[12px] text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333] rounded transition-colors cursor-pointer"
             style={{ paddingInlineStart: `${depth * 12 + 8}px` }}
             onClick={() => toggleFolder(node.path)}
             onContextMenu={e => handleContextMenu(e, node)}
           >
             {isExpanded ? <ChevronDown className="w-3 h-3 flex-shrink-0" /> : <ChevronRight className="w-3 h-3 flex-shrink-0" />}
-            <Folder className={cn("w-3.5 h-3.5 flex-shrink-0", isExpanded ? "text-[#58a6ff]" : "text-[#8b949e]")} />
+            <Folder className={cn("w-3.5 h-3.5 flex-shrink-0", isExpanded ? "text-[#58a6ff]" : "text-[#b0bac5]")} />
             <span className="truncate flex-1">{node.name}</span>
             <button
               onClick={e => handleDotsClick(e, node)}
               className="file-dots"
-              style={{ opacity: 1, flexShrink: 0, padding: '2px', borderRadius: '4px', fontSize: '14px', lineHeight: 1, color: '#8b949e', background: 'transparent', border: 'none', cursor: 'pointer', minWidth: '18px', textAlign: 'center' }}
+              style={{ opacity: 1, flexShrink: 0, padding: '2px', borderRadius: '4px', fontSize: '14px', lineHeight: 1, color: '#b0bac5', background: 'transparent', border: 'none', cursor: 'pointer', minWidth: '18px', textAlign: 'center' }}
             >
               ⋮
             </button>
@@ -2941,7 +2941,7 @@ function FileLibrary({ files, projectId, onFileSelect }: { files: ProjectFile[];
         <button
           onClick={e => handleDotsClick(e, node)}
           className="file-dots"
-          style={{ opacity: 1, flexShrink: 0, padding: '2px', borderRadius: '4px', fontSize: '14px', lineHeight: 1, color: '#8b949e', background: 'transparent', border: 'none', cursor: 'pointer', minWidth: '18px', textAlign: 'center' }}
+          style={{ opacity: 1, flexShrink: 0, padding: '2px', borderRadius: '4px', fontSize: '14px', lineHeight: 1, color: '#b0bac5', background: 'transparent', border: 'none', cursor: 'pointer', minWidth: '18px', textAlign: 'center' }}
         >
           ⋮
         </button>
@@ -3045,18 +3045,18 @@ function InlineFileTree({ files, projectId, selectedIndex, onFileSelect }: { fil
       return (
         <div key={node.path}>
           <div
-            className="file-row w-full flex items-center gap-1.5 px-2 py-1 text-[12px] text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333] rounded transition-colors cursor-pointer"
+            className="file-row w-full flex items-center gap-1.5 px-2 py-1 text-[12px] text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333] rounded transition-colors cursor-pointer"
             style={{ paddingInlineStart: `${depth * 12 + 8}px` }}
             onClick={() => toggleFolder(node.path)}
             onContextMenu={e => handleContextMenu(e, node)}
           >
             {isExpanded ? <ChevronDown className="w-3 h-3 flex-shrink-0" /> : <ChevronRight className="w-3 h-3 flex-shrink-0" />}
-            <Folder className={cn("w-3.5 h-3.5 flex-shrink-0", isExpanded ? "text-[#58a6ff]" : "text-[#8b949e]")} />
+            <Folder className={cn("w-3.5 h-3.5 flex-shrink-0", isExpanded ? "text-[#58a6ff]" : "text-[#b0bac5]")} />
             <span className="truncate flex-1">{node.name}</span>
             <button
               onClick={e => handleDotsClick(e, node)}
               className="file-dots"
-              style={{ opacity: 1, flexShrink: 0, padding: '2px', borderRadius: '4px', fontSize: '14px', lineHeight: 1, color: '#8b949e', background: 'transparent', border: 'none', cursor: 'pointer', minWidth: '18px', textAlign: 'center' }}
+              style={{ opacity: 1, flexShrink: 0, padding: '2px', borderRadius: '4px', fontSize: '14px', lineHeight: 1, color: '#b0bac5', background: 'transparent', border: 'none', cursor: 'pointer', minWidth: '18px', textAlign: 'center' }}
             >
               ⋮
             </button>
@@ -3085,7 +3085,7 @@ function InlineFileTree({ files, projectId, selectedIndex, onFileSelect }: { fil
         <button
           onClick={e => handleDotsClick(e, node)}
           className="file-dots"
-          style={{ opacity: 1, flexShrink: 0, padding: '2px', borderRadius: '4px', fontSize: '14px', lineHeight: 1, color: '#8b949e', background: 'transparent', border: 'none', cursor: 'pointer', minWidth: '18px', textAlign: 'center' }}
+          style={{ opacity: 1, flexShrink: 0, padding: '2px', borderRadius: '4px', fontSize: '14px', lineHeight: 1, color: '#b0bac5', background: 'transparent', border: 'none', cursor: 'pointer', minWidth: '18px', textAlign: 'center' }}
         >
           ⋮
         </button>
@@ -3143,7 +3143,7 @@ function ExecutionLogTimeline({ logs, isBuilding, buildCost, buildTokens }: { lo
   return (
     <div className="mt-3 bg-[#0d1117] border border-[#1c2333] rounded-lg overflow-hidden">
       <div className="flex items-center gap-2 px-3 py-2 border-b border-[#1c2333] bg-[#161b22]">
-        <Code2 className="w-3.5 h-3.5 text-[#8b949e]" />
+        <Code2 className="w-3.5 h-3.5 text-[#b0bac5]" />
         <span className="text-[11px] font-semibold text-[#e1e4e8] uppercase tracking-wider">{t.execution_log}</span>
         {isBuilding && (
           <span className="flex items-center gap-1 ms-1">
@@ -3190,14 +3190,14 @@ function ExecutionLogTimeline({ logs, isBuilding, buildCost, buildTokens }: { lo
                 <div className="flex-1 min-w-0">
                   <span className={cn(
                     "text-[11px] font-bold me-1.5",
-                    isCompleted ? "text-emerald-400" : isFailed ? "text-red-400" : isRunning ? "text-[#58a6ff]" : "text-[#8b949e]"
+                    isCompleted ? "text-emerald-400" : isFailed ? "text-red-400" : isRunning ? "text-[#58a6ff]" : "text-[#b0bac5]"
                   )}>
                     [{agentName}]
                   </span>
                   {message ? (
                     <span className="text-[#c9d1d9] whitespace-pre-wrap leading-relaxed">{message}</span>
                   ) : (
-                    <span className="text-[#8b949e]">{log.action}</span>
+                    <span className="text-[#b0bac5]">{log.action}</span>
                   )}
                 </div>
               </div>
@@ -3434,7 +3434,7 @@ function BuildPanelContent({ logs, isBuilding, buildStatus, buildCost, buildToke
               </div>
               <span className={cn(
                 "flex-1 font-medium",
-                status === "active" ? "text-[#e6edf3]" : status === "done" ? "text-[#8b949e]" : status === "failed" ? "text-red-400" : "text-[#484f58]"
+                status === "active" ? "text-[#e6edf3]" : status === "done" ? "text-[#b0bac5]" : status === "failed" ? "text-red-400" : "text-[#484f58]"
               )}>
                 {isRtl ? step.ar : step.en}
               </span>
@@ -3448,7 +3448,7 @@ function BuildPanelContent({ logs, isBuilding, buildStatus, buildCost, buildToke
 
       {generatedFiles.length > 0 && (
         <div className="p-3 border-t border-[#1c2333]">
-          <span className="text-[10px] font-semibold text-[#8b949e] uppercase tracking-wider block mb-2">
+          <span className="text-[10px] font-semibold text-[#b0bac5] uppercase tracking-wider block mb-2">
             {isRtl ? "الملفات المولّدة" : "Generated Files"} ({generatedFiles.length})
           </span>
           <div className="space-y-0.5 max-h-[200px] overflow-y-auto">
@@ -3464,7 +3464,7 @@ function BuildPanelContent({ logs, isBuilding, buildStatus, buildCost, buildToke
 
       {logs.length > 0 && (
         <div className="p-3 border-t border-[#1c2333]">
-          <span className="text-[10px] font-semibold text-[#8b949e] uppercase tracking-wider block mb-2">
+          <span className="text-[10px] font-semibold text-[#b0bac5] uppercase tracking-wider block mb-2">
             {isRtl ? "سجل التنفيذ" : "Execution Log"}
           </span>
           <div className="space-y-1 font-mono text-[11px] max-h-[300px] overflow-y-auto">
@@ -3494,11 +3494,11 @@ function BuildPanelContent({ logs, isBuilding, buildStatus, buildCost, buildToke
                   <div className="flex-1 min-w-0">
                     <span className={cn(
                       "text-[10px] font-bold me-1",
-                      isCompleted ? "text-emerald-400" : isFailed ? "text-red-400" : isRunning ? "text-[#58a6ff]" : "text-[#8b949e]"
+                      isCompleted ? "text-emerald-400" : isFailed ? "text-red-400" : isRunning ? "text-[#58a6ff]" : "text-[#b0bac5]"
                     )}>
                       [{agentName}]
                     </span>
-                    <span className="text-[#8b949e]">{message || log.action}</span>
+                    <span className="text-[#b0bac5]">{message || log.action}</span>
                   </div>
                 </div>
               );
@@ -3595,9 +3595,9 @@ function LiveBuildView({ logs, buildStatus, lang, t }: { logs: ExecutionLog[]; b
                   <p className={cn(
                     "text-sm font-medium",
                     status === "active" && "text-[#e6edf3]",
-                    status === "done" && "text-[#8b949e]",
-                    status === "partial" && "text-[#8b949e]",
-                    status === "failed" && "text-[#8b949e]",
+                    status === "done" && "text-[#b0bac5]",
+                    status === "partial" && "text-[#b0bac5]",
+                    status === "failed" && "text-[#b0bac5]",
                     status === "waiting" && "text-[#484f58]",
                   )}>
                     {isRtl ? step.ar : step.en}

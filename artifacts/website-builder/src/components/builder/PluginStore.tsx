@@ -113,7 +113,7 @@ export default function PluginStore({ projectId }: PluginStoreProps) {
                 "px-2 py-0.5 text-[10px] font-medium rounded-full whitespace-nowrap transition-colors",
                 selectedCategory === cat
                   ? "bg-[#1f6feb] text-white"
-                  : "bg-[#161b22] text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
+                  : "bg-[#161b22] text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
               )}
             >
               {(t as Record<string, string>)[CATEGORY_KEYS[cat]] || cat}
@@ -139,18 +139,18 @@ export default function PluginStore({ projectId }: PluginStoreProps) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
                     <h4 className="text-[12px] font-semibold text-[#e1e4e8] truncate">{name}</h4>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#1c2333] text-[#8b949e] flex-shrink-0">
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#1c2333] text-[#b0bac5] flex-shrink-0">
                       {(t as Record<string, string>)[`plugin_category_${plugin.category}`] || plugin.category}
                     </span>
                   </div>
-                  <p className="text-[10px] text-[#8b949e] mt-0.5 line-clamp-2 leading-relaxed">{desc}</p>
+                  <p className="text-[10px] text-[#b0bac5] mt-0.5 line-clamp-2 leading-relaxed">{desc}</p>
                 </div>
               </div>
 
               <div className="flex gap-1.5 mt-2">
                 <button
                   onClick={() => setPreviewPlugin(previewPlugin?.id === plugin.id ? null : plugin)}
-                  className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-[10px] font-medium rounded-md bg-[#0d1117] text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333] transition-colors"
+                  className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-[10px] font-medium rounded-md bg-[#0d1117] text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333] transition-colors"
                 >
                   <Eye className="w-3 h-3" />
                   {t.plugin_preview}

@@ -282,8 +282,8 @@ export default function CodeEditor({ content, filePath, onSave, readOnly = false
     <div className={cn("flex flex-col h-full", className)}>
       <div className="h-8 flex items-center justify-between px-3 bg-[#161b22] border-b border-[#1c2333] flex-shrink-0">
         <div className="flex items-center gap-2 min-w-0">
-          <FileCode2 className="w-3.5 h-3.5 text-[#8b949e] flex-shrink-0" />
-          <span className="text-[11px] text-[#8b949e] font-mono truncate">
+          <FileCode2 className="w-3.5 h-3.5 text-[#b0bac5] flex-shrink-0" />
+          <span className="text-[11px] text-[#b0bac5] font-mono truncate">
             {filePath}
           </span>
           {canSave && isDirty && (
@@ -293,7 +293,7 @@ export default function CodeEditor({ content, filePath, onSave, readOnly = false
         <div className="flex items-center gap-1">
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1 px-2 py-0.5 text-[11px] text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#21262d] rounded transition-colors"
+            className="flex items-center gap-1 px-2 py-0.5 text-[11px] text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#21262d] rounded transition-colors"
             title="Copy"
           >
             {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}

@@ -60,7 +60,7 @@ function getLogColor(log: ExecutionLog): string {
   if (log.status === "failed" || log.status === "error") return "text-red-400";
   if (log.status === "completed" || log.status === "success") return "text-emerald-400";
   if (log.status === "in_progress" || log.status === "running") return "text-yellow-400";
-  return "text-[#8b949e]";
+  return "text-[#b0bac5]";
 }
 
 function getLogPrefix(log: ExecutionLog): string {
@@ -106,7 +106,7 @@ export default function BuildTerminal({ logs, isBuilding, className }: TerminalP
     <div className={cn("flex flex-col bg-[#0d1117] border-t border-[#1c2333]", className)}>
       <div className="h-8 flex items-center justify-between px-3 bg-[#161b22] border-b border-[#1c2333] flex-shrink-0">
         <div className="flex items-center gap-2">
-          <TerminalIcon className="w-3.5 h-3.5 text-[#8b949e]" />
+          <TerminalIcon className="w-3.5 h-3.5 text-[#b0bac5]" />
           <span className="text-[11px] font-semibold text-[#e1e4e8] uppercase tracking-wider">
             {t.terminal}
           </span>
@@ -120,7 +120,7 @@ export default function BuildTerminal({ logs, isBuilding, className }: TerminalP
         <div className="flex items-center gap-1">
           <button
             onClick={() => setIsMinimized(v => !v)}
-            className="p-1 text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333] rounded transition-colors"
+            className="p-1 text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333] rounded transition-colors"
           >
             {isMinimized ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>

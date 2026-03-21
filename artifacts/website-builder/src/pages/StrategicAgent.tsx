@@ -201,7 +201,7 @@ function MessageContent({ content, fontSize, lineSpacing, fontWeight }: { conten
           return (
             <div key={i} className="my-3 rounded-lg border border-[#30363d]">
               <div className="flex items-center justify-between px-3 py-1.5 bg-[#1c2333] rounded-t-lg">
-                <span className="text-[10px] text-[#8b949e] uppercase tracking-wide">{langLabel}</span>
+                <span className="text-[10px] text-[#b0bac5] uppercase tracking-wide">{langLabel}</span>
               </div>
               <pre className="p-3 bg-[#0d1117] text-[13px] leading-relaxed text-[#e1e4e8] overflow-x-auto" dir="ltr">
                 <code>{code}</code>
@@ -210,14 +210,14 @@ function MessageContent({ content, fontSize, lineSpacing, fontWeight }: { conten
                 <div className="sticky bottom-0 z-10 flex items-center justify-end gap-2 px-2 py-1.5">
                   <button
                     onClick={() => handleCopy(code, i)}
-                    className="flex items-center gap-1 px-2 py-1 rounded border border-[#30363d] bg-[#1c2333] text-[10px] text-[#8b949e] hover:text-[#e1e4e8] transition-colors"
+                    className="flex items-center gap-1 px-2 py-1 rounded border border-[#30363d] bg-[#1c2333] text-[10px] text-[#b0bac5] hover:text-[#e1e4e8] transition-colors"
                   >
                     {copiedIdx === i ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                     <span>{copiedIdx === i ? "Copied" : "Copy"}</span>
                   </button>
                   <button
                     onClick={handleDownload}
-                    className="flex items-center gap-1 px-2 py-1 rounded border border-[#30363d] bg-[#1c2333] text-[10px] text-[#8b949e] hover:text-[#e1e4e8] transition-colors"
+                    className="flex items-center gap-1 px-2 py-1 rounded border border-[#30363d] bg-[#1c2333] text-[10px] text-[#b0bac5] hover:text-[#e1e4e8] transition-colors"
                   >
                     <Download className="w-3 h-3" />
                   </button>
@@ -836,7 +836,7 @@ export default function StrategicAgent() {
               <MessageSquarePlus className="w-3.5 h-3.5" />
               {lang === "ar" ? "موضوع جديد" : "New Thread"}
             </button>
-            <button onClick={() => setSidebarOpen(false)} className="p-1.5 text-[#484f58] hover:text-[#8b949e] transition-colors">
+            <button onClick={() => setSidebarOpen(false)} className="p-1.5 text-[#484f58] hover:text-[#b0bac5] transition-colors">
               <PanelLeftClose className="w-4 h-4" />
             </button>
           </div>
@@ -862,7 +862,7 @@ export default function StrategicAgent() {
                         onClick={() => loadThread(thread.id)}
                         className={cn(
                           "w-full text-start px-3 py-2 text-[12px] truncate transition-colors",
-                          activeThreadId === thread.id ? "bg-[#1c2333] text-[#e1e4e8]" : "text-[#8b949e] hover:bg-[#1c2333]/50 hover:text-[#c9d1d9]"
+                          activeThreadId === thread.id ? "bg-[#1c2333] text-[#e1e4e8]" : "text-[#b0bac5] hover:bg-[#1c2333]/50 hover:text-[#c9d1d9]"
                         )}
                       >
                         {thread.title}
@@ -870,7 +870,7 @@ export default function StrategicAgent() {
                     )}
                     {editingThreadId !== thread.id && (
                       <div className="absolute end-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-opacity">
-                        <button onClick={e => { e.stopPropagation(); setEditingThreadId(thread.id); setEditingThreadTitle(thread.title); }} className="p-0.5 text-[#484f58] hover:text-[#8b949e]"><Pencil className="w-3 h-3" /></button>
+                        <button onClick={e => { e.stopPropagation(); setEditingThreadId(thread.id); setEditingThreadTitle(thread.title); }} className="p-0.5 text-[#484f58] hover:text-[#b0bac5]"><Pencil className="w-3 h-3" /></button>
                         <button onClick={e => { e.stopPropagation(); fetch(`/api/strategic/threads/${thread.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ archived: true }) }).then(() => fetchThreads()); }} className="p-0.5 text-[#484f58] hover:text-amber-400"><Archive className="w-3 h-3" /></button>
                         <button onClick={e => { e.stopPropagation(); deleteThread(thread.id); }} className="p-0.5 text-[#484f58] hover:text-red-400"><Trash2 className="w-3 h-3" /></button>
                       </div>
@@ -883,7 +883,7 @@ export default function StrategicAgent() {
 
           {archivedThreads.length > 0 && (
             <details className="border-t border-[#1c2333]">
-              <summary className="px-3 py-2 text-[10px] font-medium text-[#484f58] cursor-pointer hover:text-[#8b949e] flex items-center gap-1.5">
+              <summary className="px-3 py-2 text-[10px] font-medium text-[#484f58] cursor-pointer hover:text-[#b0bac5] flex items-center gap-1.5">
                 <Archive className="w-3 h-3" />
                 {lang === "ar" ? `الأرشيف (${archivedThreads.length})` : `Archive (${archivedThreads.length})`}
               </summary>
@@ -893,8 +893,8 @@ export default function StrategicAgent() {
                     <button
                       onClick={() => loadThread(thread.id)}
                       className={cn(
-                        "w-full text-start px-3 py-1.5 text-[11px] truncate text-[#484f58] hover:text-[#8b949e] transition-colors",
-                        activeThreadId === thread.id && "bg-[#1c2333] text-[#8b949e]"
+                        "w-full text-start px-3 py-1.5 text-[11px] truncate text-[#484f58] hover:text-[#b0bac5] transition-colors",
+                        activeThreadId === thread.id && "bg-[#1c2333] text-[#b0bac5]"
                       )}
                     >
                       {thread.title}
@@ -931,11 +931,11 @@ export default function StrategicAgent() {
 
       <header className="h-14 border-b border-[#1c2333] bg-[#161b22] flex items-center px-4 gap-3 flex-shrink-0">
         {!sidebarOpen && (
-          <button onClick={() => setSidebarOpen(true)} className="p-1.5 text-[#484f58] hover:text-[#8b949e] transition-colors rounded hover:bg-[#1c2333]">
+          <button onClick={() => setSidebarOpen(true)} className="p-1.5 text-[#484f58] hover:text-[#b0bac5] transition-colors rounded hover:bg-[#1c2333]">
             <PanelLeft className="w-4 h-4" />
           </button>
         )}
-        <Link href="/dashboard" className="p-1.5 text-[#8b949e] hover:text-[#e1e4e8] transition-colors rounded hover:bg-[#1c2333]">
+        <Link href="/dashboard" className="p-1.5 text-[#b0bac5] hover:text-[#e1e4e8] transition-colors rounded hover:bg-[#1c2333]">
           <ArrowLeft className={cn("w-4 h-4", lang === "ar" && "rotate-180")} />
         </Link>
         <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0", agentMode ? "bg-purple-500/20" : "bg-amber-500/20")}>
@@ -949,14 +949,14 @@ export default function StrategicAgent() {
             {!agentMode && (
               <button
                 onClick={() => setShowStrategicSettings(p => !p)}
-                className={cn("p-0.5 rounded transition-colors", showStrategicSettings ? "text-amber-400" : "text-[#484f58] hover:text-[#8b949e]")}
+                className={cn("p-0.5 rounded transition-colors", showStrategicSettings ? "text-amber-400" : "text-[#484f58] hover:text-[#b0bac5]")}
                 title={lang === "ar" ? "إعدادات الوكيل" : "Agent settings"}
               >
                 <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showStrategicSettings && "rotate-180")} />
               </button>
             )}
           </div>
-          <p className="text-[10px] text-[#8b949e] truncate">
+          <p className="text-[10px] text-[#b0bac5] truncate">
             {agentMode ? t.strategic_agent_config_subtitle : (strategicInfo ? `${((strategicInfo.primaryModel as any)?.model || "claude-sonnet-4-20250514")} · ${lang === "ar" ? "توكنات" : "tokens"}: ${strategicInfo.tokenLimit?.toLocaleString() || "16000"}` : t.strategic_page_subtitle)}
           </p>
           {showStrategicSettings && !agentMode && strategicInfo && (
@@ -969,7 +969,7 @@ export default function StrategicAgent() {
                 { key: "primaryModel.timeoutSeconds", label: lang === "ar" ? "المهلة الزمنية (ثانية)" : "Timeout (seconds)", value: (strategicInfo.primaryModel as any)?.timeoutSeconds, type: "number" },
               ].map(item => (
                 <div key={item.key} className="flex items-center justify-between">
-                  <span className="text-[11px] text-[#8b949e]">{item.label}</span>
+                  <span className="text-[11px] text-[#b0bac5]">{item.label}</span>
                   {editingField === item.key ? (
                     <div className="flex items-center gap-1">
                       <input
@@ -981,7 +981,7 @@ export default function StrategicAgent() {
                         onKeyDown={e => { if (e.key === "Enter") saveStrategicField(item.key, Number(editValue)); if (e.key === "Escape") setEditingField(null); }}
                       />
                       <button onClick={() => saveStrategicField(item.key, Number(editValue))} className="text-emerald-400 hover:text-emerald-300"><Check className="w-3 h-3" /></button>
-                      <button onClick={() => setEditingField(null)} className="text-[#8b949e] hover:text-red-400"><X className="w-3 h-3" /></button>
+                      <button onClick={() => setEditingField(null)} className="text-[#b0bac5] hover:text-red-400"><X className="w-3 h-3" /></button>
                     </div>
                   ) : (
                     <button onClick={() => { setEditingField(item.key); setEditValue(String(item.value ?? "")); }} className="text-[11px] text-[#c9d1d9] hover:text-amber-400 transition-colors">
@@ -991,20 +991,20 @@ export default function StrategicAgent() {
                 </div>
               ))}
               <div className="flex items-center justify-between">
-                <span className="text-[11px] text-[#8b949e]">{lang === "ar" ? "النموذج الأساسي" : "Primary Model"}</span>
+                <span className="text-[11px] text-[#b0bac5]">{lang === "ar" ? "النموذج الأساسي" : "Primary Model"}</span>
                 <span className="text-[11px] text-[#c9d1d9]">{(strategicInfo.primaryModel as any)?.model || "claude-sonnet-4-20250514"}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[11px] text-[#8b949e]">{lang === "ar" ? "مفعّل" : "Enabled"}</span>
+                <span className="text-[11px] text-[#b0bac5]">{lang === "ar" ? "مفعّل" : "Enabled"}</span>
                 <span className={cn("text-[11px]", strategicInfo.enabled ? "text-emerald-400" : "text-red-400")}>{strategicInfo.enabled ? (lang === "ar" ? "نعم" : "Yes") : (lang === "ar" ? "لا" : "No")}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[11px] text-[#8b949e]">{lang === "ar" ? "الحاكم" : "Governor"}</span>
+                <span className="text-[11px] text-[#b0bac5]">{lang === "ar" ? "الحاكم" : "Governor"}</span>
                 <span className={cn("text-[11px]", strategicInfo.governorEnabled ? "text-emerald-400" : "text-[#484f58]")}>{strategicInfo.governorEnabled ? (lang === "ar" ? "مفعّل" : "On") : (lang === "ar" ? "معطّل" : "Off")}</span>
               </div>
               {strategicInfo.permissions && strategicInfo.permissions.length > 0 && (
                 <div>
-                  <span className="text-[11px] text-[#8b949e]">{lang === "ar" ? "الصلاحيات" : "Permissions"}</span>
+                  <span className="text-[11px] text-[#b0bac5]">{lang === "ar" ? "الصلاحيات" : "Permissions"}</span>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {strategicInfo.permissions.map((p: string, i: number) => (
                       <span key={i} className="px-1.5 py-0.5 bg-amber-500/10 rounded text-[9px] text-amber-300 border border-amber-500/20">{p}</span>
@@ -1022,7 +1022,7 @@ export default function StrategicAgent() {
             "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border",
             agentMode
               ? "bg-purple-500/10 border-purple-500/30 text-purple-400 hover:bg-purple-500/20"
-              : "bg-[#1c2333] border-[#30363d] text-[#8b949e] hover:text-purple-400 hover:border-purple-500/30"
+              : "bg-[#1c2333] border-[#30363d] text-[#b0bac5] hover:text-purple-400 hover:border-purple-500/30"
           )}
         >
           <Bot className="w-3.5 h-3.5" />
@@ -1042,7 +1042,7 @@ export default function StrategicAgent() {
             </button>
             {showAgentDropdown && (
               <div className="absolute top-full mt-1 end-0 w-72 bg-[#161b22] border border-[#30363d] rounded-lg shadow-xl z-50 max-h-72 overflow-y-auto">
-                <div className="p-2 border-b border-[#1c2333] text-[10px] text-[#8b949e] font-medium uppercase tracking-wider px-3">
+                <div className="p-2 border-b border-[#1c2333] text-[10px] text-[#b0bac5] font-medium uppercase tracking-wider px-3">
                   {t.strategic_all_agents}
                 </div>
                 {agents.filter(a => a.agentKey !== "strategic").map(agent => (
@@ -1078,7 +1078,7 @@ export default function StrategicAgent() {
             </button>
             {showProjectDropdown && (
               <div className="absolute top-full mt-1 end-0 w-64 bg-[#161b22] border border-[#30363d] rounded-lg shadow-xl z-50 max-h-64 overflow-y-auto">
-                <div className="p-2 border-b border-[#1c2333] text-[10px] text-[#8b949e] font-medium uppercase tracking-wider px-3">
+                <div className="p-2 border-b border-[#1c2333] text-[10px] text-[#b0bac5] font-medium uppercase tracking-wider px-3">
                   {t.strategic_all_projects}
                 </div>
                 {projects.map((p: any) => (
@@ -1104,7 +1104,7 @@ export default function StrategicAgent() {
             <button
               onClick={handleResetAgent}
               disabled={resettingAgent}
-              className="p-1.5 text-[#8b949e] hover:text-orange-400 transition-colors rounded hover:bg-[#1c2333] disabled:opacity-40"
+              className="p-1.5 text-[#b0bac5] hover:text-orange-400 transition-colors rounded hover:bg-[#1c2333] disabled:opacity-40"
               title={t.strategic_reset_agent}
             >
               {resettingAgent ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
@@ -1113,7 +1113,7 @@ export default function StrategicAgent() {
           <div className="relative">
             <button
               onClick={() => setShowTextSettings(p => !p)}
-              className={cn("p-1.5 rounded transition-colors", showTextSettings ? "bg-amber-500/20 text-amber-400" : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]")}
+              className={cn("p-1.5 rounded transition-colors", showTextSettings ? "bg-amber-500/20 text-amber-400" : "text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333]")}
               title={lang === "ar" ? "إعدادات النص" : "Text settings"}
             >
               <Settings className="w-4 h-4" />
@@ -1121,27 +1121,27 @@ export default function StrategicAgent() {
             {showTextSettings && (
               <div className="absolute top-full mt-1 end-0 w-52 bg-[#161b22] border border-[#30363d] rounded-lg shadow-xl z-50 p-3 space-y-3">
                 <div>
-                  <div className="text-[10px] text-[#8b949e] mb-1.5">{lang === "ar" ? "حجم الخط" : "Font Size"}</div>
+                  <div className="text-[10px] text-[#b0bac5] mb-1.5">{lang === "ar" ? "حجم الخط" : "Font Size"}</div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => setFontSize(s => { const v = Math.max(12, s - 1); localStorage.setItem("strategic_fontSize", String(v)); return v; })} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Minus className="w-3 h-3" /></button>
+                    <button onClick={() => setFontSize(s => { const v = Math.max(12, s - 1); localStorage.setItem("strategic_fontSize", String(v)); return v; })} className="p-1 text-[#b0bac5] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Minus className="w-3 h-3" /></button>
                     <span className="text-xs text-[#c9d1d9] min-w-[28px] text-center">{fontSize}px</span>
-                    <button onClick={() => setFontSize(s => { const v = Math.min(24, s + 1); localStorage.setItem("strategic_fontSize", String(v)); return v; })} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Plus className="w-3 h-3" /></button>
+                    <button onClick={() => setFontSize(s => { const v = Math.min(24, s + 1); localStorage.setItem("strategic_fontSize", String(v)); return v; })} className="p-1 text-[#b0bac5] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Plus className="w-3 h-3" /></button>
                   </div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-[#8b949e] mb-1.5">{lang === "ar" ? "تباعد الأسطر" : "Line Spacing"}</div>
+                  <div className="text-[10px] text-[#b0bac5] mb-1.5">{lang === "ar" ? "تباعد الأسطر" : "Line Spacing"}</div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => setLineSpacing(s => { const v = Math.max(1, +(s - 0.25).toFixed(2)); localStorage.setItem("strategic_lineSpacing", String(v)); return v; })} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Minus className="w-3 h-3" /></button>
+                    <button onClick={() => setLineSpacing(s => { const v = Math.max(1, +(s - 0.25).toFixed(2)); localStorage.setItem("strategic_lineSpacing", String(v)); return v; })} className="p-1 text-[#b0bac5] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Minus className="w-3 h-3" /></button>
                     <span className="text-xs text-[#c9d1d9] min-w-[28px] text-center">{lineSpacing}</span>
-                    <button onClick={() => setLineSpacing(s => { const v = Math.min(3, +(s + 0.25).toFixed(2)); localStorage.setItem("strategic_lineSpacing", String(v)); return v; })} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Plus className="w-3 h-3" /></button>
+                    <button onClick={() => setLineSpacing(s => { const v = Math.min(3, +(s + 0.25).toFixed(2)); localStorage.setItem("strategic_lineSpacing", String(v)); return v; })} className="p-1 text-[#b0bac5] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Plus className="w-3 h-3" /></button>
                   </div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-[#8b949e] mb-1.5">{lang === "ar" ? "تعريض الخط" : "Font Weight"}</div>
+                  <div className="text-[10px] text-[#b0bac5] mb-1.5">{lang === "ar" ? "تعريض الخط" : "Font Weight"}</div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => setFontWeight(w => { const v = Math.max(100, w - 100); localStorage.setItem("strategic_fontWeight", String(v)); return v; })} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Minus className="w-3 h-3" /></button>
+                    <button onClick={() => setFontWeight(w => { const v = Math.max(100, w - 100); localStorage.setItem("strategic_fontWeight", String(v)); return v; })} className="p-1 text-[#b0bac5] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Minus className="w-3 h-3" /></button>
                     <span className="text-xs text-[#c9d1d9] min-w-[28px] text-center">{fontWeight}</span>
-                    <button onClick={() => setFontWeight(w => { const v = Math.min(900, w + 100); localStorage.setItem("strategic_fontWeight", String(v)); return v; })} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Plus className="w-3 h-3" /></button>
+                    <button onClick={() => setFontWeight(w => { const v = Math.min(900, w + 100); localStorage.setItem("strategic_fontWeight", String(v)); return v; })} className="p-1 text-[#b0bac5] hover:text-[#e1e4e8] bg-[#1c2333] rounded transition-colors"><Plus className="w-3 h-3" /></button>
                   </div>
                 </div>
               </div>
@@ -1149,12 +1149,12 @@ export default function StrategicAgent() {
           </div>
           <button
             onClick={clearChat}
-            className="p-1.5 text-[#8b949e] hover:text-red-400 transition-colors rounded hover:bg-[#1c2333]"
+            className="p-1.5 text-[#b0bac5] hover:text-red-400 transition-colors rounded hover:bg-[#1c2333]"
             title={t.strategic_clear_chat}
           >
             <Trash2 className="w-4 h-4" />
           </button>
-          <LanguageToggle className="!bg-[#1c2333] !text-[#8b949e] hover:!bg-[#30363d] !px-2 !py-1.5 !text-xs !rounded-lg" />
+          <LanguageToggle className="!bg-[#1c2333] !text-[#b0bac5] hover:!bg-[#30363d] !px-2 !py-1.5 !text-xs !rounded-lg" />
         </div>
       </header>
 
@@ -1201,7 +1201,7 @@ export default function StrategicAgent() {
             <div className="text-center">
               <Paperclip className="w-10 h-10 text-amber-400 mx-auto mb-2 animate-bounce" />
               <p className="text-amber-400 text-sm font-medium">{t.strategic_drop_files}</p>
-              <p className="text-[#8b949e] text-xs mt-1">{t.strategic_supported_files}</p>
+              <p className="text-[#b0bac5] text-xs mt-1">{t.strategic_supported_files}</p>
             </div>
           </div>
         )}
@@ -1213,7 +1213,7 @@ export default function StrategicAgent() {
                 <LightbulbIcon className="w-8 h-8 text-amber-400" />
               </div>
               <h2 className="text-lg font-semibold text-[#e1e4e8] mb-2">{t.strategic_page_title}</h2>
-              <p className="text-sm text-[#8b949e] mb-6">{t.strategic_page_subtitle}</p>
+              <p className="text-sm text-[#b0bac5] mb-6">{t.strategic_page_subtitle}</p>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => fileInputRef.current?.click()}
@@ -1245,14 +1245,14 @@ export default function StrategicAgent() {
                   <h2 className="text-lg font-semibold text-[#e1e4e8] mb-1">
                     {lang === "ar" ? selectedAgent.displayNameAr : selectedAgent.displayNameEn}
                   </h2>
-                  <p className="text-xs text-[#8b949e]">{selectedAgent.description}</p>
+                  <p className="text-xs text-[#b0bac5]">{selectedAgent.description}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   <div className="p-3 rounded-xl bg-[#161b22] border border-[#30363d]">
                     <div className="flex items-center gap-2 mb-1.5">
                       {selectedAgent.enabled ? <ToggleRight className="w-4 h-4 text-emerald-400" /> : <ToggleLeft className="w-4 h-4 text-red-400" />}
-                      <span className="text-[11px] text-[#8b949e]">{t.strategic_agent_enabled}</span>
+                      <span className="text-[11px] text-[#b0bac5]">{t.strategic_agent_enabled}</span>
                     </div>
                     <span className={cn("text-sm font-semibold", selectedAgent.enabled ? "text-emerald-400" : "text-red-400")}>
                       {selectedAgent.enabled ? t.strategic_agent_enabled : t.strategic_agent_disabled}
@@ -1261,21 +1261,21 @@ export default function StrategicAgent() {
                   <div className="p-3 rounded-xl bg-[#161b22] border border-[#30363d]">
                     <div className="flex items-center gap-2 mb-1.5">
                       <Zap className="w-4 h-4 text-amber-400" />
-                      <span className="text-[11px] text-[#8b949e]">{t.strategic_agent_tokens}</span>
+                      <span className="text-[11px] text-[#b0bac5]">{t.strategic_agent_tokens}</span>
                     </div>
                     <span className="text-sm font-semibold text-[#e1e4e8]">{selectedAgent.tokenLimit.toLocaleString()}</span>
                   </div>
                   <div className="p-3 rounded-xl bg-[#161b22] border border-[#30363d]">
                     <div className="flex items-center gap-2 mb-1.5">
                       <Shield className="w-4 h-4 text-[#58a6ff]" />
-                      <span className="text-[11px] text-[#8b949e]">{t.strategic_agent_permissions}</span>
+                      <span className="text-[11px] text-[#b0bac5]">{t.strategic_agent_permissions}</span>
                     </div>
                     <span className="text-sm font-semibold text-[#e1e4e8]">{selectedAgent.permissions?.length || 0}</span>
                   </div>
                   <div className="p-3 rounded-xl bg-[#161b22] border border-[#30363d]">
                     <div className="flex items-center gap-2 mb-1.5">
                       <Settings className="w-4 h-4 text-purple-400" />
-                      <span className="text-[11px] text-[#8b949e]">{t.strategic_agent_creativity}</span>
+                      <span className="text-[11px] text-[#b0bac5]">{t.strategic_agent_creativity}</span>
                     </div>
                     <span className="text-sm font-semibold text-[#e1e4e8]">{selectedAgent.creativity}</span>
                   </div>
@@ -1283,7 +1283,7 @@ export default function StrategicAgent() {
 
                 {selectedAgent.permissions && selectedAgent.permissions.length > 0 && (
                   <div className="p-3 rounded-xl bg-[#161b22] border border-[#30363d] mb-4">
-                    <div className="text-[11px] text-[#8b949e] mb-2 font-medium">{t.strategic_agent_permissions}</div>
+                    <div className="text-[11px] text-[#b0bac5] mb-2 font-medium">{t.strategic_agent_permissions}</div>
                     <div className="flex flex-wrap gap-1.5">
                       {selectedAgent.permissions.map((p: string, i: number) => (
                         <span key={i} className="px-2 py-0.5 bg-[#1c2333] rounded-md text-[10px] text-[#c9d1d9] border border-[#30363d]">
@@ -1301,7 +1301,7 @@ export default function StrategicAgent() {
                 <div className="w-16 h-16 mx-auto bg-purple-500/10 rounded-2xl flex items-center justify-center mb-4">
                   <Bot className="w-8 h-8 text-purple-400/50" />
                 </div>
-                <h2 className="text-lg font-semibold text-[#8b949e] mb-2">{t.strategic_select_agent}</h2>
+                <h2 className="text-lg font-semibold text-[#b0bac5] mb-2">{t.strategic_select_agent}</h2>
                 <p className="text-sm text-[#484f58]">{t.strategic_no_agent}</p>
               </div>
             )}
@@ -1338,7 +1338,7 @@ export default function StrategicAgent() {
                             <img src={att.preview} alt={att.name} className="w-20 h-20 object-cover rounded-lg border border-[#30363d]" />
                           </button>
                         ) : (
-                          <span className="text-[10px] text-[#8b949e]">[{att.name}]</span>
+                          <span className="text-[10px] text-[#b0bac5]">[{att.name}]</span>
                         )}
                       </div>
                     ))}
@@ -1352,7 +1352,7 @@ export default function StrategicAgent() {
                       <div className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
                       <div className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                     </div>
-                    <span className="text-[12px] text-[#8b949e]">
+                    <span className="text-[12px] text-[#b0bac5]">
                       {lang === "ar" ? "يفكر..." : "Thinking..."}
                     </span>
                   </div>
@@ -1371,7 +1371,7 @@ export default function StrategicAgent() {
                 )}
 
                 {isExpanded && (
-                  <div className="mt-2 text-[10px] text-[#8b949e] space-y-1">
+                  <div className="mt-2 text-[10px] text-[#b0bac5] space-y-1">
                     {msg.thinking && msg.thinking.map((th, i) => (
                       <div key={i}>{th.model} · {(th.durationMs / 1000).toFixed(1)}s</div>
                     ))}
@@ -1398,8 +1398,8 @@ export default function StrategicAgent() {
       {attachments.length > 0 && (
         <div className="border-t border-[#1c2333] bg-[#161b22] px-4 py-2">
           <div className="flex items-center gap-1.5 mb-2">
-            <Paperclip className="w-3 h-3 text-[#8b949e]" />
-            <span className="text-[10px] text-[#8b949e] font-medium">
+            <Paperclip className="w-3 h-3 text-[#b0bac5]" />
+            <span className="text-[10px] text-[#b0bac5] font-medium">
               {t.strategic_attachments} ({attachments.length})
             </span>
           </div>
@@ -1414,7 +1414,7 @@ export default function StrategicAgent() {
                 <span className="text-[11px] text-[#c9d1d9] truncate max-w-[100px]">{att.name}</span>
                 <button
                   onClick={() => removeAttachment(att.id)}
-                  className="p-0.5 text-[#8b949e] hover:text-red-400 transition-colors"
+                  className="p-0.5 text-[#b0bac5] hover:text-red-400 transition-colors"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -1430,14 +1430,14 @@ export default function StrategicAgent() {
             <div className="flex gap-1">
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="p-2 text-[#8b949e] hover:text-[#58a6ff] hover:bg-[#1c2333] rounded-lg transition-colors"
+                className="p-2 text-[#b0bac5] hover:text-[#58a6ff] hover:bg-[#1c2333] rounded-lg transition-colors"
                 title={t.strategic_upload_files}
               >
                 <Paperclip className="w-5 h-5" />
               </button>
               <button
                 onClick={() => imageInputRef.current?.click()}
-                className="p-2 text-[#8b949e] hover:text-purple-400 hover:bg-[#1c2333] rounded-lg transition-colors"
+                className="p-2 text-[#b0bac5] hover:text-purple-400 hover:bg-[#1c2333] rounded-lg transition-colors"
                 title={t.strategic_upload_images}
               >
                 <ImageIcon className="w-5 h-5" />
@@ -1488,7 +1488,7 @@ export default function StrategicAgent() {
           <div className="flex items-center justify-between mt-2">
             <p className="text-[10px] text-[#484f58]">{t.strategic_supported_files}</p>
             {(imageAttachmentCount > 0 || fileAttachmentCount > 0) && (
-              <div className="flex items-center gap-2 text-[10px] text-[#8b949e]">
+              <div className="flex items-center gap-2 text-[10px] text-[#b0bac5]">
                 {imageAttachmentCount > 0 && (
                   <span className="flex items-center gap-1">
                     <ImageIcon className="w-3 h-3 text-purple-400" />

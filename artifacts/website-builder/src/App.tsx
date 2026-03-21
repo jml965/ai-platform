@@ -66,7 +66,7 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen bg-[#0d1117] flex items-center justify-center text-center">
         <div>
           <p className="text-red-400 text-lg mb-2">Access Denied</p>
-          <p className="text-[#8b949e]">Admin access required</p>
+          <p className="text-[#b0bac5]">Admin access required</p>
         </div>
       </div>
     );

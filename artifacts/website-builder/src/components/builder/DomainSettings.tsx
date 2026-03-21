@@ -66,7 +66,7 @@ export default function DomainSettings({ projectId }: DomainSettingsProps) {
       case "active": return "text-emerald-400 bg-emerald-400/10";
       case "dns_pending": return "text-amber-400 bg-amber-400/10";
       case "ssl_error": return "text-red-400 bg-red-400/10";
-      default: return "text-[#8b949e] bg-[#8b949e]/10";
+      default: return "text-[#b0bac5] bg-[#b0bac5]/10";
     }
   };
 
@@ -121,12 +121,12 @@ export default function DomainSettings({ projectId }: DomainSettingsProps) {
 
       {isLoading && (
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="w-5 h-5 animate-spin text-[#8b949e]" />
+          <Loader2 className="w-5 h-5 animate-spin text-[#b0bac5]" />
         </div>
       )}
 
       {!isLoading && domains.length === 0 && (
-        <div className="text-center py-8 text-[#8b949e] text-sm">
+        <div className="text-center py-8 text-[#b0bac5] text-sm">
           {t.domain_no_domains}
         </div>
       )}
@@ -136,7 +136,7 @@ export default function DomainSettings({ projectId }: DomainSettingsProps) {
           <div key={domain.id} className="bg-[#161b22] border border-[#1c2333] rounded-lg p-3 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Globe className="w-4 h-4 text-[#8b949e]" />
+                <Globe className="w-4 h-4 text-[#b0bac5]" />
                 <span className="text-sm font-medium text-[#e1e4e8]" dir="ltr">{domain.domain}</span>
                 <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-medium", getStatusColor(domain.status))}>
                   {getStatusLabel(domain.status)}
@@ -146,7 +146,7 @@ export default function DomainSettings({ projectId }: DomainSettingsProps) {
                 <button
                   onClick={() => handleVerify(domain.id)}
                   disabled={verifyDomainMut.isPending}
-                  className="p-1.5 text-[#8b949e] hover:text-[#58a6ff] hover:bg-[#1c2333] rounded transition-colors"
+                  className="p-1.5 text-[#b0bac5] hover:text-[#58a6ff] hover:bg-[#1c2333] rounded transition-colors"
                   title={t.domain_verify}
                 >
                   {verifyDomainMut.isPending ? (
@@ -158,7 +158,7 @@ export default function DomainSettings({ projectId }: DomainSettingsProps) {
                 <button
                   onClick={() => handleRemove(domain.id)}
                   disabled={removeDomainMut.isPending}
-                  className="p-1.5 text-[#8b949e] hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"
+                  className="p-1.5 text-[#b0bac5] hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"
                   title={t.domain_remove}
                 >
                   {removeDomainMut.isPending ? (
@@ -175,12 +175,12 @@ export default function DomainSettings({ projectId }: DomainSettingsProps) {
                 {domain.dnsVerified ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
                 {domain.dnsVerified ? t.domain_dns_verified : t.domain_dns_not_verified}
               </span>
-              <span className={cn("flex items-center gap-1", domain.sslIssued ? "text-emerald-400" : "text-[#8b949e]")}>
+              <span className={cn("flex items-center gap-1", domain.sslIssued ? "text-emerald-400" : "text-[#b0bac5]")}>
                 <Shield className="w-3 h-3" />
                 {domain.sslIssued ? t.domain_ssl_issued : t.domain_ssl_not_issued}
               </span>
               {domain.sslExpiresAt && (
-                <span className="text-[#8b949e]">
+                <span className="text-[#b0bac5]">
                   {t.domain_ssl_expires}: {new Date(domain.sslExpiresAt).toLocaleDateString()}
                 </span>
               )}
@@ -251,7 +251,7 @@ function DnsRecordRow({
   const fieldKey = `${type}-${host}`;
   return (
     <div className="space-y-1">
-      <p className="text-[11px] text-[#8b949e]">{label}</p>
+      <p className="text-[11px] text-[#b0bac5]">{label}</p>
       <div className="grid grid-cols-3 gap-2 text-[11px]">
         <div className="bg-[#161b22] rounded px-2 py-1.5">
           <span className="text-[#484f58] block">{t.domain_record_type}</span>
@@ -268,7 +268,7 @@ function DnsRecordRow({
           </div>
           <button
             onClick={() => onCopy(value, fieldKey)}
-            className="p-1 text-[#8b949e] hover:text-[#e1e4e8] transition-colors flex-shrink-0"
+            className="p-1 text-[#b0bac5] hover:text-[#e1e4e8] transition-colors flex-shrink-0"
           >
             {copiedField === fieldKey ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
           </button>

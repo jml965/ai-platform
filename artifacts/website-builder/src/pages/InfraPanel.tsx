@@ -192,18 +192,18 @@ function MessageContent({ content }: { content: string }) {
           return (
             <div key={i} className="my-3 rounded-lg border border-[#30363d]">
               <div className="flex items-center justify-between px-3 py-1.5 bg-[#1c2333] rounded-t-lg">
-                <span className="text-[10px] text-[#8b949e] uppercase tracking-wide">{langLabel}</span>
+                <span className="text-[10px] text-[#b0bac5] uppercase tracking-wide">{langLabel}</span>
               </div>
               <pre className="p-3 bg-[#0d1117] text-[13px] leading-relaxed text-[#e1e4e8] overflow-x-auto" dir="ltr">
                 <code>{code}</code>
               </pre>
               {code.length > 0 && (
                 <div className="sticky bottom-0 z-10 flex items-center justify-end gap-2 px-2 py-1.5">
-                  <button onClick={() => handleCopy(code, i)} className="flex items-center gap-1 px-2 py-1 rounded border border-[#30363d] bg-[#1c2333] text-[10px] text-[#8b949e] hover:text-[#e1e4e8] transition-colors">
+                  <button onClick={() => handleCopy(code, i)} className="flex items-center gap-1 px-2 py-1 rounded border border-[#30363d] bg-[#1c2333] text-[10px] text-[#b0bac5] hover:text-[#e1e4e8] transition-colors">
                     {copiedIdx === i ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                     <span>{copiedIdx === i ? "Copied" : "Copy"}</span>
                   </button>
-                  <button onClick={handleDownload} className="flex items-center gap-1 px-2 py-1 rounded border border-[#30363d] bg-[#1c2333] text-[10px] text-[#8b949e] hover:text-[#e1e4e8] transition-colors">
+                  <button onClick={handleDownload} className="flex items-center gap-1 px-2 py-1 rounded border border-[#30363d] bg-[#1c2333] text-[10px] text-[#b0bac5] hover:text-[#e1e4e8] transition-colors">
                     <Download className="w-3 h-3" />
                   </button>
                 </div>
@@ -289,7 +289,7 @@ function ModelSlotEditor({ slot, label, onChange, lang, showCustomInput }: { slo
         <span className="text-[12px] font-medium text-[#e1e4e8]">{label}</span>
         <button
           onClick={() => onChange({ ...current, enabled: !current.enabled })}
-          className={cn("text-[11px] px-2 py-0.5 rounded-full", current.enabled ? "bg-green-500/15 text-green-400" : "bg-white/5 text-[#8b949e]")}
+          className={cn("text-[11px] px-2 py-0.5 rounded-full", current.enabled ? "bg-green-500/15 text-green-400" : "bg-white/5 text-[#b0bac5]")}
         >
           {current.enabled ? (isRTL ? "مفعّل" : "Active") : (isRTL ? "معطّل" : "Off")}
         </button>
@@ -343,7 +343,7 @@ function ModelSlotEditor({ slot, label, onChange, lang, showCustomInput }: { slo
       <div className="space-y-2.5">
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="text-[10px] text-[#8b949e]">{isRTL ? "الإبداع" : "Creativity"}</label>
+            <label className="text-[10px] text-[#b0bac5]">{isRTL ? "الإبداع" : "Creativity"}</label>
             <span className={cn("text-[10px] font-medium", creativityInfo.color)}>{creativityInfo.label} ({creativity.toFixed(2)})</span>
           </div>
           <input
@@ -355,7 +355,7 @@ function ModelSlotEditor({ slot, label, onChange, lang, showCustomInput }: { slo
             onChange={e => onChange({ ...current, creativity: parseFloat(e.target.value) })}
             className="w-full accent-[#7c3aed] h-1.5"
           />
-          <div className="flex justify-between text-[9px] text-[#8b949e]/50 mt-0.5">
+          <div className="flex justify-between text-[9px] text-[#b0bac5]/50 mt-0.5">
             <span>{isRTL ? "متزن" : "Balanced"}</span>
             <span>{isRTL ? "متوسط" : "Moderate"}</span>
             <span>{isRTL ? "ذكي" : "Smart"}</span>
@@ -366,7 +366,7 @@ function ModelSlotEditor({ slot, label, onChange, lang, showCustomInput }: { slo
 
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="text-[10px] text-[#8b949e]">{isRTL ? "التوكن" : "Tokens"}</label>
+            <label className="text-[10px] text-[#b0bac5]">{isRTL ? "التوكن" : "Tokens"}</label>
             <span className="text-[10px] font-mono text-[#e2e8f0]">{formatTokens(maxTokens)}</span>
           </div>
           <input
@@ -378,7 +378,7 @@ function ModelSlotEditor({ slot, label, onChange, lang, showCustomInput }: { slo
             onChange={e => onChange({ ...current, maxTokens: parseInt(e.target.value) })}
             className="w-full accent-[#3b82f6] h-1.5"
           />
-          <div className="flex justify-between text-[9px] text-[#8b949e]/50 mt-0.5">
+          <div className="flex justify-between text-[9px] text-[#b0bac5]/50 mt-0.5">
             <span>1K</span>
             <span>50K</span>
             <span>100K</span>
@@ -389,7 +389,7 @@ function ModelSlotEditor({ slot, label, onChange, lang, showCustomInput }: { slo
 
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="text-[10px] text-[#8b949e]">{isRTL ? "المهلة (ثانية)" : "Timeout (s)"}</label>
+            <label className="text-[10px] text-[#b0bac5]">{isRTL ? "المهلة (ثانية)" : "Timeout (s)"}</label>
             <span className="text-[10px] font-mono text-[#e2e8f0]">{timeoutSeconds}s</span>
           </div>
           <input
@@ -469,7 +469,7 @@ function AgentSettingsPanel({ config, onClose, onSave, lang }: { config: FullAge
       <div className="relative ms-auto w-full max-w-2xl h-full bg-[#0d1117] border-s border-[#1c2333] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3 border-b border-[#1c2333] bg-[#161b22]">
           <div className="flex items-center gap-3">
-            <div className={cn("p-2 rounded-lg bg-[#0d1117]", AGENT_COLORS[data.agentKey] || "text-[#8b949e]")}>
+            <div className={cn("p-2 rounded-lg bg-[#0d1117]", AGENT_COLORS[data.agentKey] || "text-[#b0bac5]")}>
               {AGENT_ICONS[data.agentKey] || <Bot className="w-5 h-5" />}
             </div>
             <div>
@@ -481,7 +481,7 @@ function AgentSettingsPanel({ config, onClose, onSave, lang }: { config: FullAge
             <button onClick={() => setData({ ...data, enabled: !data.enabled })} className={cn("px-2 py-1 rounded text-[10px] font-medium border", data.enabled ? "border-emerald-500/30 text-emerald-400 bg-emerald-500/10" : "border-red-500/30 text-red-400 bg-red-500/10")}>
               {data.enabled ? (lang === "ar" ? "مفعّل" : "Enabled") : (lang === "ar" ? "معطّل" : "Disabled")}
             </button>
-            <button onClick={onClose} className="p-1.5 hover:bg-[#1c2333] rounded text-[#8b949e] hover:text-[#e1e4e8]">
+            <button onClick={onClose} className="p-1.5 hover:bg-[#1c2333] rounded text-[#b0bac5] hover:text-[#e1e4e8]">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -489,7 +489,7 @@ function AgentSettingsPanel({ config, onClose, onSave, lang }: { config: FullAge
 
         <div className="flex border-b border-[#1c2333] bg-[#161b22] overflow-x-auto">
           {tabs.map(tab => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={cn("px-4 py-2 text-xs font-medium whitespace-nowrap transition-colors border-b-2", activeTab === tab.key ? "text-cyan-400 border-cyan-400" : "text-[#8b949e] border-transparent hover:text-[#e1e4e8]")}>
+            <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={cn("px-4 py-2 text-xs font-medium whitespace-nowrap transition-colors border-b-2", activeTab === tab.key ? "text-cyan-400 border-cyan-400" : "text-[#b0bac5] border-transparent hover:text-[#e1e4e8]")}>
               {tab.label}
             </button>
           ))}
@@ -525,13 +525,13 @@ function AgentSettingsPanel({ config, onClose, onSave, lang }: { config: FullAge
                       if (!data.governorEnabled) updates.autoGovernor = false;
                       setData({ ...data, ...updates });
                     }}
-                    className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] transition-colors", data.governorEnabled ? "bg-yellow-500/15 text-yellow-400 border border-yellow-500/30" : "bg-white/5 text-[#8b949e] border border-white/10")}
+                    className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] transition-colors", data.governorEnabled ? "bg-yellow-500/15 text-yellow-400 border border-yellow-500/30" : "bg-white/5 text-[#b0bac5] border border-white/10")}
                   >
                     {data.governorEnabled ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
                     {data.governorEnabled ? (lang === "ar" ? "دمج مفعّل" : "Merge Active") : (lang === "ar" ? "بدون دمج" : "No Merge")}
                   </button>
                 </div>
-                <p className="text-[11px] text-[#8b949e] leading-relaxed mb-3">
+                <p className="text-[11px] text-[#b0bac5] leading-relaxed mb-3">
                   {lang === "ar"
                     ? "عند تفعيل الحاكم: النماذج الثلاثة تفكّر بنفس المشكلة بشكل مستقل، ثم الحاكم يأخذ أفضل الأفكار من كل نموذج ويدمجها في حل نهائي متفوّق."
                     : "When enabled: All 3 models think independently, then the Governor extracts the best ideas and merges them into a superior final solution."
@@ -550,13 +550,13 @@ function AgentSettingsPanel({ config, onClose, onSave, lang }: { config: FullAge
                         if (!data.autoGovernor) updates.governorEnabled = false;
                         setData({ ...data, ...updates });
                       }}
-                      className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] transition-colors", data.autoGovernor ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" : "bg-white/5 text-[#8b949e] border border-white/10")}
+                      className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] transition-colors", data.autoGovernor ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" : "bg-white/5 text-[#b0bac5] border border-white/10")}
                     >
                       {data.autoGovernor ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
                       {data.autoGovernor ? (lang === "ar" ? "مفعّل" : "Active") : (lang === "ar" ? "معطّل" : "Off")}
                     </button>
                   </div>
-                  <p className="text-[10px] text-[#8b949e] mt-2 leading-relaxed">
+                  <p className="text-[10px] text-[#b0bac5] mt-2 leading-relaxed">
                     {lang === "ar"
                       ? "يقدّر تعقيد الرسالة تلقائياً (0-100) ويختار الوضع المناسب: بسيط → عادي → متقدم (3 نماذج + حاكم)."
                       : "Auto-scores complexity (0-100) and picks the right mode: Simple → Standard → Advanced (3 models + judge)."
@@ -566,15 +566,15 @@ function AgentSettingsPanel({ config, onClose, onSave, lang }: { config: FullAge
                     <div className="mt-2 grid grid-cols-3 gap-1.5">
                       <div className="bg-[#161b22] rounded px-2 py-1.5 text-center">
                         <div className="text-[10px] text-emerald-400 font-medium">{lang === "ar" ? "بسيط" : "Simple"}</div>
-                        <div className="text-[9px] text-[#8b949e]">{lang === "ar" ? "0-20 نقطة" : "0-20 pts"}</div>
+                        <div className="text-[9px] text-[#b0bac5]">{lang === "ar" ? "0-20 نقطة" : "0-20 pts"}</div>
                       </div>
                       <div className="bg-[#161b22] rounded px-2 py-1.5 text-center">
                         <div className="text-[10px] text-blue-400 font-medium">{lang === "ar" ? "عادي" : "Standard"}</div>
-                        <div className="text-[9px] text-[#8b949e]">{lang === "ar" ? "21-55 نقطة" : "21-55 pts"}</div>
+                        <div className="text-[9px] text-[#b0bac5]">{lang === "ar" ? "21-55 نقطة" : "21-55 pts"}</div>
                       </div>
                       <div className="bg-[#161b22] rounded px-2 py-1.5 text-center">
                         <div className="text-[10px] text-orange-400 font-medium">{lang === "ar" ? "متقدم" : "Advanced"}</div>
-                        <div className="text-[9px] text-[#8b949e]">{lang === "ar" ? "56-100 نقطة" : "56-100 pts"}</div>
+                        <div className="text-[9px] text-[#b0bac5]">{lang === "ar" ? "56-100 نقطة" : "56-100 pts"}</div>
                       </div>
                     </div>
                   )}
@@ -658,7 +658,7 @@ function AgentSettingsPanel({ config, onClose, onSave, lang }: { config: FullAge
               </div>
 
               <div className="bg-[#161b22] border border-white/7 rounded-xl p-4">
-                <p className="text-[10px] text-[#8b949e]/60">
+                <p className="text-[10px] text-[#b0bac5]/60">
                   {lang === "ar"
                     ? "كل نموذج يمكن ضبط إبداعه وتوكنه ومهلته بشكل مستقل — غيّر القيم مباشرة في كل خانة نموذج. يمكنك أيضاً كتابة اسم نموذج مخصص عبر خيار \"نموذج مخصص\"."
                     : "Each model has its own creativity, tokens, and timeout. You can also type any custom model name via the \"Custom model\" option."
@@ -670,14 +670,14 @@ function AgentSettingsPanel({ config, onClose, onSave, lang }: { config: FullAge
 
           {activeTab === "prompt" && (
             <div>
-              <label className="text-xs text-[#8b949e] mb-2 block">{lang === "ar" ? "البرومبت الأساسي" : "System Prompt"}</label>
+              <label className="text-xs text-[#b0bac5] mb-2 block">{lang === "ar" ? "البرومبت الأساسي" : "System Prompt"}</label>
               <textarea value={data.systemPrompt} onChange={e => setData({ ...data, systemPrompt: e.target.value })} rows={20} className="w-full bg-[#161b22] border border-[#30363d] rounded px-3 py-2 text-xs text-[#e1e4e8] font-mono leading-relaxed" dir="ltr" />
             </div>
           )}
 
           {activeTab === "instructions" && (
             <div>
-              <label className="text-xs text-[#8b949e] mb-2 block">{lang === "ar" ? "تعليمات إضافية" : "Additional Instructions"}</label>
+              <label className="text-xs text-[#b0bac5] mb-2 block">{lang === "ar" ? "تعليمات إضافية" : "Additional Instructions"}</label>
               <textarea value={data.instructions || ""} onChange={e => setData({ ...data, instructions: e.target.value })} rows={12} className="w-full bg-[#161b22] border border-[#30363d] rounded px-3 py-2 text-xs text-[#e1e4e8] font-mono leading-relaxed" dir="ltr" />
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <div>
@@ -690,7 +690,7 @@ function AgentSettingsPanel({ config, onClose, onSave, lang }: { config: FullAge
                 </div>
               </div>
               <div className="mt-4">
-                <label className="text-xs text-[#8b949e] mb-2 block">{lang === "ar" ? "ملفات المصدر" : "Source Files"}</label>
+                <label className="text-xs text-[#b0bac5] mb-2 block">{lang === "ar" ? "ملفات المصدر" : "Source Files"}</label>
                 <div className="space-y-1">
                   {(data.sourceFiles || []).map((sf, i) => (
                     <div key={i} className="flex items-center gap-2 bg-[#161b22] border border-[#30363d] rounded px-2 py-1">
@@ -713,7 +713,7 @@ function AgentSettingsPanel({ config, onClose, onSave, lang }: { config: FullAge
 
           {activeTab === "permissions" && (
             <div>
-              <label className="text-xs text-[#8b949e] mb-2 block">{lang === "ar" ? "الصلاحيات" : "Permissions"}</label>
+              <label className="text-xs text-[#b0bac5] mb-2 block">{lang === "ar" ? "الصلاحيات" : "Permissions"}</label>
               <div className="space-y-1">
                 {(data.permissions || []).map((perm, i) => (
                   <div key={i} className="flex items-center gap-2 bg-[#161b22] border border-[#30363d] rounded px-3 py-1.5">
@@ -738,11 +738,11 @@ function AgentSettingsPanel({ config, onClose, onSave, lang }: { config: FullAge
           {activeTab === "memory" && (
             <>
               <div>
-                <label className="text-xs text-[#8b949e] mb-2 block">{lang === "ar" ? "ذاكرة قصيرة المدى" : "Short-Term Memory"} ({(data.shortTermMemory || []).length})</label>
+                <label className="text-xs text-[#b0bac5] mb-2 block">{lang === "ar" ? "ذاكرة قصيرة المدى" : "Short-Term Memory"} ({(data.shortTermMemory || []).length})</label>
                 <textarea value={JSON.stringify(data.shortTermMemory || [], null, 2)} onChange={e => { try { setData({ ...data, shortTermMemory: JSON.parse(e.target.value) }); } catch {} }} rows={6} className="w-full bg-[#161b22] border border-[#30363d] rounded px-3 py-2 text-xs text-[#e1e4e8] font-mono" dir="ltr" />
               </div>
               <div>
-                <label className="text-xs text-[#8b949e] mb-2 block">{lang === "ar" ? "ذاكرة طويلة المدى" : "Long-Term Memory"} ({(data.longTermMemory || []).length})</label>
+                <label className="text-xs text-[#b0bac5] mb-2 block">{lang === "ar" ? "ذاكرة طويلة المدى" : "Long-Term Memory"} ({(data.longTermMemory || []).length})</label>
                 <textarea value={JSON.stringify(data.longTermMemory || [], null, 2)} onChange={e => { try { setData({ ...data, longTermMemory: JSON.parse(e.target.value) }); } catch {} }} rows={6} className="w-full bg-[#161b22] border border-[#30363d] rounded px-3 py-2 text-xs text-[#e1e4e8] font-mono" dir="ltr" />
               </div>
             </>
@@ -795,7 +795,7 @@ function AgentSettingsPanel({ config, onClose, onSave, lang }: { config: FullAge
 
         <div className="border-t border-[#1c2333] bg-[#161b22] px-5 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <button onClick={onClose} className="px-4 py-2 text-xs text-[#8b949e] hover:text-[#e1e4e8] border border-[#30363d] rounded-lg hover:bg-[#1c2333] transition-colors">
+            <button onClick={onClose} className="px-4 py-2 text-xs text-[#b0bac5] hover:text-[#e1e4e8] border border-[#30363d] rounded-lg hover:bg-[#1c2333] transition-colors">
               {lang === "ar" ? "إلغاء" : "Cancel"}
             </button>
             <button onClick={handleReset} disabled={resetting} className="px-4 py-2 text-xs text-orange-400 hover:text-orange-300 border border-orange-500/30 rounded-lg hover:bg-orange-500/10 transition-colors flex items-center gap-2 disabled:opacity-50">
@@ -1039,7 +1039,7 @@ export default function InfraPanel() {
       <div className="w-72 bg-[#0d1117] border-e border-[#1c2333] flex flex-col">
         <div className="p-4 border-b border-[#1c2333]">
           <Link href="/">
-            <button className="flex items-center gap-2 text-[#8b949e] hover:text-[#e1e4e8] transition-colors mb-3">
+            <button className="flex items-center gap-2 text-[#b0bac5] hover:text-[#e1e4e8] transition-colors mb-3">
               <ArrowLeft className="w-4 h-4" />
               <span className="text-sm">{lang === "ar" ? "الرئيسية" : "Home"}</span>
             </button>
@@ -1093,7 +1093,7 @@ export default function InfraPanel() {
                   : "hover:bg-[#161b22] border border-transparent"
               )}
             >
-              <div className={cn("flex-shrink-0 cursor-pointer", AGENT_COLORS[agent.agentKey] || "text-[#8b949e]")} onClick={() => selectAgent(agent)}>
+              <div className={cn("flex-shrink-0 cursor-pointer", AGENT_COLORS[agent.agentKey] || "text-[#b0bac5]")} onClick={() => selectAgent(agent)}>
                 {AGENT_ICONS[agent.agentKey] || <Bot className="w-5 h-5" />}
               </div>
               <div className="min-w-0 flex-1 cursor-pointer" onClick={() => selectAgent(agent)}>
@@ -1137,7 +1137,7 @@ export default function InfraPanel() {
           <>
             <header className="bg-[#0d1117] border-b border-[#1c2333] px-5 py-3 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className={cn("p-2 rounded-lg bg-[#161b22]", AGENT_COLORS[selectedAgent.agentKey] || "text-[#8b949e]")}>
+                <div className={cn("p-2 rounded-lg bg-[#161b22]", AGENT_COLORS[selectedAgent.agentKey] || "text-[#b0bac5]")}>
                   {AGENT_ICONS[selectedAgent.agentKey] || <Bot className="w-5 h-5" />}
                 </div>
                 <div>
@@ -1149,7 +1149,7 @@ export default function InfraPanel() {
               </div>
               <button
                 onClick={clearSession}
-                className="p-2 text-[#8b949e] hover:text-red-400 hover:bg-[#161b22] rounded-lg transition-colors"
+                className="p-2 text-[#b0bac5] hover:text-red-400 hover:bg-[#161b22] rounded-lg transition-colors"
                 title={lang === "ar" ? "مسح المحادثة" : "Clear chat"}
               >
                 <Trash2 className="w-4 h-4" />
@@ -1196,7 +1196,7 @@ export default function InfraPanel() {
                     <div key={msg.id} className="flex items-center justify-center py-1">
                       <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-[#161b22] border border-[#30363d]">
                         <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse" />
-                        <span className="text-[11px] text-[#8b949e]">{msg.content}</span>
+                        <span className="text-[11px] text-[#b0bac5]">{msg.content}</span>
                       </div>
                     </div>
                   );
@@ -1220,10 +1220,10 @@ export default function InfraPanel() {
                           <span className="text-[13px] font-bold text-red-400">طلب موافقة</span>
                         </div>
                         <div className="space-y-1.5 text-[12px]">
-                          <div><span className="text-[#8b949e]">العملية:</span> <span className="text-white font-mono">{data.tool}</span></div>
-                          <div><span className="text-[#8b949e]">النوع:</span> <span className="text-white">{catAr[data.category] || data.category}</span></div>
-                          <div><span className="text-[#8b949e]">الخطورة:</span> <span className={`font-bold ${data.risk === "critical" ? "text-red-400" : data.risk === "high" ? "text-orange-400" : "text-amber-400"}`}>{riskAr[data.risk] || data.risk}</span></div>
-                          {data.input && <div className="mt-2 font-mono text-[10px] text-[#8b949e] bg-[#0d1117] rounded-lg px-3 py-2 max-h-16 overflow-auto">{JSON.stringify(data.input).slice(0, 200)}</div>}
+                          <div><span className="text-[#b0bac5]">العملية:</span> <span className="text-white font-mono">{data.tool}</span></div>
+                          <div><span className="text-[#b0bac5]">النوع:</span> <span className="text-white">{catAr[data.category] || data.category}</span></div>
+                          <div><span className="text-[#b0bac5]">الخطورة:</span> <span className={`font-bold ${data.risk === "critical" ? "text-red-400" : data.risk === "high" ? "text-orange-400" : "text-amber-400"}`}>{riskAr[data.risk] || data.risk}</span></div>
+                          {data.input && <div className="mt-2 font-mono text-[10px] text-[#b0bac5] bg-[#0d1117] rounded-lg px-3 py-2 max-h-16 overflow-auto">{JSON.stringify(data.input).slice(0, 200)}</div>}
                         </div>
                         {data.decided ? (
                           <div className={`mt-3 text-[12px] font-bold ${data.decided === "approved" ? "text-emerald-400" : "text-red-400"}`}>
@@ -1252,7 +1252,7 @@ export default function InfraPanel() {
                           <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
                           <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                         </div>
-                        <span className="text-[12px] text-[#8b949e]">
+                        <span className="text-[12px] text-[#b0bac5]">
                           {lang === "ar" ? "يحلل النظام..." : "Analyzing system..."}
                         </span>
                       </div>

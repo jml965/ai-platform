@@ -901,14 +901,14 @@ function FloatingChatInner() {
                     <div className="flex items-center gap-1 px-2 py-1.5 bg-[#161b22] border-t border-[#30363d]">
                       <button
                         onClick={() => copyCode(trimmed, blockId)}
-                        className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] text-[#8b949e] hover:text-[#e1e4e8] hover:bg-white/5 transition-colors"
+                        className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-white/5 transition-colors"
                       >
                         {copiedId === blockId ? <CheckCheck className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
                         {copiedId === blockId ? (isRTL ? "تم" : "Copied") : (isRTL ? "نسخ" : "Copy")}
                       </button>
                       <button
                         onClick={() => downloadCode(trimmed, seg.lang)}
-                        className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] text-[#8b949e] hover:text-[#e1e4e8] hover:bg-white/5 transition-colors"
+                        className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-white/5 transition-colors"
                       >
                         <Download className="w-3 h-3" />
                         {isRTL ? "تحميل" : "Download"}
@@ -919,7 +919,7 @@ function FloatingChatInner() {
                           setShowSidebar(true);
                           setSidebarTab("files");
                         }}
-                        className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] text-[#8b949e] hover:text-cyan-400 hover:bg-cyan-500/5 transition-colors"
+                        className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] text-[#b0bac5] hover:text-cyan-400 hover:bg-cyan-500/5 transition-colors"
                       >
                         <Save className="w-3 h-3" />
                         {isRTL ? "حفظ" : "Save"}
@@ -1026,10 +1026,10 @@ function FloatingChatInner() {
                                   }
                                 }}
                               />
-                              <p className="text-[9px] text-[#8b949e] mt-1">{isRTL ? "اضغط للتكبير" : "Click to enlarge"}</p>
+                              <p className="text-[9px] text-[#b0bac5] mt-1">{isRTL ? "اضغط للتكبير" : "Click to enlarge"}</p>
                             </div>
                           ) : (
-                            <pre className="p-2 text-[10px] text-[#8b949e] overflow-x-auto max-h-[150px] overflow-y-auto whitespace-pre-wrap break-all" dir="ltr">
+                            <pre className="p-2 text-[10px] text-[#b0bac5] overflow-x-auto max-h-[150px] overflow-y-auto whitespace-pre-wrap break-all" dir="ltr">
                               {result ? result.result : (isRTL ? "لا توجد نتيجة محفوظة" : "No result stored")}
                             </pre>
                           )}
@@ -1046,7 +1046,7 @@ function FloatingChatInner() {
     );
   };
 
-  const agentColor = selectedAgent ? (AGENT_COLORS[selectedAgent.agentKey] || "text-[#8b949e]") : "text-cyan-400";
+  const agentColor = selectedAgent ? (AGENT_COLORS[selectedAgent.agentKey] || "text-[#b0bac5]") : "text-cyan-400";
   const agentIcon = selectedAgent ? (AGENT_ICONS[selectedAgent.agentKey] || <Bot className="w-4 h-4" />) : <Bot className="w-4 h-4" />;
 
   if (!open) {
@@ -1075,8 +1075,8 @@ function FloatingChatInner() {
           <span className="text-[12px] font-medium text-[#e1e4e8] flex-1 truncate">
             {selectedAgent ? (isRTL ? selectedAgent.displayNameAr : selectedAgent.displayNameEn) : "Chat"}
           </span>
-          <button onClick={(e) => { e.stopPropagation(); setMinimized(false); }} className="p-1 text-[#8b949e] hover:text-[#e1e4e8]"><Maximize2 className="w-3.5 h-3.5" /></button>
-          <button onClick={(e) => { e.stopPropagation(); setOpen(false); setMinimized(false); }} className="p-1 text-[#8b949e] hover:text-red-400"><X className="w-3.5 h-3.5" /></button>
+          <button onClick={(e) => { e.stopPropagation(); setMinimized(false); }} className="p-1 text-[#b0bac5] hover:text-[#e1e4e8]"><Maximize2 className="w-3.5 h-3.5" /></button>
+          <button onClick={(e) => { e.stopPropagation(); setOpen(false); setMinimized(false); }} className="p-1 text-[#b0bac5] hover:text-red-400"><X className="w-3.5 h-3.5" /></button>
         </div>
       </div>,
       document.body
@@ -1106,7 +1106,7 @@ function FloatingChatInner() {
               <span className="text-[12px] font-semibold text-[#e1e4e8] truncate">
                 {selectedAgent ? (isRTL ? selectedAgent.displayNameAr : selectedAgent.displayNameEn) : (isRTL ? "اختر وكيل" : "Select agent")}
               </span>
-              <ChevronDown className={`w-3 h-3 text-[#8b949e] flex-shrink-0 transition-transform ${showAgentPicker ? "rotate-180" : ""}`} />
+              <ChevronDown className={`w-3 h-3 text-[#b0bac5] flex-shrink-0 transition-transform ${showAgentPicker ? "rotate-180" : ""}`} />
             </button>
 
             {showAgentPicker && (
@@ -1119,7 +1119,7 @@ function FloatingChatInner() {
                       selectedAgent?.agentKey === agent.agentKey ? "bg-white/8" : ""
                     }`}
                   >
-                    <div className={`flex-shrink-0 ${AGENT_COLORS[agent.agentKey] || "text-[#8b949e]"}`}>
+                    <div className={`flex-shrink-0 ${AGENT_COLORS[agent.agentKey] || "text-[#b0bac5]"}`}>
                       {AGENT_ICONS[agent.agentKey] || <Bot className="w-4 h-4" />}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -1138,25 +1138,25 @@ function FloatingChatInner() {
 
           <button
             onClick={() => setShowSidebar(!showSidebar)}
-            className={`p-1.5 transition-colors rounded-md ${showSidebar ? "text-[#58a6ff] bg-[#58a6ff]/10" : "text-[#8b949e] hover:text-[#e1e4e8] hover:bg-white/5"}`}
+            className={`p-1.5 transition-colors rounded-md ${showSidebar ? "text-[#58a6ff] bg-[#58a6ff]/10" : "text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-white/5"}`}
             title={isRTL ? "المحادثات" : "Conversations"}
           >
             {showSidebar ? <PanelLeftClose className="w-3.5 h-3.5" /> : <PanelLeftOpen className="w-3.5 h-3.5" />}
           </button>
           <button
             onClick={() => { setWandMode(!wandMode); setWandHighlight(null); }}
-            className={`p-1.5 transition-colors rounded-md ${wandMode ? "text-amber-400 bg-amber-500/15" : "text-[#8b949e] hover:text-amber-400 hover:bg-white/5"}`}
+            className={`p-1.5 transition-colors rounded-md ${wandMode ? "text-amber-400 bg-amber-500/15" : "text-[#b0bac5] hover:text-amber-400 hover:bg-white/5"}`}
             title={isRTL ? "عصا سحرية" : "Magic Wand"}
           >
             <Wand2 className="w-3.5 h-3.5" />
           </button>
-          <button onClick={() => { setMessages([]); setActiveThreadId(null); }} className="p-1.5 text-[#8b949e] hover:text-red-400 rounded-md hover:bg-white/5" title={isRTL ? "مسح" : "Clear"}>
+          <button onClick={() => { setMessages([]); setActiveThreadId(null); }} className="p-1.5 text-[#b0bac5] hover:text-red-400 rounded-md hover:bg-white/5" title={isRTL ? "مسح" : "Clear"}>
             <Trash2 className="w-3.5 h-3.5" />
           </button>
-          <button onClick={() => setMinimized(true)} className="p-1.5 text-[#8b949e] hover:text-[#e1e4e8] rounded-md hover:bg-white/5">
+          <button onClick={() => setMinimized(true)} className="p-1.5 text-[#b0bac5] hover:text-[#e1e4e8] rounded-md hover:bg-white/5">
             <Minimize2 className="w-3.5 h-3.5" />
           </button>
-          <button onClick={() => { setOpen(false); setWandMode(false); setWandHighlight(null); }} className="p-1.5 text-[#8b949e] hover:text-red-400 rounded-md hover:bg-white/5">
+          <button onClick={() => { setOpen(false); setWandMode(false); setWandHighlight(null); }} className="p-1.5 text-[#b0bac5] hover:text-red-400 rounded-md hover:bg-white/5">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -1176,14 +1176,14 @@ function FloatingChatInner() {
               <div className="flex border-b border-[#1c2333]">
                 <button
                   onClick={() => setSidebarTab("chats")}
-                  className={`flex-1 px-2 py-1.5 text-[10px] font-semibold flex items-center justify-center gap-1 transition-colors ${sidebarTab === "chats" ? "text-cyan-400 border-b-2 border-cyan-400" : "text-[#484f58] hover:text-[#8b949e]"}`}
+                  className={`flex-1 px-2 py-1.5 text-[10px] font-semibold flex items-center justify-center gap-1 transition-colors ${sidebarTab === "chats" ? "text-cyan-400 border-b-2 border-cyan-400" : "text-[#484f58] hover:text-[#b0bac5]"}`}
                 >
                   <MessageSquare className="w-3 h-3" />
                   {isRTL ? "المحادثات" : "Chats"}
                 </button>
                 <button
                   onClick={() => setSidebarTab("files")}
-                  className={`flex-1 px-2 py-1.5 text-[10px] font-semibold flex items-center justify-center gap-1 transition-colors ${sidebarTab === "files" ? "text-cyan-400 border-b-2 border-cyan-400" : "text-[#484f58] hover:text-[#8b949e]"}`}
+                  className={`flex-1 px-2 py-1.5 text-[10px] font-semibold flex items-center justify-center gap-1 transition-colors ${sidebarTab === "files" ? "text-cyan-400 border-b-2 border-cyan-400" : "text-[#484f58] hover:text-[#b0bac5]"}`}
                 >
                   <FolderOpen className="w-3 h-3" />
                   {isRTL ? "الملفات" : "Files"}
@@ -1197,7 +1197,7 @@ function FloatingChatInner() {
                     <span className="text-[10px] text-[#484f58]">{threads.filter(t => t.agentKey === (selectedAgent?.agentKey || "strategic")).length} {isRTL ? "محادثة" : "chats"}</span>
                     <button
                       onClick={startNewThread}
-                      className="p-1 rounded-md hover:bg-white/5 text-[#8b949e] hover:text-cyan-400 transition-colors"
+                      className="p-1 rounded-md hover:bg-white/5 text-[#b0bac5] hover:text-cyan-400 transition-colors"
                       title={isRTL ? "محادثة جديدة" : "New chat"}
                     >
                       <Plus className="w-3.5 h-3.5" />
@@ -1215,7 +1215,7 @@ function FloatingChatInner() {
                           const isActive = thread.id === activeThreadId;
                           const isEditing = editingThreadId === thread.id;
                           const threadAgent = AGENT_ICONS[thread.agentKey];
-                          const threadColor = AGENT_COLORS[thread.agentKey] || "text-[#8b949e]";
+                          const threadColor = AGENT_COLORS[thread.agentKey] || "text-[#b0bac5]";
                           return (
                             <div
                               key={thread.id}
@@ -1285,7 +1285,7 @@ function FloatingChatInner() {
                       {savedFiles.filter(f => f.agentKey === (selectedAgent?.agentKey || "strategic")).map(file => {
                         const isRenaming = renamingFileId === file.id;
                         const isPreviewing = previewFileId === file.id;
-                        const fileColor = AGENT_COLORS[file.agentKey] || "text-[#8b949e]";
+                        const fileColor = AGENT_COLORS[file.agentKey] || "text-[#b0bac5]";
                         return (
                           <div key={file.id}>
                             <div className={`group relative px-2 py-1.5 mx-1 rounded-lg transition-colors hover:bg-white/5`}>
@@ -1330,7 +1330,7 @@ function FloatingChatInner() {
                                           onClick={() => { copyFileContent(file.content); setFileMenuId(null); }}
                                           className="w-full flex items-center gap-2 px-3 py-1.5 text-start text-[11px] text-[#c9d1d9] hover:bg-white/5"
                                         >
-                                          <Copy className="w-3 h-3 text-[#8b949e]" />
+                                          <Copy className="w-3 h-3 text-[#b0bac5]" />
                                           {isRTL ? "نسخ المحتوى" : "Copy content"}
                                         </button>
                                         <button
@@ -1415,7 +1415,7 @@ function FloatingChatInner() {
                           <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
                           <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
                           <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                          <span className="text-[10px] text-[#8b949e]">{isRTL ? "يحلل..." : "Analyzing..."}</span>
+                          <span className="text-[10px] text-[#b0bac5]">{isRTL ? "يحلل..." : "Analyzing..."}</span>
                         </div>
                       ) : renderMessageContent(textContent || msg.content)}
                       {msgImages && msgImages.length > 0 && (
@@ -1452,7 +1452,7 @@ function FloatingChatInner() {
                       if (btn.cmd.endsWith(": ")) { setPrompt(btn.cmd); textareaRef.current?.focus(); }
                       else { doSend(btn.cmd); }
                     }}
-                    className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#161b22] hover:bg-[#1c2333] border border-[#30363d] text-[10px] text-[#8b949e] hover:text-cyan-400 transition-colors whitespace-nowrap"
+                    className="flex items-center gap-1 px-2 py-1 rounded-md bg-[#161b22] hover:bg-[#1c2333] border border-[#30363d] text-[10px] text-[#b0bac5] hover:text-cyan-400 transition-colors whitespace-nowrap"
                     title={btn.cmd}
                   >
                     {btn.icon}
@@ -1518,7 +1518,7 @@ function FloatingChatInner() {
                   <div className="relative">
                     <button
                       onClick={() => setShowScreenshotMenu(!showScreenshotMenu)}
-                      className={`p-1.5 rounded-lg transition-colors ${pendingImages.length > 0 ? "text-cyan-400 bg-cyan-500/10" : "text-[#484f58] hover:text-[#8b949e] hover:bg-white/5"}`}
+                      className={`p-1.5 rounded-lg transition-colors ${pendingImages.length > 0 ? "text-cyan-400 bg-cyan-500/10" : "text-[#484f58] hover:text-[#b0bac5] hover:bg-white/5"}`}
                       title={isRTL ? "التقاط صورة" : "Screenshot"}
                     >
                       <Camera className="w-4 h-4" />
@@ -1603,7 +1603,7 @@ function FloatingChatInner() {
           <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[#161b22] border border-[#30363d] rounded-lg px-4 py-2 flex items-center gap-3 shadow-2xl">
             <Scissors className="w-4 h-4 text-amber-400" />
             <span className="text-[12px] text-[#e1e4e8]">{isRTL ? "اسحب لتحديد المنطقة — Esc للإلغاء" : "Drag to select area — Esc to cancel"}</span>
-            <button onClick={() => { setScreenshotMode("off"); setCropRect(null); cropStartRef.current = null; }} className="p-1 text-[#8b949e] hover:text-red-400">
+            <button onClick={() => { setScreenshotMode("off"); setCropRect(null); cropStartRef.current = null; }} className="p-1 text-[#b0bac5] hover:text-red-400">
               <X className="w-3.5 h-3.5" />
             </button>
           </div>

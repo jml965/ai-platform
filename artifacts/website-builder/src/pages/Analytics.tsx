@@ -58,7 +58,7 @@ function StatCard({
     <div className="bg-[#161b22] border border-[#1c2333] rounded-xl p-4 hover:border-[#30363d] transition-colors">
       <div className="flex items-center gap-3 mb-2">
         <div className="p-2 rounded-lg bg-[#1f6feb]/10 text-[#58a6ff]">{icon}</div>
-        <span className="text-sm text-[#8b949e]">{label}</span>
+        <span className="text-sm text-[#b0bac5]">{label}</span>
       </div>
       <p className="text-2xl font-bold text-[#e1e4e8]">{value}</p>
       {subtitle && <p className="text-xs text-[#484f58] mt-1">{subtitle}</p>}
@@ -68,7 +68,7 @@ function StatCard({
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-20 text-[#8b949e]">
+    <div className="flex flex-col items-center justify-center py-20 text-[#b0bac5]">
       <BarChart3 className="w-12 h-12 mb-4 opacity-30" />
       <p className="text-sm">{message}</p>
     </div>
@@ -127,7 +127,7 @@ export default function Analytics() {
     if (!active || !payload?.length) return null;
     return (
       <div className="bg-[#161b22] border border-[#30363d] rounded-lg px-3 py-2 shadow-xl">
-        <p className="text-xs text-[#8b949e] mb-1">{label}</p>
+        <p className="text-xs text-[#b0bac5] mb-1">{label}</p>
         {payload.map((p: any, i: number) => (
           <p key={i} className="text-sm font-medium" style={{ color: p.color }}>
             {p.name}: {p.value}
@@ -143,13 +143,13 @@ export default function Analytics() {
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-4">
           <Link
             href={`/project/${id}`}
-            className="p-1.5 text-[#8b949e] hover:text-[#e1e4e8] transition-colors rounded hover:bg-[#1c2333]"
+            className="p-1.5 text-[#b0bac5] hover:text-[#e1e4e8] transition-colors rounded hover:bg-[#1c2333]"
           >
             <ArrowLeft className={cn("w-5 h-5", lang === "ar" && "rotate-180")} />
           </Link>
           <div className="flex-1">
             <h1 className="text-lg font-bold">{t.analytics_title}</h1>
-            <p className="text-xs text-[#8b949e]">{project?.name || t.loading}</p>
+            <p className="text-xs text-[#b0bac5]">{project?.name || t.loading}</p>
           </div>
           <div className="flex items-center gap-2">
             <div className="flex bg-[#161b22] rounded-lg border border-[#1c2333] overflow-hidden">
@@ -159,7 +159,7 @@ export default function Analytics() {
                   "px-3 py-1.5 text-xs font-medium transition-colors",
                   period === "7d"
                     ? "bg-[#1f6feb] text-white"
-                    : "text-[#8b949e] hover:text-[#e1e4e8]"
+                    : "text-[#b0bac5] hover:text-[#e1e4e8]"
                 )}
               >
                 {t.analytics_period_7d}
@@ -170,7 +170,7 @@ export default function Analytics() {
                   "px-3 py-1.5 text-xs font-medium transition-colors",
                   period === "30d"
                     ? "bg-[#1f6feb] text-white"
-                    : "text-[#8b949e] hover:text-[#e1e4e8]"
+                    : "text-[#b0bac5] hover:text-[#e1e4e8]"
                 )}
               >
                 {t.analytics_period_30d}
@@ -204,7 +204,7 @@ export default function Analytics() {
                     {copied ? t.analytics_copied : t.analytics_copy}
                   </button>
                 </div>
-                <p className="text-xs text-[#8b949e] mb-3">{t.analytics_tracking_desc}</p>
+                <p className="text-xs text-[#b0bac5] mb-3">{t.analytics_tracking_desc}</p>
                 <pre className="bg-[#0d1117] rounded-lg p-4 text-xs text-[#79c0ff] overflow-x-auto font-mono leading-relaxed">
                   {trackingScript}
                 </pre>
@@ -268,10 +268,10 @@ export default function Analytics() {
                     <XAxis
                       dataKey="date"
                       stroke="#484f58"
-                      tick={{ fill: "#8b949e", fontSize: 11 }}
+                      tick={{ fill: "#b0bac5", fontSize: 11 }}
                       tickFormatter={(v) => v.slice(5)}
                     />
-                    <YAxis stroke="#484f58" tick={{ fill: "#8b949e", fontSize: 11 }} />
+                    <YAxis stroke="#484f58" tick={{ fill: "#b0bac5", fontSize: 11 }} />
                     <Tooltip content={<CustomTooltip />} />
                     <Area
                       type="monotone"
@@ -302,7 +302,7 @@ export default function Analytics() {
                 </h3>
                 {pages && pages.length > 0 ? (
                   <div className="space-y-2">
-                    <div className="flex items-center text-xs text-[#8b949e] px-3 py-1">
+                    <div className="flex items-center text-xs text-[#b0bac5] px-3 py-1">
                       <span className="flex-1">{t.analytics_page}</span>
                       <span className="w-20 text-center">{t.analytics_views}</span>
                       <span className="w-20 text-center">{t.analytics_visitors}</span>
@@ -316,14 +316,14 @@ export default function Analytics() {
                           {page.path}
                         </span>
                         <span className="w-20 text-center text-sm">{page.views}</span>
-                        <span className="w-20 text-center text-sm text-[#8b949e]">
+                        <span className="w-20 text-center text-sm text-[#b0bac5]">
                           {page.uniqueVisitors}
                         </span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-[#8b949e] text-center py-8">{t.analytics_no_data}</p>
+                  <p className="text-sm text-[#b0bac5] text-center py-8">{t.analytics_no_data}</p>
                 )}
               </div>
 
@@ -340,7 +340,7 @@ export default function Analytics() {
                           <span className="truncate">
                             {source.source === "Direct" ? t.analytics_direct : source.source}
                           </span>
-                          <span className="text-[#8b949e] flex-shrink-0 ms-2">
+                          <span className="text-[#b0bac5] flex-shrink-0 ms-2">
                             {source.views} ({source.percentage}%)
                           </span>
                         </div>
@@ -357,7 +357,7 @@ export default function Analytics() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-[#8b949e] text-center py-8">{t.analytics_no_data}</p>
+                  <p className="text-sm text-[#b0bac5] text-center py-8">{t.analytics_no_data}</p>
                 )}
               </div>
             </div>
@@ -370,7 +370,7 @@ export default function Analytics() {
               {devices ? (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   <div>
-                    <h4 className="text-xs font-medium text-[#8b949e] mb-3">{t.analytics_browsers}</h4>
+                    <h4 className="text-xs font-medium text-[#b0bac5] mb-3">{t.analytics_browsers}</h4>
                     <div className="h-48">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
@@ -408,26 +408,26 @@ export default function Analytics() {
                             />
                             <span>{b.name}</span>
                           </div>
-                          <span className="text-[#8b949e]">{b.percentage}%</span>
+                          <span className="text-[#b0bac5]">{b.percentage}%</span>
                         </div>
                       ))}
                     </div>
                   </div>
 
                   <div>
-                    <h4 className="text-xs font-medium text-[#8b949e] mb-3">
+                    <h4 className="text-xs font-medium text-[#b0bac5] mb-3">
                       {t.analytics_device_types}
                     </h4>
                     <div className="h-48">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={devices.devices} layout="vertical">
                           <CartesianGrid strokeDasharray="3 3" stroke="#1c2333" />
-                          <XAxis type="number" stroke="#484f58" tick={{ fill: "#8b949e", fontSize: 11 }} />
+                          <XAxis type="number" stroke="#484f58" tick={{ fill: "#b0bac5", fontSize: 11 }} />
                           <YAxis
                             type="category"
                             dataKey="name"
                             stroke="#484f58"
-                            tick={{ fill: "#8b949e", fontSize: 11 }}
+                            tick={{ fill: "#b0bac5", fontSize: 11 }}
                             width={60}
                           />
                           <Tooltip content={<CustomTooltip />} />
@@ -438,7 +438,7 @@ export default function Analytics() {
                   </div>
 
                   <div>
-                    <h4 className="text-xs font-medium text-[#8b949e] mb-3">
+                    <h4 className="text-xs font-medium text-[#b0bac5] mb-3">
                       {t.analytics_operating_systems}
                     </h4>
                     <div className="h-48">
@@ -478,14 +478,14 @@ export default function Analytics() {
                             />
                             <span>{o.name}</span>
                           </div>
-                          <span className="text-[#8b949e]">{o.percentage}%</span>
+                          <span className="text-[#b0bac5]">{o.percentage}%</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-[#8b949e] text-center py-8">{t.analytics_no_data}</p>
+                <p className="text-sm text-[#b0bac5] text-center py-8">{t.analytics_no_data}</p>
               )}
             </div>
 
@@ -503,7 +503,7 @@ export default function Analytics() {
                   {copied ? t.analytics_copied : t.analytics_copy}
                 </button>
               </div>
-              <p className="text-xs text-[#8b949e] mb-3">{t.analytics_tracking_desc}</p>
+              <p className="text-xs text-[#b0bac5] mb-3">{t.analytics_tracking_desc}</p>
               <pre className="bg-[#0d1117] rounded-lg p-4 text-xs text-[#79c0ff] overflow-x-auto font-mono leading-relaxed">
                 {trackingScript}
               </pre>

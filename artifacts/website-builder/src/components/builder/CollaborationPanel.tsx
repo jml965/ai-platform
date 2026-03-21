@@ -29,7 +29,7 @@ export default function CollaborationPanel({
   return (
     <div className="flex flex-col h-full">
       <div className="px-3 py-2 border-b border-[#1c2333] bg-[#161b22] flex items-center gap-2">
-        <Users className="w-3.5 h-3.5 text-[#8b949e]" />
+        <Users className="w-3.5 h-3.5 text-[#b0bac5]" />
         <span className="text-[11px] font-semibold text-[#e1e4e8] uppercase tracking-wider">
           {t.collab_panel_title}
         </span>
@@ -144,7 +144,7 @@ export default function CollaborationPanel({
                 className={cn(
                   "flex items-center gap-1.5 px-2 py-1 rounded text-[10px]",
                   notification.type === "join" && "bg-emerald-500/10 text-emerald-400",
-                  notification.type === "leave" && "bg-[#484f58]/10 text-[#8b949e]",
+                  notification.type === "leave" && "bg-[#484f58]/10 text-[#b0bac5]",
                   notification.type === "lock" && "bg-yellow-500/10 text-yellow-400",
                   notification.type === "unlock" && "bg-blue-500/10 text-blue-400",
                   notification.type === "lock_rejected" && "bg-red-500/10 text-red-400",

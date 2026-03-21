@@ -85,7 +85,7 @@ export default function BuildProgress({ currentPhase, failed, allComplete, class
       })}
 
       {(allComplete || failed) && totalCostUsd != null && totalCostUsd > 0 && (
-        <div className="ms-auto flex items-center gap-2 text-[10px] font-mono text-[#8b949e]">
+        <div className="ms-auto flex items-center gap-2 text-[10px] font-mono text-[#b0bac5]">
           <span>${totalCostUsd.toFixed(4)}</span>
           {totalTokensUsed != null && totalTokensUsed > 0 && (
             <span>{totalTokensUsed.toLocaleString()} {lang === "ar" ? "توكن" : "tokens"}</span>

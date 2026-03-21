@@ -143,7 +143,7 @@ export default function SeoPanel({ projectId }: SeoPanelProps) {
             {isAnalyzing ? t.seo_analyzing : analysis ? t.seo_reanalyze : t.seo_analyze}
           </button>
         </div>
-        <p className="text-[11px] text-[#8b949e]">{t.seo_description}</p>
+        <p className="text-[11px] text-[#b0bac5]">{t.seo_description}</p>
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -164,7 +164,7 @@ export default function SeoPanel({ projectId }: SeoPanelProps) {
         {isAnalyzing && (
           <div className="flex flex-col items-center justify-center h-full">
             <Loader2 className="w-8 h-8 animate-spin text-[#58a6ff] mb-3" />
-            <p className="text-sm text-[#8b949e]">{t.seo_analyzing}</p>
+            <p className="text-sm text-[#b0bac5]">{t.seo_analyzing}</p>
             <p className="text-[11px] text-[#484f58] mt-1">{t.seo_analyzing_desc}</p>
           </div>
         )}
@@ -203,14 +203,14 @@ export default function SeoPanel({ projectId }: SeoPanelProps) {
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span className="text-lg font-bold">{passedCount}</span>
                 </div>
-                <span className="text-[10px] text-[#8b949e]">{t.seo_passed}</span>
+                <span className="text-[10px] text-[#b0bac5]">{t.seo_passed}</span>
               </div>
               <div className="flex-1 bg-[#161b22] border border-[#1c2333] rounded-lg p-3 text-center">
                 <div className="flex items-center justify-center gap-1 text-red-400">
                   <XCircle className="w-3.5 h-3.5" />
                   <span className="text-lg font-bold">{failedCount}</span>
                 </div>
-                <span className="text-[10px] text-[#8b949e]">{t.seo_failed}</span>
+                <span className="text-[10px] text-[#b0bac5]">{t.seo_failed}</span>
               </div>
             </div>
 
@@ -223,19 +223,19 @@ export default function SeoPanel({ projectId }: SeoPanelProps) {
                 <div className="space-y-1.5 mb-3">
                   {analysis.metaSuggestions.title && (
                     <div className="text-[11px]">
-                      <span className="text-[#8b949e]">{t.seo_meta_title}: </span>
+                      <span className="text-[#b0bac5]">{t.seo_meta_title}: </span>
                       <span className="text-[#c9d1d9]">{analysis.metaSuggestions.title}</span>
                     </div>
                   )}
                   {analysis.metaSuggestions.description && (
                     <div className="text-[11px]">
-                      <span className="text-[#8b949e]">{t.seo_meta_desc}: </span>
+                      <span className="text-[#b0bac5]">{t.seo_meta_desc}: </span>
                       <span className="text-[#c9d1d9]">{analysis.metaSuggestions.description}</span>
                     </div>
                   )}
                   {analysis.metaSuggestions.keywords && (
                     <div className="text-[11px]">
-                      <span className="text-[#8b949e]">{t.seo_meta_keywords}: </span>
+                      <span className="text-[#b0bac5]">{t.seo_meta_keywords}: </span>
                       <span className="text-[#c9d1d9]">{analysis.metaSuggestions.keywords}</span>
                     </div>
                   )}
@@ -321,7 +321,7 @@ export default function SeoPanel({ projectId }: SeoPanelProps) {
                                   <p className="text-[11px] font-medium text-[#e1e4e8]">
                                     {lang === "ar" ? check.nameAr : check.name}
                                   </p>
-                                  <p className="text-[10px] text-[#8b949e] mt-0.5">
+                                  <p className="text-[10px] text-[#b0bac5] mt-0.5">
                                     {lang === "ar" ? check.messageAr : check.message}
                                   </p>
                                   {!check.passed && (check.suggestion || check.suggestionAr) && (

@@ -116,12 +116,12 @@ export default function TranslationsPanel({ projectId, onInjectSwitcher }: Trans
           <Languages className="w-4 h-4 text-[#58a6ff]" />
           <h2 className="text-sm font-semibold">{t.translations_title}</h2>
         </div>
-        <p className="text-xs text-[#8b949e]">{t.translations_desc}</p>
+        <p className="text-xs text-[#b0bac5]">{t.translations_desc}</p>
       </div>
 
       <div className="px-4 py-3 border-b border-[#1c2333]">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-medium text-[#8b949e] uppercase tracking-wider">
+          <span className="text-xs font-medium text-[#b0bac5] uppercase tracking-wider">
             {t.translations_panel}
           </span>
           <div className="relative">
@@ -147,7 +147,7 @@ export default function TranslationsPanel({ projectId, onInjectSwitcher }: Trans
                     className="w-full px-3 py-2 text-start text-xs hover:bg-[#1c2333] flex items-center justify-between transition-colors"
                   >
                     <span>{lang === "ar" ? sl.nameAr : sl.name}</span>
-                    <span className="text-[#8b949e]">
+                    <span className="text-[#b0bac5]">
                       {sl.rtl ? t.translations_rtl : t.translations_ltr}
                     </span>
                   </button>
@@ -158,7 +158,7 @@ export default function TranslationsPanel({ projectId, onInjectSwitcher }: Trans
         </div>
 
         {projectLanguages.length === 0 ? (
-          <p className="text-xs text-[#8b949e] py-4 text-center">
+          <p className="text-xs text-[#b0bac5] py-4 text-center">
             {t.translations_no_languages}
           </p>
         ) : (
@@ -191,7 +191,7 @@ export default function TranslationsPanel({ projectId, onInjectSwitcher }: Trans
                     e.stopPropagation();
                     handleRemoveLanguage(pl.languageCode);
                   }}
-                  className="p-0.5 text-[#8b949e] hover:text-red-400 transition-colors"
+                  className="p-0.5 text-[#b0bac5] hover:text-red-400 transition-colors"
                 >
                   <Trash2 className="w-3 h-3" />
                 </button>
@@ -218,7 +218,7 @@ export default function TranslationsPanel({ projectId, onInjectSwitcher }: Trans
       {selectedLang && (
         <div className="flex-1 overflow-y-auto">
           <div className="px-4 py-2 border-b border-[#1c2333] flex items-center justify-between sticky top-0 bg-[#0d1117] z-10">
-            <span className="text-xs font-medium text-[#8b949e]">
+            <span className="text-xs font-medium text-[#b0bac5]">
               {t.translations_content_keys} ({translationsList.length})
             </span>
             <button
@@ -245,7 +245,7 @@ export default function TranslationsPanel({ projectId, onInjectSwitcher }: Trans
           </div>
 
           {translationsList.length === 0 ? (
-            <p className="text-xs text-[#8b949e] py-8 text-center px-4">
+            <p className="text-xs text-[#b0bac5] py-8 text-center px-4">
               {t.translations_no_translations}
             </p>
           ) : (
@@ -253,7 +253,7 @@ export default function TranslationsPanel({ projectId, onInjectSwitcher }: Trans
               {translationsList.map((tr) => (
                 <div key={tr.id} className="px-4 py-3">
                   <div className="flex items-start justify-between gap-2 mb-1.5">
-                    <span className="text-[10px] text-[#8b949e] font-mono truncate max-w-[200px]">
+                    <span className="text-[10px] text-[#b0bac5] font-mono truncate max-w-[200px]">
                       {tr.contentKey.split("::").pop()}
                     </span>
                     <span
@@ -271,7 +271,7 @@ export default function TranslationsPanel({ projectId, onInjectSwitcher }: Trans
                   </div>
 
                   <div className="mb-1.5">
-                    <span className="text-[10px] text-[#8b949e] block mb-0.5">
+                    <span className="text-[10px] text-[#b0bac5] block mb-0.5">
                       {t.translations_source}
                     </span>
                     <p className="text-xs text-[#e1e4e8]/70 bg-[#161b22] px-2 py-1.5 rounded">
@@ -280,7 +280,7 @@ export default function TranslationsPanel({ projectId, onInjectSwitcher }: Trans
                   </div>
 
                   <div>
-                    <span className="text-[10px] text-[#8b949e] block mb-0.5">
+                    <span className="text-[10px] text-[#b0bac5] block mb-0.5">
                       {t.translations_translated}
                     </span>
                     {editingId === tr.id ? (
@@ -305,7 +305,7 @@ export default function TranslationsPanel({ projectId, onInjectSwitcher }: Trans
                               setEditingId(null);
                               setEditText("");
                             }}
-                            className="p-1 text-[#8b949e] hover:bg-[#1c2333] rounded transition-colors"
+                            className="p-1 text-[#b0bac5] hover:bg-[#1c2333] rounded transition-colors"
                           >
                             <X className="w-3.5 h-3.5" />
                           </button>
@@ -324,7 +324,7 @@ export default function TranslationsPanel({ projectId, onInjectSwitcher }: Trans
                             setEditingId(tr.id);
                             setEditText(tr.translatedText);
                           }}
-                          className="p-1 text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333] rounded transition-colors flex-shrink-0"
+                          className="p-1 text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333] rounded transition-colors flex-shrink-0"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>

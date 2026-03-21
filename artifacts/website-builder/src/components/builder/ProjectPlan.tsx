@@ -56,7 +56,7 @@ export default function ProjectPlan({ steps, onApprove, onModify, isApproved, cl
             <div className="flex-1 min-w-0">
               <p className={cn(
                 "text-[13px] font-medium",
-                step.status === "done" ? "text-[#8b949e] line-through" : "text-[#e1e4e8]"
+                step.status === "done" ? "text-[#b0bac5] line-through" : "text-[#e1e4e8]"
               )}>
                 {step.title}
               </p>
@@ -82,7 +82,7 @@ export default function ProjectPlan({ steps, onApprove, onModify, isApproved, cl
           {onModify && (
             <button
               onClick={onModify}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-[#8b949e] border border-[#30363d] rounded-md hover:text-[#e1e4e8] hover:bg-[#1c2333] transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-[#b0bac5] border border-[#30363d] rounded-md hover:text-[#e1e4e8] hover:bg-[#1c2333] transition-colors"
             >
               <Edit3 className="w-3.5 h-3.5" />
               {t.plan_modify}

@@ -100,7 +100,7 @@ export default function PwaSettingsPanel({ projectId }: PwaSettingsPanelProps) {
       <label className="flex items-center justify-between p-3 bg-[#161b22] border border-[#30363d] rounded-lg cursor-pointer hover:border-[#58a6ff]/50 transition-colors">
         <div className="flex-1">
           <p className="text-[13px] font-medium text-[#e1e4e8]">{t.pwa_enable}</p>
-          <p className="text-[11px] text-[#8b949e] mt-0.5">{t.pwa_enable_desc}</p>
+          <p className="text-[11px] text-[#b0bac5] mt-0.5">{t.pwa_enable_desc}</p>
         </div>
         <div
           onClick={handleToggleEnabled}
@@ -122,7 +122,7 @@ export default function PwaSettingsPanel({ projectId }: PwaSettingsPanelProps) {
         <>
           <div className="space-y-3">
             <div>
-              <label className="text-[11px] font-medium text-[#8b949e] mb-1 block">{t.pwa_app_name}</label>
+              <label className="text-[11px] font-medium text-[#b0bac5] mb-1 block">{t.pwa_app_name}</label>
               <input
                 type="text"
                 value={form.appName}
@@ -132,7 +132,7 @@ export default function PwaSettingsPanel({ projectId }: PwaSettingsPanelProps) {
             </div>
 
             <div>
-              <label className="text-[11px] font-medium text-[#8b949e] mb-1 block">{t.pwa_short_name}</label>
+              <label className="text-[11px] font-medium text-[#b0bac5] mb-1 block">{t.pwa_short_name}</label>
               <input
                 type="text"
                 value={form.shortName}
@@ -142,7 +142,7 @@ export default function PwaSettingsPanel({ projectId }: PwaSettingsPanelProps) {
             </div>
 
             <div>
-              <label className="text-[11px] font-medium text-[#8b949e] mb-1 block">{t.pwa_description}</label>
+              <label className="text-[11px] font-medium text-[#b0bac5] mb-1 block">{t.pwa_description}</label>
               <textarea
                 value={form.description}
                 onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
@@ -153,7 +153,7 @@ export default function PwaSettingsPanel({ projectId }: PwaSettingsPanelProps) {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-[11px] font-medium text-[#8b949e] mb-1 block">{t.pwa_theme_color}</label>
+                <label className="text-[11px] font-medium text-[#b0bac5] mb-1 block">{t.pwa_theme_color}</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="color"
@@ -170,7 +170,7 @@ export default function PwaSettingsPanel({ projectId }: PwaSettingsPanelProps) {
                 </div>
               </div>
               <div>
-                <label className="text-[11px] font-medium text-[#8b949e] mb-1 block">{t.pwa_bg_color}</label>
+                <label className="text-[11px] font-medium text-[#b0bac5] mb-1 block">{t.pwa_bg_color}</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="color"
@@ -190,7 +190,7 @@ export default function PwaSettingsPanel({ projectId }: PwaSettingsPanelProps) {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-[11px] font-medium text-[#8b949e] mb-1 block">{t.pwa_display}</label>
+                <label className="text-[11px] font-medium text-[#b0bac5] mb-1 block">{t.pwa_display}</label>
                 <select
                   value={form.display}
                   onChange={e => setForm(f => ({ ...f, display: e.target.value }))}
@@ -203,7 +203,7 @@ export default function PwaSettingsPanel({ projectId }: PwaSettingsPanelProps) {
                 </select>
               </div>
               <div>
-                <label className="text-[11px] font-medium text-[#8b949e] mb-1 block">{t.pwa_orientation}</label>
+                <label className="text-[11px] font-medium text-[#b0bac5] mb-1 block">{t.pwa_orientation}</label>
                 <select
                   value={form.orientation}
                   onChange={e => setForm(f => ({ ...f, orientation: e.target.value }))}
@@ -218,7 +218,7 @@ export default function PwaSettingsPanel({ projectId }: PwaSettingsPanelProps) {
             </div>
 
             <div>
-              <label className="text-[11px] font-medium text-[#8b949e] mb-1 block">{t.pwa_icon_url}</label>
+              <label className="text-[11px] font-medium text-[#b0bac5] mb-1 block">{t.pwa_icon_url}</label>
               <input
                 type="text"
                 value={form.iconUrl}
@@ -229,7 +229,7 @@ export default function PwaSettingsPanel({ projectId }: PwaSettingsPanelProps) {
             </div>
 
             <div>
-              <label className="text-[11px] font-medium text-[#8b949e] mb-1 block">{t.pwa_start_url}</label>
+              <label className="text-[11px] font-medium text-[#b0bac5] mb-1 block">{t.pwa_start_url}</label>
               <input
                 type="text"
                 value={form.startUrl}
@@ -243,11 +243,11 @@ export default function PwaSettingsPanel({ projectId }: PwaSettingsPanelProps) {
                 {form.offlineEnabled ? (
                   <WifiOff className="w-4 h-4 text-[#58a6ff]" />
                 ) : (
-                  <Wifi className="w-4 h-4 text-[#8b949e]" />
+                  <Wifi className="w-4 h-4 text-[#b0bac5]" />
                 )}
                 <div>
                   <p className="text-[13px] font-medium text-[#e1e4e8]">{t.pwa_offline}</p>
-                  <p className="text-[11px] text-[#8b949e]">{t.pwa_offline_desc}</p>
+                  <p className="text-[11px] text-[#b0bac5]">{t.pwa_offline_desc}</p>
                 </div>
               </div>
               <div
@@ -269,10 +269,10 @@ export default function PwaSettingsPanel({ projectId }: PwaSettingsPanelProps) {
 
           <div className="space-y-2 p-3 bg-[#161b22] border border-[#30363d] rounded-lg">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-[#8b949e]">{t.pwa_manifest_url}</span>
+              <span className="text-[11px] text-[#b0bac5]">{t.pwa_manifest_url}</span>
               <button
                 onClick={() => copyToClipboard(manifestUrl)}
-                className="p-1 text-[#8b949e] hover:text-[#e1e4e8] transition-colors"
+                className="p-1 text-[#b0bac5] hover:text-[#e1e4e8] transition-colors"
               >
                 <Copy className="w-3 h-3" />
               </button>
@@ -280,10 +280,10 @@ export default function PwaSettingsPanel({ projectId }: PwaSettingsPanelProps) {
             <p className="text-[11px] font-mono text-[#58a6ff] truncate">{manifestUrl}</p>
 
             <div className="flex items-center justify-between mt-2">
-              <span className="text-[11px] text-[#8b949e]">{t.pwa_sw_url}</span>
+              <span className="text-[11px] text-[#b0bac5]">{t.pwa_sw_url}</span>
               <button
                 onClick={() => copyToClipboard(swUrl)}
-                className="p-1 text-[#8b949e] hover:text-[#e1e4e8] transition-colors"
+                className="p-1 text-[#b0bac5] hover:text-[#e1e4e8] transition-colors"
               >
                 <Copy className="w-3 h-3" />
               </button>

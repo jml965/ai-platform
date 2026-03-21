@@ -98,7 +98,7 @@ function BLabel({ ar, en }: { ar: string; en: string }) {
 }
 
 function FieldHint({ text }: { text: string }) {
-  return <p className="text-[9px] text-[#8b949e]/70 mt-0.5 leading-relaxed">{text}</p>;
+  return <p className="text-[9px] text-[#b0bac5]/70 mt-0.5 leading-relaxed">{text}</p>;
 }
 
 function StatusDot({ status }: { status: string }) {
@@ -171,14 +171,14 @@ function AiProviderDetail({
           <h2 className="text-[15px] font-bold">{provider.displayNameAr} <span className="text-[#58a6ff]">({provider.displayName})</span></h2>
           <div className="flex items-center gap-2 mt-0.5">
             <StatusBadge status={provider.keyStatus} />
-            <span className="text-[10px] text-[#8b949e]">{provider.models.length} نموذج (models)</span>
+            <span className="text-[10px] text-[#b0bac5]">{provider.models.length} نموذج (models)</span>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
-          <label className="text-[10px] text-[#8b949e] mb-1 block"><BLabel ar="مفتاح API" en="API Key" /></label>
+          <label className="text-[10px] text-[#b0bac5] mb-1 block"><BLabel ar="مفتاح API" en="API Key" /></label>
           <FieldHint text="المفتاح السري للاتصال بخدمة المزود" />
           <div className="flex gap-1.5 mt-1">
             <div className="relative flex-1">
@@ -189,7 +189,7 @@ function AiProviderDetail({
                 placeholder="أدخل مفتاح API..."
                 className="w-full bg-[#0d1117] border border-white/10 rounded-lg px-3 py-2 text-[11px] text-[#e2e8f0] font-mono pr-8"
               />
-              <button onClick={() => setShowKey(!showKey)} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#8b949e] hover:text-white">
+              <button onClick={() => setShowKey(!showKey)} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#b0bac5] hover:text-white">
                 {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
               </button>
             </div>
@@ -198,7 +198,7 @@ function AiProviderDetail({
           </div>
         </div>
         <div>
-          <label className="text-[10px] text-[#8b949e] mb-1 block"><BLabel ar="رابط الحصول على المفتاح" en="Get API Key Link" /></label>
+          <label className="text-[10px] text-[#b0bac5] mb-1 block"><BLabel ar="رابط الحصول على المفتاح" en="Get API Key Link" /></label>
           <FieldHint text="رابط مباشر لصفحة إنشاء مفتاح API في موقع المزود" />
           <a href={provider.apiKeyUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 bg-[#0d1117] border border-white/10 rounded-lg px-3 py-2 text-[11px] text-blue-400 hover:text-blue-300 mt-1">
             <ExternalLink className="w-3.5 h-3.5" />
@@ -209,22 +209,22 @@ function AiProviderDetail({
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <div>
-          <label className="text-[10px] text-[#8b949e] mb-1 block"><BLabel ar="الأولوية" en="Priority" /></label>
+          <label className="text-[10px] text-[#b0bac5] mb-1 block"><BLabel ar="الأولوية" en="Priority" /></label>
           <FieldHint text="رقم أقل = أولوية أعلى" />
           <input type="number" min="1" max="50" value={provider.priority} onChange={e => onUpdate(provider.providerKey, { priority: parseInt(e.target.value) || 10 })} className="w-full bg-[#0d1117] border border-white/10 rounded-lg px-3 py-1.5 text-[11px] text-[#e2e8f0] mt-0.5" />
         </div>
         <div>
-          <label className="text-[10px] text-[#8b949e] mb-1 block"><BLabel ar="الميزانية الشهرية" en="Monthly Budget $" /></label>
+          <label className="text-[10px] text-[#b0bac5] mb-1 block"><BLabel ar="الميزانية الشهرية" en="Monthly Budget $" /></label>
           <FieldHint text="الحد الأقصى للإنفاق شهرياً بالدولار" />
           <input type="number" min="0" step="1" value={parseFloat(provider.budgetMonthlyUsd) || 0} onChange={e => onUpdate(provider.providerKey, { budgetMonthlyUsd: e.target.value } as any)} className="w-full bg-[#0d1117] border border-white/10 rounded-lg px-3 py-1.5 text-[11px] text-[#e2e8f0] mt-0.5" />
         </div>
         <div>
-          <label className="text-[10px] text-[#8b949e] mb-1 block"><BLabel ar="تنبيه عند %" en="Alert Threshold %" /></label>
+          <label className="text-[10px] text-[#b0bac5] mb-1 block"><BLabel ar="تنبيه عند %" en="Alert Threshold %" /></label>
           <FieldHint text="نسبة الميزانية التي يُرسل عندها تنبيه" />
           <input type="number" min="50" max="100" value={provider.alertThreshold} onChange={e => onUpdate(provider.providerKey, { alertThreshold: parseInt(e.target.value) || 80 })} className="w-full bg-[#0d1117] border border-white/10 rounded-lg px-3 py-1.5 text-[11px] text-[#e2e8f0] mt-0.5" />
         </div>
         <div>
-          <label className="text-[10px] text-[#8b949e] mb-1 block"><BLabel ar="مزود احتياطي" en="Fallback Provider" /></label>
+          <label className="text-[10px] text-[#b0bac5] mb-1 block"><BLabel ar="مزود احتياطي" en="Fallback Provider" /></label>
           <FieldHint text="المزود البديل إذا فشل هذا المزود" />
           <select value={provider.fallbackProviderKey || ""} onChange={e => onUpdate(provider.providerKey, { fallbackProviderKey: e.target.value || null } as any)} className="w-full bg-[#0d1117] border border-white/10 rounded-lg px-3 py-1.5 text-[11px] text-[#e2e8f0] mt-0.5">
             <option value="">بدون (None)</option>
@@ -246,9 +246,9 @@ function AiProviderDetail({
             <div key={m.id} className="flex items-center justify-between bg-[#0d1117] border border-white/5 rounded-lg px-3 py-2">
               <div>
                 <span className="text-[11px] font-medium">{m.name}</span>
-                <span className="text-[9px] text-[#8b949e] ml-2">{m.id}</span>
+                <span className="text-[9px] text-[#b0bac5] ml-2">{m.id}</span>
               </div>
-              <div className="flex items-center gap-3 text-[9px] text-[#8b949e]">
+              <div className="flex items-center gap-3 text-[9px] text-[#b0bac5]">
                 <span title="الحد الأقصى للتوكنات">{(m.maxTokens / 1000).toFixed(0)}K tokens</span>
                 <span className="text-green-400" title="تكلفة الإدخال">${m.inputCostPer1k}/1K in</span>
                 <span className="text-orange-400" title="تكلفة الإخراج">${m.outputCostPer1k}/1K out</span>
@@ -272,9 +272,9 @@ function AiProviderDetail({
               { label: "الشهر (Month)", data: usage.monthly },
             ].map(period => (
               <div key={period.label} className="bg-[#0d1117] border border-white/5 rounded-lg p-2.5">
-                <span className="text-[9px] text-[#8b949e] block mb-1">{period.label}</span>
+                <span className="text-[9px] text-[#b0bac5] block mb-1">{period.label}</span>
                 <div className="text-[13px] font-bold text-green-400">${period.data.cost.toFixed(4)}</div>
-                <div className="text-[9px] text-[#8b949e] mt-0.5">
+                <div className="text-[9px] text-[#b0bac5] mt-0.5">
                   {(period.data.tokens / 1000).toFixed(1)}K توكن · {period.data.requests} طلب
                 </div>
               </div>
@@ -325,10 +325,10 @@ function AiProviderDetail({
               <div key={i} className="flex items-center justify-between bg-[#0d1117] border border-white/5 rounded px-2.5 py-1.5 text-[10px]">
                 <div className="flex items-center gap-2">
                   <span className={log.success ? "text-green-400" : "text-red-400"}>{log.success ? "✓" : "✗"}</span>
-                  <span className="text-[#8b949e]">{log.modelId}</span>
+                  <span className="text-[#b0bac5]">{log.modelId}</span>
                   {log.agentKey && <span className="text-[#7c3aed]">{log.agentKey}</span>}
                 </div>
-                <div className="flex items-center gap-2 text-[#8b949e]">
+                <div className="flex items-center gap-2 text-[#b0bac5]">
                   <span>{((log.inputTokens + log.outputTokens) / 1000).toFixed(1)}K</span>
                   <span className="text-green-400">${parseFloat(log.costUsd).toFixed(5)}</span>
                   <span>{new Date(log.createdAt).toLocaleTimeString()}</span>
@@ -404,7 +404,7 @@ function MediaProviderDetail({
           <h2 className="text-[15px] font-bold">{provider.displayNameAr} <span className="text-[#58a6ff]">({provider.displayName})</span></h2>
           <div className="flex items-center gap-2 mt-0.5">
             <StatusBadge status={provider.keyStatus} />
-            <span className="text-[10px] text-[#8b949e]">{provider.models.length} {isImage ? "نموذج صور" : "نموذج فيديو"}</span>
+            <span className="text-[10px] text-[#b0bac5]">{provider.models.length} {isImage ? "نموذج صور" : "نموذج فيديو"}</span>
             {provider.parentProvider && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-medium border bg-amber-500/10 text-amber-400 border-amber-500/25">
                 <Link2 className="w-2.5 h-2.5" />
@@ -421,11 +421,11 @@ function MediaProviderDetail({
             <Link2 className="w-3.5 h-3.5 text-amber-400" />
             <span className="text-[11px] font-medium text-amber-400"><BLabel ar="مفتاح API مشترك" en="Shared API Key" /></span>
           </div>
-          <p className="text-[10px] text-[#8b949e] leading-relaxed">
+          <p className="text-[10px] text-[#b0bac5] leading-relaxed">
             هذا المزود يشارك نفس مفتاح API مع المزود الرئيسي <span className="text-amber-400 font-medium">{provider.parentProvider}</span>.
             عند تغيير المفتاح هنا سيتم تحديثه تلقائياً في المزود الرئيسي وجميع المزودين المرتبطين.
           </p>
-          <p className="text-[9px] text-[#8b949e]/60 mt-1">
+          <p className="text-[9px] text-[#b0bac5]/60 mt-1">
             This provider shares an API key with the parent provider "{provider.parentProvider}". Changing the key here auto-syncs to the parent and all siblings.
           </p>
         </div>
@@ -433,12 +433,12 @@ function MediaProviderDetail({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
-          <label className="text-[10px] text-[#8b949e] mb-1 block"><BLabel ar="مفتاح API" en="API Key" /></label>
+          <label className="text-[10px] text-[#b0bac5] mb-1 block"><BLabel ar="مفتاح API" en="API Key" /></label>
           <FieldHint text={provider.parentProvider ? "المفتاح مشترك — سيتم مزامنته تلقائياً" : "المفتاح السري للاتصال بخدمة المزود"} />
           <div className="flex gap-1.5 mt-1">
             <div className="relative flex-1">
               <input type={showKey ? "text" : "password"} value={localKey} onChange={e => setLocalKey(e.target.value)} placeholder="أدخل مفتاح API..." className={`w-full bg-[#0d1117] border rounded-lg px-3 py-2 text-[11px] text-[#e2e8f0] font-mono pr-8 ${provider.parentProvider ? "border-amber-500/20" : "border-white/10"}`} />
-              <button onClick={() => setShowKey(!showKey)} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#8b949e] hover:text-white">
+              <button onClick={() => setShowKey(!showKey)} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#b0bac5] hover:text-white">
                 {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
               </button>
             </div>
@@ -449,7 +449,7 @@ function MediaProviderDetail({
           </div>
         </div>
         <div>
-          <label className="text-[10px] text-[#8b949e] mb-1 block"><BLabel ar="رابط الحصول على المفتاح" en="Get API Key Link" /></label>
+          <label className="text-[10px] text-[#b0bac5] mb-1 block"><BLabel ar="رابط الحصول على المفتاح" en="Get API Key Link" /></label>
           <FieldHint text="رابط مباشر لصفحة إنشاء مفتاح API" />
           <a href={provider.apiKeyUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 bg-[#0d1117] border border-white/10 rounded-lg px-3 py-2 text-[11px] text-blue-400 hover:text-blue-300 mt-1">
             <ExternalLink className="w-3.5 h-3.5" />
@@ -460,22 +460,22 @@ function MediaProviderDetail({
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <div>
-          <label className="text-[10px] text-[#8b949e] mb-1 block"><BLabel ar="الأولوية" en="Priority" /></label>
+          <label className="text-[10px] text-[#b0bac5] mb-1 block"><BLabel ar="الأولوية" en="Priority" /></label>
           <FieldHint text="رقم أقل = أولوية أعلى" />
           <input type="number" min="1" max="50" value={provider.priority} onChange={e => onUpdate(provider.providerKey, { priority: parseInt(e.target.value) || 10 })} className="w-full bg-[#0d1117] border border-white/10 rounded-lg px-3 py-1.5 text-[11px] text-[#e2e8f0] mt-0.5" />
         </div>
         <div>
-          <label className="text-[10px] text-[#8b949e] mb-1 block"><BLabel ar="الميزانية الشهرية" en="Monthly Budget $" /></label>
+          <label className="text-[10px] text-[#b0bac5] mb-1 block"><BLabel ar="الميزانية الشهرية" en="Monthly Budget $" /></label>
           <FieldHint text="الحد الأقصى للإنفاق شهرياً" />
           <input type="number" min="0" step="1" value={parseFloat(provider.budgetMonthlyUsd) || 0} onChange={e => onUpdate(provider.providerKey, { budgetMonthlyUsd: e.target.value })} className="w-full bg-[#0d1117] border border-white/10 rounded-lg px-3 py-1.5 text-[11px] text-[#e2e8f0] mt-0.5" />
         </div>
         <div>
-          <label className="text-[10px] text-[#8b949e] mb-1 block"><BLabel ar="تنبيه عند %" en="Alert %" /></label>
+          <label className="text-[10px] text-[#b0bac5] mb-1 block"><BLabel ar="تنبيه عند %" en="Alert %" /></label>
           <FieldHint text="نسبة الميزانية للتنبيه" />
           <input type="number" min="50" max="100" value={provider.alertThreshold} onChange={e => onUpdate(provider.providerKey, { alertThreshold: parseInt(e.target.value) || 80 })} className="w-full bg-[#0d1117] border border-white/10 rounded-lg px-3 py-1.5 text-[11px] text-[#e2e8f0] mt-0.5" />
         </div>
         <div>
-          <label className="text-[10px] text-[#8b949e] mb-1 block"><BLabel ar="الحد الأقصى للملف" en="Max File Size" /></label>
+          <label className="text-[10px] text-[#b0bac5] mb-1 block"><BLabel ar="الحد الأقصى للملف" en="Max File Size" /></label>
           <FieldHint text={isImage ? "أقصى حجم للصورة بالميجابايت" : "أقصى حجم للفيديو بالميجابايت"} />
           <div className="mt-0.5">
             <input
@@ -489,7 +489,7 @@ function MediaProviderDetail({
               onTouchEnd={() => onUpdate(provider.providerKey, { maxFileSizeMb: localMaxSize })}
               className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer accent-[#7c3aed]"
             />
-            <div className="flex justify-between text-[9px] text-[#8b949e] mt-0.5">
+            <div className="flex justify-between text-[9px] text-[#b0bac5] mt-0.5">
               <span>1 MB</span>
               <span className="text-[#7c3aed] font-bold">{localMaxSize} MB</span>
               <span>{isImage ? 50 : 2000} MB</span>
@@ -510,7 +510,7 @@ function MediaProviderDetail({
               <div className="flex items-center justify-between">
                 <div>
                   <span className="text-[11px] font-medium">{m.name}</span>
-                  <span className="text-[9px] text-[#8b949e] ml-2">{m.id}</span>
+                  <span className="text-[9px] text-[#b0bac5] ml-2">{m.id}</span>
                 </div>
                 <div className="flex items-center gap-2 text-[9px]">
                   <span className={typeColor} title="أقصى دقة">{m.maxResolution}</span>
@@ -521,7 +521,7 @@ function MediaProviderDetail({
                 <span className="px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400" title="تكلفة لكل طلب">${m.costPerRequest}/طلب (per request)</span>
                 <span className="px-1.5 py-0.5 rounded bg-green-500/10 text-green-400" title="تكلفة لكل توكن">${m.costPerToken}/توكن (per token)</span>
               </div>
-              <p className="text-[9px] text-[#8b949e]/70 mt-1.5">{m.description}</p>
+              <p className="text-[9px] text-[#b0bac5]/70 mt-1.5">{m.description}</p>
             </div>
           ))}
         </div>
@@ -541,9 +541,9 @@ function MediaProviderDetail({
               { label: "الشهر (Month)", data: usage.monthly },
             ].map(period => (
               <div key={period.label} className="bg-[#0d1117] border border-white/5 rounded-lg p-2.5">
-                <span className="text-[9px] text-[#8b949e] block mb-1">{period.label}</span>
+                <span className="text-[9px] text-[#b0bac5] block mb-1">{period.label}</span>
                 <div className="text-[13px] font-bold text-green-400">${(period.data.cost || 0).toFixed(4)}</div>
-                <div className="text-[9px] text-[#8b949e] mt-0.5">
+                <div className="text-[9px] text-[#b0bac5] mt-0.5">
                   {period.data.requests || 0} طلب · {(period.data.tokens / 1000).toFixed(1)}K توكن
                 </div>
                 <div className="text-[9px] text-blue-400 mt-0.5">
@@ -597,10 +597,10 @@ function MediaProviderDetail({
               <div key={i} className="flex items-center justify-between bg-[#0d1117] border border-white/5 rounded px-2.5 py-1.5 text-[10px]">
                 <div className="flex items-center gap-2">
                   <span className={log.success ? "text-green-400" : "text-red-400"}>{log.success ? "✓" : "✗"}</span>
-                  <span className="text-[#8b949e]">{log.modelId}</span>
+                  <span className="text-[#b0bac5]">{log.modelId}</span>
                   {log.agentKey && <span className="text-[#7c3aed]">{log.agentKey}</span>}
                 </div>
-                <div className="flex items-center gap-2 text-[#8b949e]">
+                <div className="flex items-center gap-2 text-[#b0bac5]">
                   <span>{parseFloat(log.fileSizeMb || 0).toFixed(1)} MB</span>
                   <span className="text-green-400">${parseFloat(log.costUsd).toFixed(5)}</span>
                   <span>{new Date(log.createdAt).toLocaleTimeString()}</span>
@@ -616,19 +616,19 @@ function MediaProviderDetail({
         <div className="grid grid-cols-4 gap-2">
           <div className="text-center">
             <div className={`text-[14px] font-bold ${typeColor}`}>{provider.models.length}</div>
-            <div className="text-[8px] text-[#8b949e]">نماذج متوفرة</div>
+            <div className="text-[8px] text-[#b0bac5]">نماذج متوفرة</div>
           </div>
           <div className="text-center">
             <div className="text-[14px] font-bold text-orange-400">${Math.min(...provider.models.map(m => m.costPerRequest)).toFixed(3)}</div>
-            <div className="text-[8px] text-[#8b949e]">أقل تكلفة/طلب</div>
+            <div className="text-[8px] text-[#b0bac5]">أقل تكلفة/طلب</div>
           </div>
           <div className="text-center">
             <div className="text-[14px] font-bold text-blue-400">{Math.max(...provider.models.map(m => m.maxFileSizeMb))} MB</div>
-            <div className="text-[8px] text-[#8b949e]">أقصى حجم ملف</div>
+            <div className="text-[8px] text-[#b0bac5]">أقصى حجم ملف</div>
           </div>
           <div className="text-center">
             <div className="text-[14px] font-bold text-green-400">{provider.models.map(m => m.maxResolution).sort().pop()}</div>
-            <div className="text-[8px] text-[#8b949e]">أعلى دقة</div>
+            <div className="text-[8px] text-[#b0bac5]">أعلى دقة</div>
           </div>
         </div>
       </div>
@@ -762,13 +762,13 @@ export default function AIControlCenter() {
         <div className="flex-1">
           <h1 className="text-[15px] font-bold">مركز التحكم بالذكاء الاصطناعي <span className="text-[#58a6ff] text-[13px] font-normal">(AI Control Center)</span></h1>
         </div>
-        <div className="flex items-center gap-3 text-[10px] text-[#8b949e]">
+        <div className="flex items-center gap-3 text-[10px] text-[#b0bac5]">
           <span>{providers.length} مزود نصي</span>
           <span>{imageProviders.length} مزود صور</span>
           <span>{videoProviders.length} مزود فيديو</span>
           <button
             onClick={() => setShowSyncPanel(!showSyncPanel)}
-            className={`flex items-center gap-1 px-2 py-1 rounded-lg border transition-colors ${syncStatus?.syncInProgress ? "bg-blue-500/10 text-blue-400 border-blue-500/20 animate-pulse" : "bg-white/5 text-[#8b949e] border-white/10 hover:text-white"}`}
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg border transition-colors ${syncStatus?.syncInProgress ? "bg-blue-500/10 text-blue-400 border-blue-500/20 animate-pulse" : "bg-white/5 text-[#b0bac5] border-white/10 hover:text-white"}`}
           >
             <RefreshCw className={`w-3 h-3 ${syncStatus?.syncInProgress ? "animate-spin" : ""}`} />
             <span>{syncStatus?.syncInProgress ? "جاري المزامنة..." : "المزامنة"}</span>
@@ -794,28 +794,28 @@ export default function AIControlCenter() {
               </button>
             </div>
 
-            <p className="text-[9px] text-[#8b949e]/70 mb-3 leading-relaxed">
+            <p className="text-[9px] text-[#b0bac5]/70 mb-3 leading-relaxed">
               يتم التحقق من صلاحية مفاتيح API وحالة المزودين بشكل دوري بفترات معقولة بدون ضغط على السيرفر.
               كل مزود يتم فحصه مع تأخير 2 ثانية بين كل فحص لتجنب الضغط.
             </p>
 
             <div className="grid grid-cols-4 gap-3 mb-3">
               <div className="bg-[#0d1117] border border-white/5 rounded-lg p-2.5">
-                <div className="text-[9px] text-[#8b949e] mb-0.5">آخر مزامنة (Last Sync)</div>
+                <div className="text-[9px] text-[#b0bac5] mb-0.5">آخر مزامنة (Last Sync)</div>
                 <div className="text-[11px] font-medium">{syncStatus.lastSyncAt ? new Date(syncStatus.lastSyncAt).toLocaleTimeString("ar") : "لم يتم بعد"}</div>
               </div>
               <div className="bg-[#0d1117] border border-white/5 rounded-lg p-2.5">
-                <div className="text-[9px] text-[#8b949e] mb-0.5">المزامنة التالية (Next)</div>
+                <div className="text-[9px] text-[#b0bac5] mb-0.5">المزامنة التالية (Next)</div>
                 <div className="text-[11px] font-medium">{syncStatus.nextSyncAt ? new Date(syncStatus.nextSyncAt).toLocaleTimeString("ar") : "—"}</div>
               </div>
               <div className="bg-[#0d1117] border border-white/5 rounded-lg p-2.5">
-                <div className="text-[9px] text-[#8b949e] mb-0.5">الحالة (Status)</div>
+                <div className="text-[9px] text-[#b0bac5] mb-0.5">الحالة (Status)</div>
                 <div className={`text-[11px] font-medium ${syncStatus.syncInProgress ? "text-blue-400" : "text-green-400"}`}>
                   {syncStatus.syncInProgress ? "جاري التشغيل..." : "مكتمل"}
                 </div>
               </div>
               <div className="bg-[#0d1117] border border-white/5 rounded-lg p-2.5">
-                <div className="text-[9px] text-[#8b949e] mb-0.5">الفترة (Interval)</div>
+                <div className="text-[9px] text-[#b0bac5] mb-0.5">الفترة (Interval)</div>
                 <select
                   value={syncStatus.syncIntervalMinutes}
                   onChange={e => updateSyncInterval(parseInt(e.target.value))}
@@ -834,7 +834,7 @@ export default function AIControlCenter() {
 
             {syncStatus.results.length > 0 && (
               <div>
-                <div className="text-[10px] text-[#8b949e] mb-1.5">نتائج آخر فحص (Last Check Results)</div>
+                <div className="text-[10px] text-[#b0bac5] mb-1.5">نتائج آخر فحص (Last Check Results)</div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5">
                   {syncStatus.results.map(r => {
                     const statusColors: Record<string, string> = {
@@ -842,7 +842,7 @@ export default function AIControlCenter() {
                       assumed_valid: "text-blue-400 bg-blue-500/10",
                       key_invalid: "text-red-400 bg-red-500/10",
                       unreachable: "text-orange-400 bg-orange-500/10",
-                      skipped_no_key: "text-[#8b949e] bg-white/5",
+                      skipped_no_key: "text-[#b0bac5] bg-white/5",
                     };
                     const statusLabels: Record<string, string> = {
                       verified: "تم التحقق ✓",
@@ -852,7 +852,7 @@ export default function AIControlCenter() {
                       skipped_no_key: "بدون مفتاح",
                     };
                     return (
-                      <div key={r.providerKey} className={`rounded-lg px-2 py-1.5 text-[9px] ${statusColors[r.status] || "bg-white/5 text-[#8b949e]"}`}>
+                      <div key={r.providerKey} className={`rounded-lg px-2 py-1.5 text-[9px] ${statusColors[r.status] || "bg-white/5 text-[#b0bac5]"}`}>
                         <div className="font-medium">{r.providerKey}</div>
                         <div className="opacity-80">{statusLabels[r.status] || r.status}</div>
                       </div>
@@ -867,19 +867,19 @@ export default function AIControlCenter() {
 
       <div className="grid grid-cols-4 gap-3 px-4 py-3 border-b border-white/7">
         <div className="bg-[#161b22] border border-white/7 rounded-xl p-2.5">
-          <div className="text-[10px] text-[#8b949e] mb-0.5">المزودون (Providers)</div>
+          <div className="text-[10px] text-[#b0bac5] mb-0.5">المزودون (Providers)</div>
           <div className="text-lg font-bold">{providers.length + mediaProviders.length}</div>
         </div>
         <div className="bg-[#161b22] border border-white/7 rounded-xl p-2.5">
-          <div className="text-[10px] text-[#8b949e] mb-0.5">مفاتيح نشطة (Active)</div>
+          <div className="text-[10px] text-[#b0bac5] mb-0.5">مفاتيح نشطة (Active)</div>
           <div className="text-lg font-bold text-green-400">{activeCount}</div>
         </div>
         <div className="bg-[#161b22] border border-white/7 rounded-xl p-2.5">
-          <div className="text-[10px] text-[#8b949e] mb-0.5">نماذج النص (Text Models)</div>
+          <div className="text-[10px] text-[#b0bac5] mb-0.5">نماذج النص (Text Models)</div>
           <div className="text-lg font-bold text-[#7c3aed]">{totalModels}</div>
         </div>
         <div className="bg-[#161b22] border border-white/7 rounded-xl p-2.5">
-          <div className="text-[10px] text-[#8b949e] mb-0.5">نماذج الوسائط (Media Models)</div>
+          <div className="text-[10px] text-[#b0bac5] mb-0.5">نماذج الوسائط (Media Models)</div>
           <div className="text-lg font-bold text-pink-400">{mediaProviders.reduce((s, p) => s + p.models.length, 0)}</div>
         </div>
       </div>
@@ -888,7 +888,7 @@ export default function AIControlCenter() {
         <div className="w-64 border-l border-white/7 bg-[#0d1117] flex flex-col shrink-0">
           <div className="p-2">
             <div className="relative">
-              <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#8b949e]" />
+              <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#b0bac5]" />
               <input
                 type="text"
                 value={search}
@@ -909,7 +909,7 @@ export default function AIControlCenter() {
                 key={tab.key}
                 onClick={() => { setActiveSection(tab.key); setSelectedKey(null); }}
                 className={`flex-1 flex items-center justify-center gap-1 py-2 text-[10px] font-medium border-b-2 transition-colors ${
-                  activeSection === tab.key ? `${tab.color} border-current` : "text-[#8b949e] border-transparent hover:text-white/60"
+                  activeSection === tab.key ? `${tab.color} border-current` : "text-[#b0bac5] border-transparent hover:text-white/60"
                 }`}
               >
                 {tab.icon}
@@ -933,14 +933,14 @@ export default function AIControlCenter() {
                     <span className="text-[11px] font-medium truncate">{p.displayNameAr}</span>
                     {p.parentProvider && <Link2 className="w-2.5 h-2.5 text-amber-400 shrink-0" />}
                   </div>
-                  <div className="text-[9px] text-[#8b949e] truncate">{p.displayName}</div>
+                  <div className="text-[9px] text-[#b0bac5] truncate">{p.displayName}</div>
                 </div>
-                <span className="text-[9px] text-[#8b949e] shrink-0">{p.models?.length || 0}</span>
+                <span className="text-[9px] text-[#b0bac5] shrink-0">{p.models?.length || 0}</span>
               </button>
             ))}
 
             {filteredList.length === 0 && (
-              <div className="text-center py-8 text-[#8b949e]">
+              <div className="text-center py-8 text-[#b0bac5]">
                 <p className="text-[11px]">لا توجد نتائج</p>
               </div>
             )}
@@ -949,7 +949,7 @@ export default function AIControlCenter() {
 
         <div className="flex-1 overflow-y-auto p-5">
           {!selectedKey && (
-            <div className="flex flex-col items-center justify-center h-full text-[#8b949e]">
+            <div className="flex flex-col items-center justify-center h-full text-[#b0bac5]">
               {activeSection === "ai" && <Cpu className="w-10 h-10 mb-3 opacity-30" />}
               {activeSection === "image" && <Image className="w-10 h-10 mb-3 opacity-30" />}
               {activeSection === "video" && <Film className="w-10 h-10 mb-3 opacity-30" />}

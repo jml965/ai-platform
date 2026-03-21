@@ -554,7 +554,7 @@ function InfraInlineChat({ agent, lang, onClose }: { agent: SidebarInfraAgent; l
     }
   };
 
-  const agentColor = SIDEBAR_AGENT_COLORS[agent.agentKey] || "text-[#8b949e]";
+  const agentColor = SIDEBAR_AGENT_COLORS[agent.agentKey] || "text-[#b0bac5]";
   const agentIcon = SIDEBAR_AGENT_ICONS[agent.agentKey] || <Bot className="w-4 h-4" />;
 
   const renderMessageContent = (content: string) => {
@@ -578,7 +578,7 @@ function InfraInlineChat({ agent, lang, onClose }: { agent: SidebarInfraAgent; l
           if (seg.type === "code") {
             return (
               <div key={i} className="my-2 rounded border border-[#30363d] overflow-hidden">
-                <div className="px-2 py-1 bg-[#1c2333] text-[9px] text-[#8b949e] uppercase">{seg.lang || "code"}</div>
+                <div className="px-2 py-1 bg-[#1c2333] text-[9px] text-[#b0bac5] uppercase">{seg.lang || "code"}</div>
                 <pre className="p-2 bg-[#0d1117] text-[12px] text-[#e1e4e8] overflow-x-auto" dir="ltr"><code>{seg.value.trim()}</code></pre>
               </div>
             );
@@ -621,22 +621,22 @@ function InfraInlineChat({ agent, lang, onClose }: { agent: SidebarInfraAgent; l
         </div>
         <button
           onClick={() => { setWandMode(!wandMode); setWandHighlight(null); }}
-          className={`p-1 transition-colors rounded hover:bg-white/5 ${wandMode ? "text-amber-400 bg-amber-500/15" : "text-[#8b949e] hover:text-amber-400"}`}
+          className={`p-1 transition-colors rounded hover:bg-white/5 ${wandMode ? "text-amber-400 bg-amber-500/15" : "text-[#b0bac5] hover:text-amber-400"}`}
           title={isRTL ? "عصا سحرية — حدد عنصر لتعديله" : "Magic Wand — select element to edit"}
         >
           <Wand2 className="w-3.5 h-3.5" />
         </button>
-        <button onClick={() => setExpanded(!expanded)} className="p-1 text-[#8b949e] hover:text-[#e1e4e8] transition-colors rounded hover:bg-white/5" title={expanded ? (isRTL ? "تضييق" : "Narrow") : (isRTL ? "توسيع" : "Widen")}>
+        <button onClick={() => setExpanded(!expanded)} className="p-1 text-[#b0bac5] hover:text-[#e1e4e8] transition-colors rounded hover:bg-white/5" title={expanded ? (isRTL ? "تضييق" : "Narrow") : (isRTL ? "توسيع" : "Widen")}>
           {expanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
         </button>
         <button
           onClick={() => { setMessages([]); }}
-          className="p-1 text-[#8b949e] hover:text-red-400 transition-colors rounded hover:bg-white/5"
+          className="p-1 text-[#b0bac5] hover:text-red-400 transition-colors rounded hover:bg-white/5"
           title={isRTL ? "مسح" : "Clear"}
         >
           <Trash2 className="w-3.5 h-3.5" />
         </button>
-        <button onClick={onClose} className="p-1 text-[#8b949e] hover:text-red-400 transition-colors rounded hover:bg-white/5" title={isRTL ? "إغلاق" : "Close"}>
+        <button onClick={onClose} className="p-1 text-[#b0bac5] hover:text-red-400 transition-colors rounded hover:bg-white/5" title={isRTL ? "إغلاق" : "Close"}>
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
@@ -680,7 +680,7 @@ function InfraInlineChat({ agent, lang, onClose }: { agent: SidebarInfraAgent; l
               <div key={msg.id} className="flex items-center justify-center py-0.5">
                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#161b22] border border-[#30363d]">
                   <div className="w-1 h-1 bg-yellow-400 rounded-full animate-pulse" />
-                  <span className="text-[10px] text-[#8b949e]">{msg.content}</span>
+                  <span className="text-[10px] text-[#b0bac5]">{msg.content}</span>
                 </div>
               </div>
             );
@@ -693,7 +693,7 @@ function InfraInlineChat({ agent, lang, onClose }: { agent: SidebarInfraAgent; l
                     <div className="w-1 h-1 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
                     <div className="w-1 h-1 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
                     <div className="w-1 h-1 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                    <span className="text-[10px] text-[#8b949e]">{isRTL ? "يحلل..." : "Analyzing..."}</span>
+                    <span className="text-[10px] text-[#b0bac5]">{isRTL ? "يحلل..." : "Analyzing..."}</span>
                   </div>
                 ) : renderMessageContent(msg.content)}
                 {msg.tokensUsed && (
@@ -788,7 +788,7 @@ function InfraAgentsSection({ t, lang, onSelectAgent }: { t: any; lang: string; 
             {t.home_nav_infrastructure}
           </span>
         </div>
-        <ChevronDown className={`w-3 h-3 text-[#8b949e] transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
+        <ChevronDown className={`w-3 h-3 text-[#b0bac5] transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
       </button>
 
       <div className={`overflow-hidden transition-all duration-300 ease-in-out ${expanded ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"}`}>
@@ -824,7 +824,7 @@ function InfraAgentsSection({ t, lang, onSelectAgent }: { t: any; lang: string; 
               onClick={() => onSelectAgent(agent)}
               className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md hover:bg-[#161b22] transition-all text-start group/agent"
             >
-              <div className={`flex-shrink-0 ${SIDEBAR_AGENT_COLORS[agent.agentKey] || "text-[#8b949e]"}`}>
+              <div className={`flex-shrink-0 ${SIDEBAR_AGENT_COLORS[agent.agentKey] || "text-[#b0bac5]"}`}>
                 {SIDEBAR_AGENT_ICONS[agent.agentKey] || <Bot className="w-4 h-4" />}
               </div>
               <div className="min-w-0 flex-1">
@@ -858,7 +858,7 @@ function AdminPanelSection({ t, onToggleFiles }: { t: any; onToggleFiles: () => 
     <div className="mt-3 border-t border-white/7 pt-3">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center justify-between w-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#8b949e] hover:text-[#c9d1d9] transition-colors"
+        className="flex items-center justify-between w-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#b0bac5] hover:text-[#c9d1d9] transition-colors"
       >
         <span>{t.home_nav_admin_panel}</span>
         <ChevronRight
@@ -873,7 +873,7 @@ function AdminPanelSection({ t, onToggleFiles }: { t: any; onToggleFiles: () => 
                 <button
                   key={i}
                   onClick={item.onClick}
-                  className="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer text-[12.5px] text-[#8b949e] hover:bg-white/5 transition-colors text-start"
+                  className="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer text-[12.5px] text-[#b0bac5] hover:bg-white/5 transition-colors text-start"
                 >
                   <item.icon className="w-4 h-4" />
                   <span>{item.label}</span>
@@ -884,7 +884,7 @@ function AdminPanelSection({ t, onToggleFiles }: { t: any; onToggleFiles: () => 
               <Link
                 key={i}
                 href={item.href}
-                className="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer text-[12.5px] text-[#8b949e] hover:bg-white/5 transition-colors"
+                className="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer text-[12.5px] text-[#b0bac5] hover:bg-white/5 transition-colors"
               >
                 <item.icon className="w-4 h-4" />
                 <span>{item.label}</span>
@@ -910,15 +910,15 @@ function HomeSidebar({ t, lang, userName, isAdmin, onSelectInfraAgent, onToggleF
       <div className="flex items-center justify-between p-3 border-b border-white/7">
         <div className="flex items-center gap-2">
           <ReplitLogo />
-          <ChevronDown className="w-3 h-3 text-[#8b949e]" />
+          <ChevronDown className="w-3 h-3 text-[#b0bac5]" />
         </div>
         <div className="flex items-center gap-1">
           {isAdmin && (
-            <button onClick={onToggleFiles} className="text-[#8b949e] hover:text-[#e3b341] transition-colors" title="Files">
+            <button onClick={onToggleFiles} className="text-[#b0bac5] hover:text-[#e3b341] transition-colors" title="Files">
               <FolderGit2 className="w-4 h-4" />
             </button>
           )}
-          <button className="text-[#8b949e] hover:text-white transition-colors">
+          <button className="text-[#b0bac5] hover:text-white transition-colors">
             <Search className="w-4 h-4" />
           </button>
         </div>
@@ -931,12 +931,12 @@ function HomeSidebar({ t, lang, userName, isAdmin, onSelectInfraAgent, onToggleF
         <span className="text-[12.5px] text-[#c9d1d9] font-medium flex-1 truncate">
           {t.home_workspace.replace("{name}", userName)}
         </span>
-        <ChevronDown className="w-3 h-3 text-[#8b949e] flex-shrink-0" />
+        <ChevronDown className="w-3 h-3 text-[#b0bac5] flex-shrink-0" />
       </div>
 
       <div className="p-2 flex flex-col gap-1">
         <button className="flex items-center gap-2 w-full px-3 py-2 rounded-md text-[12px] font-medium text-[#c9d1d9] bg-white/7 border border-white/10 hover:bg-white/10 transition-colors text-start">
-          <Plus className="w-3.5 h-3.5 text-[#8b949e]" />
+          <Plus className="w-3.5 h-3.5 text-[#b0bac5]" />
           {t.home_create_app}
         </button>
 
@@ -951,7 +951,7 @@ function HomeSidebar({ t, lang, userName, isAdmin, onSelectInfraAgent, onToggleF
             className={`flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer text-[12.5px] transition-colors ${
               item.active
                 ? "bg-white/8 text-[#e2e8f0]"
-                : "text-[#8b949e] hover:bg-white/5"
+                : "text-[#b0bac5] hover:bg-white/5"
             }`}
           >
             <item.icon className="w-4 h-4" />
@@ -979,7 +979,7 @@ function HomeSidebar({ t, lang, userName, isAdmin, onSelectInfraAgent, onToggleF
         ].map((item, i) => (
           <div
             key={i}
-            className="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer text-[12.5px] text-[#8b949e] hover:bg-white/5 transition-colors"
+            className="flex items-center gap-2 px-3 py-2 rounded-md cursor-pointer text-[12.5px] text-[#b0bac5] hover:bg-white/5 transition-colors"
           >
             <item.icon className="w-3.5 h-3.5" />
             <span>{item.label}</span>
@@ -1043,7 +1043,7 @@ function HomeHeroSection({ t, lang, userName, onStart, isStarting }: { t: any; l
           <span className="text-[13px] text-[#c9d1d9] font-medium">
             {t.home_workspace.replace("{name}", userName)}
           </span>
-          <ChevronDown className="w-3 h-3 text-[#8b949e]" />
+          <ChevronDown className="w-3 h-3 text-[#b0bac5]" />
         </div>
 
         <h1 className="text-[28px] font-bold text-white tracking-tight text-center mb-6">
@@ -1064,7 +1064,7 @@ function HomeHeroSection({ t, lang, userName, onStart, isStarting }: { t: any; l
                 className={`flex items-center gap-2 px-5 py-2.5 text-[13px] border-b-2 -mb-px transition-colors ${
                   activeTab === tab.key
                     ? "border-[#58a6ff] text-[#e2e8f0] font-medium"
-                    : "border-transparent text-[#8b949e] hover:text-[#c9d1d9]"
+                    : "border-transparent text-[#b0bac5] hover:text-[#c9d1d9]"
                 }`}
               >
                 <tab.icon className="w-3.5 h-3.5" />
@@ -1091,7 +1091,7 @@ function HomeHeroSection({ t, lang, userName, onStart, isStarting }: { t: any; l
                 >
                   <Cpu className="w-3.5 h-3.5" />
                   {selectedBuildMode}
-                  <ChevronDown className="w-3 h-3 text-[#8b949e]" />
+                  <ChevronDown className="w-3 h-3 text-[#b0bac5]" />
                 </button>
 
                 {showBuildDropdown && (
@@ -1103,9 +1103,9 @@ function HomeHeroSection({ t, lang, userName, onStart, isStarting }: { t: any; l
                     <div className="px-3.5 py-2 border-b border-white/7">
                       <span className="text-[11px] text-[#6e7681]">
                         {t.home_switch_modes}&nbsp;
-                        <kbd className="bg-white/8 border border-white/15 rounded px-1.5 py-0.5 text-[11px] text-[#8b949e] font-mono">I</kbd>
+                        <kbd className="bg-white/8 border border-white/15 rounded px-1.5 py-0.5 text-[11px] text-[#b0bac5] font-mono">I</kbd>
                         &nbsp;
-                        <kbd className="bg-white/8 border border-white/15 rounded px-1.5 py-0.5 text-[11px] text-[#8b949e] font-mono">&#8984;</kbd>
+                        <kbd className="bg-white/8 border border-white/15 rounded px-1.5 py-0.5 text-[11px] text-[#b0bac5] font-mono">&#8984;</kbd>
                       </span>
                     </div>
                     {buildOptions.map(opt => (
@@ -1118,7 +1118,7 @@ function HomeHeroSection({ t, lang, userName, onStart, isStarting }: { t: any; l
                           ? <Check className="w-3.5 h-3.5 text-[#58a6ff]" />
                           : <span className="w-3.5" />}
                         <span className="flex-1">{opt.label}</span>
-                        <span className="text-[#8b949e] font-semibold text-[12px]">{opt.mode}</span>
+                        <span className="text-[#b0bac5] font-semibold text-[12px]">{opt.mode}</span>
                         <opt.icon className="w-3.5 h-3.5 text-[#6e7681]" />
                       </div>
                     ))}
@@ -1129,7 +1129,7 @@ function HomeHeroSection({ t, lang, userName, onStart, isStarting }: { t: any; l
               <div className="relative">
                 <button
                   onClick={e => { e.stopPropagation(); setShowPlusDropdown(v => !v); setShowBuildDropdown(false); setShowWebAppDropdown(false); }}
-                  className={`flex items-center justify-center w-[30px] h-[30px] rounded-md border border-white/10 text-[#8b949e] transition-colors ${
+                  className={`flex items-center justify-center w-[30px] h-[30px] rounded-md border border-white/10 text-[#b0bac5] transition-colors ${
                     showPlusDropdown ? "bg-white/10" : "bg-white/4 hover:bg-white/8"
                   }`}
                 >
@@ -1148,7 +1148,7 @@ function HomeHeroSection({ t, lang, userName, onStart, isStarting }: { t: any; l
                     <div className="flex items-center justify-between px-4 py-2 cursor-pointer text-[14px] text-white font-medium hover:bg-white/7 transition-colors">
                       <span>{t.home_upload_file}</span>
                       <div className="w-7 h-7 rounded-md bg-white/7 border border-white/10 flex items-center justify-center">
-                        <UploadCloud className="w-3.5 h-3.5 text-[#8b949e]" />
+                        <UploadCloud className="w-3.5 h-3.5 text-[#b0bac5]" />
                       </div>
                     </div>
 
@@ -1163,11 +1163,11 @@ function HomeHeroSection({ t, lang, userName, onStart, isStarting }: { t: any; l
                     </div>
                     <div className="flex items-center justify-between px-4 py-2 pb-3 cursor-pointer text-[14px] text-white font-medium hover:bg-white/7 transition-colors">
                       <div className="flex items-center gap-2">
-                        <ExternalLink className="w-3.5 h-3.5 text-[#8b949e]" />
+                        <ExternalLink className="w-3.5 h-3.5 text-[#b0bac5]" />
                         <span>{t.home_import_project}</span>
                       </div>
                       <div className="w-7 h-7 rounded-md bg-white/7 border border-white/10 flex items-center justify-center">
-                        <Download className="w-3.5 h-3.5 text-[#8b949e]" />
+                        <Download className="w-3.5 h-3.5 text-[#b0bac5]" />
                       </div>
                     </div>
                   </div>
@@ -1176,7 +1176,7 @@ function HomeHeroSection({ t, lang, userName, onStart, isStarting }: { t: any; l
             </div>
 
             <div className="flex items-center gap-2">
-              <button className="flex items-center gap-1 px-2 py-1.5 rounded-md text-[#8b949e] bg-white/4 border border-white/8 hover:bg-white/8 transition-colors">
+              <button className="flex items-center gap-1 px-2 py-1.5 rounded-md text-[#b0bac5] bg-white/4 border border-white/8 hover:bg-white/8 transition-colors">
                 <Camera className="w-3.5 h-3.5" />
                 <ChevronDown className="w-3 h-3" />
               </button>
@@ -1186,7 +1186,7 @@ function HomeHeroSection({ t, lang, userName, onStart, isStarting }: { t: any; l
                 className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-[12.5px] font-medium transition-all ${
                   textValue.trim() && !isStarting
                     ? "bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20"
-                    : "text-[#8b949e] hover:text-white"
+                    : "text-[#b0bac5] hover:text-white"
                 }`}
               >
                 {isStarting ? (
@@ -1203,7 +1203,7 @@ function HomeHeroSection({ t, lang, userName, onStart, isStarting }: { t: any; l
           <div className="relative">
             <button
               onClick={e => { e.stopPropagation(); setShowWebAppDropdown(v => !v); setShowBuildDropdown(false); setShowPlusDropdown(false); }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] text-[#8b949e] bg-white/5 border border-white/10 hover:bg-white/8 cursor-pointer transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] text-[#b0bac5] bg-white/5 border border-white/10 hover:bg-white/8 cursor-pointer transition-colors"
             >
               <currentAppOption.icon className="w-3.5 h-3.5" />
               <span>{selectedApp}</span>
@@ -1221,7 +1221,7 @@ function HomeHeroSection({ t, lang, userName, onStart, isStarting }: { t: any; l
                     key={opt.label}
                     onClick={() => { setSelectedApp(opt.label); setShowWebAppDropdown(false); }}
                     className={`flex items-center justify-between px-4 py-2.5 cursor-pointer text-[14px] hover:bg-white/7 transition-colors ${
-                      selectedApp === opt.label ? "text-[#e2e8f0]" : "text-[#8b949e]"
+                      selectedApp === opt.label ? "text-[#e2e8f0]" : "text-[#b0bac5]"
                     }`}
                   >
                     <div className="flex items-center gap-2">
@@ -1242,7 +1242,7 @@ function HomeHeroSection({ t, lang, userName, onStart, isStarting }: { t: any; l
             )}
           </div>
 
-          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] text-[#8b949e] bg-white/5 border border-white/10 hover:bg-white/8 cursor-pointer transition-colors">
+          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] text-[#b0bac5] bg-white/5 border border-white/10 hover:bg-white/8 cursor-pointer transition-colors">
             <RefreshCw className="w-3.5 h-3.5" />
             <span>{t.home_auto}</span>
             <ChevronDown className="w-3 h-3" />

@@ -55,7 +55,7 @@ function ColorInput({ value, onChange, label }: { value: string; onChange: (v: s
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[11px] text-[#8b949e] w-24 flex-shrink-0 truncate">{label}</span>
+      <span className="text-[11px] text-[#b0bac5] w-24 flex-shrink-0 truncate">{label}</span>
       <div className="flex items-center gap-1.5 flex-1">
         <input
           type="color"
@@ -83,7 +83,7 @@ function SliderInput({ value, onChange, label, min, max, step, unit }: {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[11px] text-[#8b949e] w-24 flex-shrink-0 truncate">{label}</span>
+      <span className="text-[11px] text-[#b0bac5] w-24 flex-shrink-0 truncate">{label}</span>
       <input
         type="range"
         min={min}
@@ -109,7 +109,7 @@ function SelectInput({ value, onChange, label, options }: {
 }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[11px] text-[#8b949e] w-24 flex-shrink-0 truncate">{label}</span>
+      <span className="text-[11px] text-[#b0bac5] w-24 flex-shrink-0 truncate">{label}</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -132,7 +132,7 @@ function PropertySection({ title, icon: Icon, children, defaultOpen = true }: {
     <div className="border-b border-[#1c2333]">
       <button
         onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-[#8b949e] uppercase tracking-wider hover:bg-[#1c2333]/50 transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-[#b0bac5] uppercase tracking-wider hover:bg-[#1c2333]/50 transition-colors"
       >
         {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
         <Icon className="w-3.5 h-3.5" />
@@ -182,7 +182,7 @@ export default function CSSEditorPanel({
         </div>
         <button
           onClick={onClose}
-          className="p-1 rounded text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333] transition-colors"
+          className="p-1 rounded text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333] transition-colors"
         >
           <X className="w-3.5 h-3.5" />
         </button>
@@ -193,7 +193,7 @@ export default function CSSEditorPanel({
           onClick={onUndo}
           disabled={!canUndo}
           title={t.css_undo}
-          className="p-1.5 rounded text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333] disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+          className="p-1.5 rounded text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333] disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
         >
           <Undo2 className="w-3.5 h-3.5" />
         </button>
@@ -201,7 +201,7 @@ export default function CSSEditorPanel({
           onClick={onRedo}
           disabled={!canRedo}
           title={t.css_redo}
-          className="p-1.5 rounded text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333] disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+          className="p-1.5 rounded text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333] disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
         >
           <Redo2 className="w-3.5 h-3.5" />
         </button>
@@ -211,7 +211,7 @@ export default function CSSEditorPanel({
             <button
               onClick={onClear}
               title={t.css_clear}
-              className="p-1.5 rounded text-[#8b949e] hover:text-red-400 hover:bg-red-500/10 transition-colors"
+              className="p-1.5 rounded text-[#b0bac5] hover:text-red-400 hover:bg-red-500/10 transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -233,7 +233,7 @@ export default function CSSEditorPanel({
             <div className="w-12 h-12 mx-auto bg-[#1c2333] rounded-full flex items-center justify-center mb-3">
               <Paintbrush className="w-6 h-6 opacity-40 text-[#58a6ff]" />
             </div>
-            <p className="text-[13px] text-[#8b949e]">{t.css_click_element}</p>
+            <p className="text-[13px] text-[#b0bac5]">{t.css_click_element}</p>
             <p className="text-[11px] text-[#484f58] mt-1">{t.css_click_hint}</p>
           </div>
         </div>
@@ -249,7 +249,7 @@ export default function CSSEditorPanel({
             {selectedElement.classList.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-1">
                 {selectedElement.classList.map((c) => (
-                  <span key={c} className="text-[10px] px-1 py-0.5 rounded bg-[#1c2333] text-[#8b949e] font-mono">.{c}</span>
+                  <span key={c} className="text-[10px] px-1 py-0.5 rounded bg-[#1c2333] text-[#b0bac5] font-mono">.{c}</span>
                 ))}
               </div>
             )}
@@ -312,7 +312,7 @@ export default function CSSEditorPanel({
               step={0.5}
             />
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-[#8b949e] w-24 flex-shrink-0">{t.css_text_align}</span>
+              <span className="text-[11px] text-[#b0bac5] w-24 flex-shrink-0">{t.css_text_align}</span>
               <div className="flex gap-1">
                 {textAlignOptions.map(({ value: align, label }) => (
                   <button
@@ -322,7 +322,7 @@ export default function CSSEditorPanel({
                       "px-2 py-1 text-[10px] rounded border transition-colors",
                       styles.textAlign === align
                         ? "bg-[#1f6feb]/20 border-[#1f6feb] text-[#58a6ff]"
-                        : "border-[#30363d] text-[#8b949e] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
+                        : "border-[#30363d] text-[#b0bac5] hover:text-[#e1e4e8] hover:bg-[#1c2333]"
                     )}
                   >
                     {label}
@@ -394,7 +394,7 @@ export default function CSSEditorPanel({
             <div className="border-t border-[#1c2333]">
               <button
                 onClick={() => setShowCSS(v => !v)}
-                className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-[#8b949e] uppercase tracking-wider hover:bg-[#1c2333]/50 transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-2 text-[11px] font-semibold text-[#b0bac5] uppercase tracking-wider hover:bg-[#1c2333]/50 transition-colors"
               >
                 {showCSS ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                 {t.css_generated_code}

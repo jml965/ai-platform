@@ -63,7 +63,7 @@ function getFileIcon(name: string) {
     return <FileCode className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />;
   if (name === "Dockerfile")
     return <Package className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />;
-  return <File className="w-3.5 h-3.5 text-[#8b949e] flex-shrink-0" />;
+  return <File className="w-3.5 h-3.5 text-[#b0bac5] flex-shrink-0" />;
 }
 
 function ContextMenu({
@@ -218,14 +218,14 @@ function TreeNodeItem({
             style={{ paddingLeft: `${depth * 12 + 4}px` }}
           >
             {isExpanded ? (
-              <ChevronDown className="w-3 h-3 text-[#8b949e] flex-shrink-0" />
+              <ChevronDown className="w-3 h-3 text-[#b0bac5] flex-shrink-0" />
             ) : (
-              <ChevronRight className="w-3 h-3 text-[#8b949e] flex-shrink-0" />
+              <ChevronRight className="w-3 h-3 text-[#b0bac5] flex-shrink-0" />
             )}
             {isExpanded ? (
               <FolderOpen className="w-3.5 h-3.5 text-[#e3b341] flex-shrink-0" />
             ) : (
-              <Folder className="w-3.5 h-3.5 text-[#8b949e] flex-shrink-0" />
+              <Folder className="w-3.5 h-3.5 text-[#b0bac5] flex-shrink-0" />
             )}
             {isRenaming ? (
               <InlineInput
@@ -239,7 +239,7 @@ function TreeNodeItem({
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onContextMenu(e, fullPath, "folder"); }}
-            className="opacity-0 group-hover:opacity-100 p-0.5 mr-1 rounded hover:bg-white/10 text-[#8b949e] hover:text-white transition-all flex-shrink-0"
+            className="opacity-0 group-hover:opacity-100 p-0.5 mr-1 rounded hover:bg-white/10 text-[#b0bac5] hover:text-white transition-all flex-shrink-0"
           >
             <MoreVertical className="w-3.5 h-3.5" />
           </button>
@@ -251,7 +251,7 @@ function TreeNodeItem({
                 {creatingType === "folder" ? (
                   <Folder className="w-3.5 h-3.5 text-[#e3b341] flex-shrink-0" />
                 ) : (
-                  <File className="w-3.5 h-3.5 text-[#8b949e] flex-shrink-0" />
+                  <File className="w-3.5 h-3.5 text-[#b0bac5] flex-shrink-0" />
                 )}
                 <InlineInput
                   defaultValue=""
@@ -310,7 +310,7 @@ function TreeNodeItem({
       </button>
       <button
         onClick={(e) => { e.stopPropagation(); onContextMenu(e, fullPath, "file"); }}
-        className="opacity-0 group-hover:opacity-100 p-0.5 mr-1 rounded hover:bg-white/10 text-[#8b949e] hover:text-white transition-all flex-shrink-0"
+        className="opacity-0 group-hover:opacity-100 p-0.5 mr-1 rounded hover:bg-white/10 text-[#b0bac5] hover:text-white transition-all flex-shrink-0"
       >
         <MoreVertical className="w-3.5 h-3.5" />
       </button>
@@ -434,7 +434,7 @@ function FileViewer({ filePath, onClose }: { filePath: string; onClose: () => vo
                 setEditing(true);
                 setTimeout(() => textareaRef.current?.focus(), 50);
               }}
-              className="p-1 rounded hover:bg-white/10 text-[#8b949e] hover:text-white transition-colors"
+              className="p-1 rounded hover:bg-white/10 text-[#b0bac5] hover:text-white transition-colors"
               title="Edit"
             >
               <Pencil className="w-3.5 h-3.5" />
@@ -443,7 +443,7 @@ function FileViewer({ filePath, onClose }: { filePath: string; onClose: () => vo
           {editing && hasChanges && (
             <button
               onClick={handleUndo}
-              className="p-1 rounded hover:bg-white/10 text-[#8b949e] hover:text-white transition-colors"
+              className="p-1 rounded hover:bg-white/10 text-[#b0bac5] hover:text-white transition-colors"
               title="Undo changes"
             >
               <Undo2 className="w-3.5 h-3.5" />
@@ -471,14 +471,14 @@ function FileViewer({ filePath, onClose }: { filePath: string; onClose: () => vo
           )}
           <button
             onClick={handleCopy}
-            className="p-1 rounded hover:bg-white/10 text-[#8b949e] hover:text-white transition-colors"
+            className="p-1 rounded hover:bg-white/10 text-[#b0bac5] hover:text-white transition-colors"
             title="Copy"
           >
             {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
           </button>
           <button
             onClick={onClose}
-            className="p-1 rounded hover:bg-white/10 text-[#8b949e] hover:text-white transition-colors"
+            className="p-1 rounded hover:bg-white/10 text-[#b0bac5] hover:text-white transition-colors"
           >
             <X className="w-3.5 h-3.5" />
           </button>
@@ -495,7 +495,7 @@ function FileViewer({ filePath, onClose }: { filePath: string; onClose: () => vo
         </div>
       )}
       <div className="flex-1 overflow-auto">
-        {loading && <div className="text-[#8b949e] text-[12px] animate-pulse p-3">Loading...</div>}
+        {loading && <div className="text-[#b0bac5] text-[12px] animate-pulse p-3">Loading...</div>}
         {error && <div className="text-red-400 text-[12px] p-3">{error}</div>}
         {content !== null && editing ? (
           <textarea
@@ -717,7 +717,7 @@ export default function AdminFilesPanel({ onClose }: { onClose: () => void }) {
         <div className="flex items-center gap-2">
           <button
             onClick={onClose}
-            className="flex items-center gap-1 text-[11px] text-[#8b949e] hover:text-[#c9d1d9] transition-colors"
+            className="flex items-center gap-1 text-[11px] text-[#b0bac5] hover:text-[#c9d1d9] transition-colors"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             <span>File tree</span>
@@ -725,7 +725,7 @@ export default function AdminFilesPanel({ onClose }: { onClose: () => void }) {
           <div className="relative">
             <button
               onClick={() => setShowMenu(!showMenu)}
-              className="text-[#8b949e] hover:text-[#c9d1d9] transition-colors p-0.5"
+              className="text-[#b0bac5] hover:text-[#c9d1d9] transition-colors p-0.5"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
             </button>
@@ -754,7 +754,7 @@ export default function AdminFilesPanel({ onClose }: { onClose: () => void }) {
             className="bg-transparent text-[12px] text-[#c9d1d9] placeholder-[#484f58] outline-none flex-1 w-full"
           />
           {searchTerm && (
-            <button onClick={() => setSearchTerm("")} className="text-[#8b949e] hover:text-white">
+            <button onClick={() => setSearchTerm("")} className="text-[#b0bac5] hover:text-white">
               <X className="w-3 h-3" />
             </button>
           )}
@@ -767,10 +767,10 @@ export default function AdminFilesPanel({ onClose }: { onClose: () => void }) {
         <div className="flex-1 overflow-y-auto px-1 pb-2">
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <RefreshCw className="w-4 h-4 text-[#8b949e] animate-spin" />
+              <RefreshCw className="w-4 h-4 text-[#b0bac5] animate-spin" />
             </div>
           ) : tree.length === 0 ? (
-            <div className="text-[#8b949e] text-[12px] text-center py-8">No files found</div>
+            <div className="text-[#b0bac5] text-[12px] text-center py-8">No files found</div>
           ) : (
             tree.map((node, i) => (
               <TreeNodeItem

@@ -107,13 +107,13 @@ export default function SnapshotsPanel({ projectId }: SnapshotsPanelProps) {
         <div className="flex items-center gap-2">
           <Archive className="w-4 h-4 text-[#58a6ff]" />
           <span className="text-xs font-semibold text-[#e1e4e8]">{t.snapshots}</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#1c2333] text-[#8b949e]">
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#1c2333] text-[#b0bac5]">
             {snapshots.length}
           </span>
         </div>
         <button
           onClick={() => setShowCreateForm((v) => !v)}
-          className="p-1 rounded text-[#8b949e] hover:text-[#58a6ff] hover:bg-[#1c2333] transition-colors"
+          className="p-1 rounded text-[#b0bac5] hover:text-[#58a6ff] hover:bg-[#1c2333] transition-colors"
           title={t.snapshot_create}
         >
           <Plus className="w-4 h-4" />
@@ -166,7 +166,7 @@ export default function SnapshotsPanel({ projectId }: SnapshotsPanelProps) {
                 </button>
                 <button
                   onClick={() => setShowCreateForm(false)}
-                  className="px-2 py-1.5 text-[#8b949e] text-xs rounded hover:bg-[#1c2333] transition-colors"
+                  className="px-2 py-1.5 text-[#b0bac5] text-xs rounded hover:bg-[#1c2333] transition-colors"
                 >
                   {t.cancel}
                 </button>
@@ -180,7 +180,7 @@ export default function SnapshotsPanel({ projectId }: SnapshotsPanelProps) {
         {snapshots.length === 0 ? (
           <div className="text-center mt-8 px-4">
             <Archive className="w-8 h-8 mx-auto text-[#484f58] mb-2" />
-            <p className="text-xs text-[#8b949e]">{t.snapshot_no_snapshots}</p>
+            <p className="text-xs text-[#b0bac5]">{t.snapshot_no_snapshots}</p>
           </div>
         ) : (
           <div className="divide-y divide-[#1c2333]">
@@ -197,9 +197,9 @@ export default function SnapshotsPanel({ projectId }: SnapshotsPanelProps) {
                   <div className="flex items-start gap-2">
                     <div className="mt-0.5">
                       {expandedSnapshotId === snap.id ? (
-                        <ChevronDown className="w-3 h-3 text-[#8b949e]" />
+                        <ChevronDown className="w-3 h-3 text-[#b0bac5]" />
                       ) : (
-                        <ChevronRight className="w-3 h-3 text-[#8b949e]" />
+                        <ChevronRight className="w-3 h-3 text-[#b0bac5]" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -207,7 +207,7 @@ export default function SnapshotsPanel({ projectId }: SnapshotsPanelProps) {
                         {snap.label}
                       </p>
                       {snap.description && (
-                        <p className="text-[10px] text-[#8b949e] truncate mt-0.5">
+                        <p className="text-[10px] text-[#b0bac5] truncate mt-0.5">
                           {snap.description}
                         </p>
                       )}
@@ -265,7 +265,7 @@ export default function SnapshotsPanel({ projectId }: SnapshotsPanelProps) {
                               </button>
                               <button
                                 onClick={() => setConfirmAction(null)}
-                                className="px-2 py-1 text-[11px] text-[#8b949e] rounded hover:bg-[#1c2333] transition-colors"
+                                className="px-2 py-1 text-[11px] text-[#b0bac5] rounded hover:bg-[#1c2333] transition-colors"
                               >
                                 <X className="w-3 h-3" />
                               </button>
@@ -294,7 +294,7 @@ export default function SnapshotsPanel({ projectId }: SnapshotsPanelProps) {
                                 "flex-1 flex items-center justify-center gap-1 px-2 py-1 text-[11px] rounded transition-colors",
                                 comparingSnapshotId === snap.id
                                   ? "text-[#d2a8ff] bg-purple-500/20"
-                                  : "text-[#8b949e] bg-[#1c2333] hover:bg-[#21262d]"
+                                  : "text-[#b0bac5] bg-[#1c2333] hover:bg-[#21262d]"
                               )}
                             >
                               <GitCompare className="w-3 h-3" />
@@ -334,7 +334,7 @@ export default function SnapshotsPanel({ projectId }: SnapshotsPanelProps) {
                                       </span>
                                     </div>
                                     {typedCompareData.added.map((f) => (
-                                      <p key={f} className="text-[10px] text-[#8b949e] ps-4 truncate">{f}</p>
+                                      <p key={f} className="text-[10px] text-[#b0bac5] ps-4 truncate">{f}</p>
                                     ))}
                                   </div>
                                 )}
@@ -348,7 +348,7 @@ export default function SnapshotsPanel({ projectId }: SnapshotsPanelProps) {
                                       </span>
                                     </div>
                                     {typedCompareData.removed.map((f) => (
-                                      <p key={f} className="text-[10px] text-[#8b949e] ps-4 truncate">{f}</p>
+                                      <p key={f} className="text-[10px] text-[#b0bac5] ps-4 truncate">{f}</p>
                                     ))}
                                   </div>
                                 )}
@@ -362,7 +362,7 @@ export default function SnapshotsPanel({ projectId }: SnapshotsPanelProps) {
                                       </span>
                                     </div>
                                     {typedCompareData.modified.map((f) => (
-                                      <p key={f.filePath} className="text-[10px] text-[#8b949e] ps-4 truncate">
+                                      <p key={f.filePath} className="text-[10px] text-[#b0bac5] ps-4 truncate">
                                         {f.filePath}
                                       </p>
                                     ))}
@@ -383,7 +383,7 @@ export default function SnapshotsPanel({ projectId }: SnapshotsPanelProps) {
                                 {typedCompareData.added.length === 0 &&
                                   typedCompareData.removed.length === 0 &&
                                   typedCompareData.modified.length === 0 && (
-                                    <p className="text-[10px] text-[#8b949e]">
+                                    <p className="text-[10px] text-[#b0bac5]">
                                       {t.snapshot_unchanged}
                                     </p>
                                   )}

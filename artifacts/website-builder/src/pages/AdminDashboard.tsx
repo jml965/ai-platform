@@ -254,7 +254,7 @@ export default function AdminDashboard() {
       <div className="min-h-screen bg-[#0d1117] flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-10 h-10 animate-spin text-[#58a6ff] mx-auto mb-4" />
-          <p className="text-[#8b949e]">{t.loading}</p>
+          <p className="text-[#b0bac5]">{t.loading}</p>
         </div>
       </div>
     );
@@ -316,7 +316,7 @@ export default function AdminDashboard() {
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
                 tab === id
                   ? "bg-[#58a6ff]/10 text-[#58a6ff] border border-[#58a6ff]/30"
-                  : "bg-[#21262d] text-[#8b949e] border border-[#30363d] hover:bg-[#30363d]"
+                  : "bg-[#21262d] text-[#b0bac5] border border-[#30363d] hover:bg-[#30363d]"
               }`}
             >
               <Icon className="w-4 h-4" />
@@ -343,10 +343,10 @@ function StatCard({ icon: Icon, label, value, subtitle, color }: {
         <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: color + "15" }}>
           <Icon className="w-5 h-5" style={{ color }} />
         </div>
-        <span className="text-[#8b949e] text-sm">{label}</span>
+        <span className="text-[#b0bac5] text-sm">{label}</span>
       </div>
       <p className="text-2xl font-bold text-white">{value}</p>
-      {subtitle && <p className="text-xs text-[#8b949e] mt-1">{subtitle}</p>}
+      {subtitle && <p className="text-xs text-[#b0bac5] mt-1">{subtitle}</p>}
     </div>
   );
 }
@@ -357,7 +357,7 @@ function OverviewTab({ overview, daily, agents, t, lang }: {
   const pieData = agents.filter(a => a.cost > 0).map(a => ({
     name: AGENT_LABELS[a.agentType]?.[lang === "ar" ? "ar" : "en"] || a.agentType,
     value: a.cost,
-    color: AGENT_LABELS[a.agentType]?.color || "#8b949e",
+    color: AGENT_LABELS[a.agentType]?.color || "#b0bac5",
   }));
 
   return (
@@ -388,8 +388,8 @@ function OverviewTab({ overview, daily, agents, t, lang }: {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#30363d" />
-              <XAxis dataKey="date" stroke="#8b949e" tick={{ fontSize: 11 }} tickFormatter={(v) => v.split("-").slice(1).join("/")} />
-              <YAxis stroke="#8b949e" tick={{ fontSize: 11 }} tickFormatter={(v) => "$" + v} />
+              <XAxis dataKey="date" stroke="#b0bac5" tick={{ fontSize: 11 }} tickFormatter={(v) => v.split("-").slice(1).join("/")} />
+              <YAxis stroke="#b0bac5" tick={{ fontSize: 11 }} tickFormatter={(v) => "$" + v} />
               <Tooltip
                 contentStyle={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 12, color: "#c9d1d9" }}
                 formatter={(v: number) => ["$" + v.toFixed(4), lang === "ar" ? "التكلفة" : "Cost"]}
@@ -419,7 +419,7 @@ function OverviewTab({ overview, daily, agents, t, lang }: {
               <div key={i} className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: d.color }} />
-                  <span className="text-[#8b949e]">{d.name}</span>
+                  <span className="text-[#b0bac5]">{d.name}</span>
                 </div>
                 <span className="text-white font-mono">{formatCost(d.value)}</span>
               </div>
@@ -436,7 +436,7 @@ function AgentsTab({ agents, t, lang }: { agents: AgentStat[]; t: any; lang: str
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {agents.map((agent) => {
-          const info = AGENT_LABELS[agent.agentType] || { ar: agent.agentType, en: agent.agentType, color: "#8b949e" };
+          const info = AGENT_LABELS[agent.agentType] || { ar: agent.agentType, en: agent.agentType, color: "#b0bac5" };
           const successRate = agent.runs > 0 ? Math.round(((agent.successCount || 0) / agent.runs) * 100) : 0;
           return (
             <div key={agent.agentType} className="bg-[#161b22] border border-[#30363d] rounded-2xl p-5">
@@ -446,32 +446,32 @@ function AgentsTab({ agents, t, lang }: { agents: AgentStat[]; t: any; lang: str
                 </div>
                 <div>
                   <h3 className="text-white font-semibold">{lang === "ar" ? info.ar : info.en}</h3>
-                  <span className="text-xs text-[#8b949e]">{agent.agentType}</span>
+                  <span className="text-xs text-[#b0bac5]">{agent.agentType}</span>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-[#0d1117] rounded-xl p-3">
-                  <p className="text-xs text-[#8b949e] mb-1">{t.runs}</p>
+                  <p className="text-xs text-[#b0bac5] mb-1">{t.runs}</p>
                   <p className="text-lg font-bold text-white">{agent.runs}</p>
                 </div>
                 <div className="bg-[#0d1117] rounded-xl p-3">
-                  <p className="text-xs text-[#8b949e] mb-1">{t.tokens}</p>
+                  <p className="text-xs text-[#b0bac5] mb-1">{t.tokens}</p>
                   <p className="text-lg font-bold text-white">{formatNumber(agent.tokens)}</p>
                 </div>
                 <div className="bg-[#0d1117] rounded-xl p-3">
-                  <p className="text-xs text-[#8b949e] mb-1">{t.cost}</p>
+                  <p className="text-xs text-[#b0bac5] mb-1">{t.cost}</p>
                   <p className="text-lg font-bold text-[#f0883e]">{formatCost(agent.cost)}</p>
                 </div>
                 <div className="bg-[#0d1117] rounded-xl p-3">
-                  <p className="text-xs text-[#8b949e] mb-1">{t.avgDuration}</p>
+                  <p className="text-xs text-[#b0bac5] mb-1">{t.avgDuration}</p>
                   <p className="text-lg font-bold text-white">{formatDuration(agent.avgDuration)}</p>
                 </div>
               </div>
 
               <div className="mt-4">
                 <div className="flex items-center justify-between text-sm mb-2">
-                  <span className="text-[#8b949e]">{t.successRate}</span>
+                  <span className="text-[#b0bac5]">{t.successRate}</span>
                   <span className="text-white font-mono">{successRate}%</span>
                 </div>
                 <div className="h-2 bg-[#0d1117] rounded-full overflow-hidden">
@@ -493,11 +493,11 @@ function AgentsTab({ agents, t, lang }: { agents: AgentStat[]; t: any; lang: str
             name: AGENT_LABELS[a.agentType]?.[lang === "ar" ? "ar" : "en"] || a.agentType,
             cost: a.cost,
             tokens: a.tokens,
-            color: AGENT_LABELS[a.agentType]?.color || "#8b949e",
+            color: AGENT_LABELS[a.agentType]?.color || "#b0bac5",
           }))}>
             <CartesianGrid strokeDasharray="3 3" stroke="#30363d" />
-            <XAxis dataKey="name" stroke="#8b949e" tick={{ fontSize: 11 }} />
-            <YAxis stroke="#8b949e" tick={{ fontSize: 11 }} tickFormatter={(v) => "$" + v} />
+            <XAxis dataKey="name" stroke="#b0bac5" tick={{ fontSize: 11 }} />
+            <YAxis stroke="#b0bac5" tick={{ fontSize: 11 }} tickFormatter={(v) => "$" + v} />
             <Tooltip
               contentStyle={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 12, color: "#c9d1d9" }}
               formatter={(v: number) => formatCost(v)}
@@ -516,7 +516,7 @@ function AgentsTab({ agents, t, lang }: { agents: AgentStat[]; t: any; lang: str
 
 function ProjectsTab({ projects, t, lang }: { projects: ProjectStat[]; t: any; lang: string }) {
   const statusColors: Record<string, string> = {
-    draft: "#8b949e",
+    draft: "#b0bac5",
     building: "#58a6ff",
     completed: "#3fb950",
     failed: "#f85149",
@@ -529,12 +529,12 @@ function ProjectsTab({ projects, t, lang }: { projects: ProjectStat[]; t: any; l
         <table className="w-full">
           <thead>
             <tr className="border-b border-[#30363d]">
-              <th className="px-5 py-4 text-start text-sm font-medium text-[#8b949e]">{t.projectName}</th>
-              <th className="px-5 py-4 text-start text-sm font-medium text-[#8b949e]">{t.owner}</th>
-              <th className="px-5 py-4 text-start text-sm font-medium text-[#8b949e]">{t.status}</th>
-              <th className="px-5 py-4 text-start text-sm font-medium text-[#8b949e]">{t.tokens}</th>
-              <th className="px-5 py-4 text-start text-sm font-medium text-[#8b949e]">{t.cost}</th>
-              <th className="px-5 py-4 text-start text-sm font-medium text-[#8b949e]">{t.createdAt}</th>
+              <th className="px-5 py-4 text-start text-sm font-medium text-[#b0bac5]">{t.projectName}</th>
+              <th className="px-5 py-4 text-start text-sm font-medium text-[#b0bac5]">{t.owner}</th>
+              <th className="px-5 py-4 text-start text-sm font-medium text-[#b0bac5]">{t.status}</th>
+              <th className="px-5 py-4 text-start text-sm font-medium text-[#b0bac5]">{t.tokens}</th>
+              <th className="px-5 py-4 text-start text-sm font-medium text-[#b0bac5]">{t.cost}</th>
+              <th className="px-5 py-4 text-start text-sm font-medium text-[#b0bac5]">{t.createdAt}</th>
             </tr>
           </thead>
           <tbody>
@@ -549,15 +549,15 @@ function ProjectsTab({ projects, t, lang }: { projects: ProjectStat[]; t: any; l
                 <td className="px-5 py-4">
                   <div>
                     <p className="text-white text-sm">{p.userName}</p>
-                    <p className="text-[#8b949e] text-xs">{p.userEmail}</p>
+                    <p className="text-[#b0bac5] text-xs">{p.userEmail}</p>
                   </div>
                 </td>
                 <td className="px-5 py-4">
                   <span
                     className="px-2.5 py-1 rounded-full text-xs font-medium"
                     style={{
-                      color: statusColors[p.status] || "#8b949e",
-                      backgroundColor: (statusColors[p.status] || "#8b949e") + "15",
+                      color: statusColors[p.status] || "#b0bac5",
+                      backgroundColor: (statusColors[p.status] || "#b0bac5") + "15",
                     }}
                   >
                     {p.status}
@@ -565,7 +565,7 @@ function ProjectsTab({ projects, t, lang }: { projects: ProjectStat[]; t: any; l
                 </td>
                 <td className="px-5 py-4 font-mono text-sm text-white">{formatNumber(p.totalTokens)}</td>
                 <td className="px-5 py-4 font-mono text-sm text-[#f0883e]">{formatCost(p.totalCost)}</td>
-                <td className="px-5 py-4 text-sm text-[#8b949e]">{new Date(p.createdAt).toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US")}</td>
+                <td className="px-5 py-4 text-sm text-[#b0bac5]">{new Date(p.createdAt).toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US")}</td>
               </tr>
             ))}
           </tbody>
@@ -582,13 +582,13 @@ function UsersTab({ users, t, lang }: { users: UserStat[]; t: any; lang: string 
         <table className="w-full">
           <thead>
             <tr className="border-b border-[#30363d]">
-              <th className="px-5 py-4 text-start text-sm font-medium text-[#8b949e]">{t.displayName}</th>
-              <th className="px-5 py-4 text-start text-sm font-medium text-[#8b949e]">{t.email}</th>
-              <th className="px-5 py-4 text-start text-sm font-medium text-[#8b949e]">{t.role}</th>
-              <th className="px-5 py-4 text-start text-sm font-medium text-[#8b949e]">{t.projects}</th>
-              <th className="px-5 py-4 text-start text-sm font-medium text-[#8b949e]">{t.tokens}</th>
-              <th className="px-5 py-4 text-start text-sm font-medium text-[#8b949e]">{t.cost}</th>
-              <th className="px-5 py-4 text-start text-sm font-medium text-[#8b949e]">{t.balance}</th>
+              <th className="px-5 py-4 text-start text-sm font-medium text-[#b0bac5]">{t.displayName}</th>
+              <th className="px-5 py-4 text-start text-sm font-medium text-[#b0bac5]">{t.email}</th>
+              <th className="px-5 py-4 text-start text-sm font-medium text-[#b0bac5]">{t.role}</th>
+              <th className="px-5 py-4 text-start text-sm font-medium text-[#b0bac5]">{t.projects}</th>
+              <th className="px-5 py-4 text-start text-sm font-medium text-[#b0bac5]">{t.tokens}</th>
+              <th className="px-5 py-4 text-start text-sm font-medium text-[#b0bac5]">{t.cost}</th>
+              <th className="px-5 py-4 text-start text-sm font-medium text-[#b0bac5]">{t.balance}</th>
             </tr>
           </thead>
           <tbody>
@@ -602,10 +602,10 @@ function UsersTab({ users, t, lang }: { users: UserStat[]; t: any; lang: string 
                     <span className="text-white font-medium">{u.displayName}</span>
                   </div>
                 </td>
-                <td className="px-5 py-4 text-sm text-[#8b949e]">{u.email}</td>
+                <td className="px-5 py-4 text-sm text-[#b0bac5]">{u.email}</td>
                 <td className="px-5 py-4">
                   <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                    u.role === "admin" ? "bg-[#d2a8ff]/10 text-[#d2a8ff]" : "bg-[#8b949e]/10 text-[#8b949e]"
+                    u.role === "admin" ? "bg-[#d2a8ff]/10 text-[#d2a8ff]" : "bg-[#b0bac5]/10 text-[#b0bac5]"
                   }`}>
                     {u.role === "admin" ? t.admin : t.user}
                   </span>
