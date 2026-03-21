@@ -1616,6 +1616,7 @@ export async function executeInfraTool(toolName: string, input: any, callerRole?
         if (!ghToken) return JSON.stringify({ error: "GitHub token not available" });
         const repo = process.env.GITHUB_REPOSITORY || "jml965/ai-platform";
         const branch = input.branch || "main";
+        const triggerTimestamp = new Date().toISOString();
         const res = await fetch(`https://api.github.com/repos/${repo}/actions/workflows`, {
           headers: { Authorization: `token ${ghToken}`, Accept: "application/vnd.github.v3+json" },
         });
@@ -1627,7 +1628,32 @@ export async function executeInfraTool(toolName: string, input: any, callerRole?
           headers: { Authorization: `token ${ghToken}`, Accept: "application/vnd.github.v3+json", "Content-Type": "application/json" },
           body: JSON.stringify({ ref: branch }),
         });
-        if (triggerRes.status === 204) return JSON.stringify({ success: true, message: `Deployment triggered on branch '${branch}'`, workflow: deployWf.name });
+        if (triggerRes.status === 204) {
+          await new Promise(r => setTimeout(r, 3000));
+          const runsRes = await fetch(`https://api.github.com/repos/${repo}/actions/runs?per_page=3&branch=${branch}`, {
+            headers: { Authorization: `token ${ghToken}`, Accept: "application/vnd.github.v3+json" },
+          });
+          const runsData = await runsRes.json();
+          const latestRun = (runsData.workflow_runs || [])[0];
+          const gcpProject = process.env.GCP_PROJECT || "oktamam-ai-platform";
+          const gcpService = process.env.GCP_SERVICE || "mrcodeai";
+          const gcpRegion = process.env.GCP_REGION || "me-central1";
+          return JSON.stringify({
+            success: true,
+            message: `Deployment triggered on branch '${branch}'`,
+            workflow: deployWf.name,
+            deployId: latestRun?.id || "pending",
+            runUrl: latestRun?.html_url || `https://github.com/${repo}/actions`,
+            status: latestRun?.status || "queued",
+            timestamp: triggerTimestamp,
+            cloudRun: {
+              project: gcpProject,
+              service: gcpService,
+              region: gcpRegion,
+              consoleUrl: `https://console.cloud.google.com/run/detail/${gcpRegion}/${gcpService}/revisions?project=${gcpProject}`,
+            },
+          });
+        }
         const errBody = await triggerRes.text();
         return JSON.stringify({ success: false, status: triggerRes.status, error: errBody });
       }
@@ -1848,7 +1874,21 @@ export async function executeInfraTool(toolName: string, input: any, callerRole?
             if (!(ce?.stderr || ce?.message || "").includes("nothing to commit")) throw ce;
           }
           const pushOut = execSync(`git push github master:main`, { cwd: PROJECT_ROOT, encoding: "utf-8", timeout: 30000 });
-          return JSON.stringify({ success: true, message: `Pushed to GitHub (master → main)`, backupTag, output: pushOut.slice(0, 5000) });
+          const commitHash = execSync("git rev-parse HEAD", { cwd: PROJECT_ROOT, encoding: "utf-8" }).trim();
+          const commitShort = commitHash.slice(0, 7);
+          const repo = process.env.GITHUB_REPOSITORY || "jml965/ai-platform";
+          const repoUrl = `https://github.com/${repo}`;
+          const commitLink = `${repoUrl}/commit/${commitHash}`;
+          return JSON.stringify({
+            success: true,
+            message: `Pushed to GitHub (master → main)`,
+            backupTag,
+            repo: repoUrl,
+            commitHash,
+            commitShort,
+            commitLink,
+            output: pushOut.slice(0, 3000),
+          });
         } catch (e: any) {
           const errMsg = (e?.stderr || e?.message || "").slice(0, 5000);
           if (errMsg.includes("rejected") || errMsg.includes("non-fast-forward")) {
@@ -1884,26 +1924,35 @@ export async function executeInfraTool(toolName: string, input: any, callerRole?
           const prodUrl = `https://mrcodeai.com${pagePath}`;
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), 15000);
+          const fetchStart = Date.now();
           const res = await fetch(prodUrl, {
             signal: controller.signal,
             headers: { "User-Agent": "MrCodeAI-Verifier/1.0" },
           });
           clearTimeout(timeout);
+          const fetchDuration = Date.now() - fetchStart;
           if (!res.ok) {
-            return JSON.stringify({ success: false, found: false, error: `HTTP ${res.status}`, url: prodUrl });
+            return JSON.stringify({ success: false, found: false, error: `HTTP ${res.status}`, url: prodUrl, responseTimeMs: fetchDuration });
           }
           const html = await res.text();
           const found = html.includes(searchText);
+          const occurrences = found ? html.split(searchText).length - 1 : 0;
           const htmlSnippet = found
-            ? (() => { const idx = html.indexOf(searchText); return html.slice(Math.max(0, idx - 50), idx + searchText.length + 50); })()
-            : "";
+            ? (() => { const idx = html.indexOf(searchText); return html.slice(Math.max(0, idx - 100), idx + searchText.length + 100); })()
+            : html.slice(0, 500);
+          const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
           return JSON.stringify({
             success: true,
             found,
             url: prodUrl,
-            message: found ? `✅ النص "${searchText}" موجود في الصفحة` : `❌ النص "${searchText}" غير موجود في الصفحة`,
-            snippet: htmlSnippet.slice(0, 300),
+            message: found ? `✅ النص "${searchText}" موجود في الصفحة (${occurrences} مرة)` : `❌ النص "${searchText}" غير موجود في الصفحة`,
+            snippet: htmlSnippet.slice(0, 500),
+            occurrences,
+            pageTitle: titleMatch?.[1] || "",
             htmlLength: html.length,
+            responseTimeMs: fetchDuration,
+            httpStatus: res.status,
+            server: res.headers.get("server") || "",
           });
         } catch (e: any) {
           return JSON.stringify({ success: false, found: false, error: e.message?.slice(0, 500), url: `https://mrcodeai.com${input.path || "/"}` });

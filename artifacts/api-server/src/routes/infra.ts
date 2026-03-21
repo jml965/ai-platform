@@ -47,7 +47,7 @@ const TOOL_RISK_CONFIG: Record<string, { risk: string; category: string; require
   github_api: { risk: "medium", category: "deploy", requiresApproval: false, sandboxed: false },
   remote_server_api: { risk: "high", category: "deploy", requiresApproval: true, sandboxed: false },
   rollback_deploy: { risk: "high", category: "deploy", requiresApproval: true, sandboxed: false },
-  verify_production: { risk: "low", category: "deploy", requiresApproval: false, sandboxed: false },
+  verify_production: { risk: "medium", category: "deploy", requiresApproval: false, sandboxed: false },
 };
 
 function isSafeSQL(query: string): { safe: boolean; reason?: string } {
@@ -116,21 +116,20 @@ const DEFAULT_INFRA_AGENTS = [
 - كن مختصراً ومباشراً ودقيقاً
 - لا تخترع ملفات غير موجودة
 
-⚠️ قاعدة حاسمة — أنت تملك أدوات حقيقية (tools):
-- system_status, read_file, write_file, db_query, db_tables, exec_command, get_env, set_env
-- list_components, view_page_source, edit_component, create_component
-- screenshot_page, click_element, type_text, hover_element, inspect_styles
-- get_page_structure, scroll_page, get_console_errors, get_network_requests
-- trigger_deploy, deploy_status, github_api, browse_page, site_health
-- remote_server_api: استدعاء أي API على سيرفر الإنتاج (Cloud Run)
-- git_push: رفع التغييرات على GitHub (فقط عند طلب المالك صراحة)
+⚠️ أنت Thinker فقط — لا تنفّذ. أدواتك المتاحة:
+- system_status, read_file, db_query (SELECT فقط), db_tables, get_env
+- list_files, list_components, view_page_source, search_text
+- screenshot_page, get_page_structure, browse_page, site_health
+- deploy_status, verify_production
 
-⛔⛔⛔ قواعد مطلقة — المخالفة = فشل فوري ⛔⛔⛔
-1. لما يُطلب منك حذف/تعديل/إنشاء أي شيء → استدعِ الأداة فوراً. لا تكتب نص تشرح فيه ماذا "ستفعل" أو "فعلت" — فقط نفّذ الأداة.
-2. ممنوع كتابة أوامر bash وهمية أو مخرجات مزيفة. أنت تملك أدوات حقيقية — استخدمها.
-3. ممنوع تقول "ضغطت الزر" أو "حذفته" أو "تم" بدون ما تستدعي أداة أولاً. المالك يشوف إذا استدعيت أداة أو لا.
-4. لتعديل الكود: أولاً read_file → ثم edit_component → ثم screenshot_page. لعمليات DB/السيرفر/البيئة: استخدم الأداة المناسبة مباشرة (db_query, exec_command, set_env).
-5. إذا ما تقدر تسوي شيء، قل "لا أستطيع". ممنوع التظاهر أبداً.`,
+⛔⛔⛔ ممنوع عليك نهائياً ⛔⛔⛔
+- write_file, edit_component, create_component, delete_file ← ممنوع
+- exec_command, run_command ← ممنوع
+- git_push, trigger_deploy ← ممنوع
+- set_env, run_sql, database_write ← ممنوع
+
+إذا المالك طلب تعديل/كتابة/نشر → وجّه الطلب لوكيل التطوير (infra_builder) أو وكيل النشر (infra_deploy).
+دورك: تحليل، مراقبة، موافقات، توجيه — لا تنفيذ.`,
     instructions: `## أنت مدير النظام الأعلى لمنصة Mr Code AI
 
 أنت القائد الأول والمسؤول عن كامل البنية التحتية.
@@ -870,6 +869,17 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
         for (const tool of toolUseBlocks) {
           const riskCfg = TOOL_RISK_CONFIG[tool.name] || { risk: "medium", category: "unknown", requiresApproval: false, sandboxed: false };
           const toolStart = Date.now();
+
+          const EXECUTOR_ONLY_TOOLS = new Set(["edit_component", "write_file", "create_component", "delete_file", "git_push", "trigger_deploy", "run_sql", "exec_command", "run_command", "set_env"]);
+          const EXECUTOR_AGENTS = new Set(["infra_builder", "infra_deploy", "execution_engine"]);
+          if (EXECUTOR_ONLY_TOOLS.has(tool.name) && !EXECUTOR_AGENTS.has(agentKey)) {
+            const blocked = `⛔ EXECUTOR_ONLY — الأداة ${tool.name} محصورة بالوكلاء المنفّذين فقط (infra_builder, infra_deploy, execution_engine). الوكيل ${agentKey} من نوع thinker/specialist — ممنوع التنفيذ.`;
+            res.write(`data: ${JSON.stringify({ type: "chunk", text: `\n\n${blocked}\n` })}\n\n`);
+            fullReply += `\n\n${blocked}\n`;
+            await logAudit(agentKey, "blocked_executor_only", tool.name, tool.input, blocked, riskCfg.risk, "blocked");
+            toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: blocked });
+            continue;
+          }
 
           if (agentPerms.length > 0) {
             const allowedNames = new Set<string>();
