@@ -1326,7 +1326,8 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
             if (decisionState.domText && !targetState.found) {
               const domSearchHint = `\n\n✅ DOM_TO_SEARCH — تم اكتشاف النص "${decisionState.domText.slice(0, 40)}" في الصفحة.\n\n🔧 الخطوة التالية المطلوبة:\nsearch_text text="${decisionState.domText.slice(0, 30)}" للعثور على الملف الذي يحتوي هذا النص في الكود.\n\n⛔ لا تتصفح الصفحة مرة أخرى.`;
               console.log(`[Agent] DOM_TO_SEARCH: injecting search hint for domText="${decisionState.domText.slice(0, 30)}"`);
-              result = (result || "") + domSearchHint;
+              toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: (result || "") + domSearchHint });
+              continue;
             }
           }
 
