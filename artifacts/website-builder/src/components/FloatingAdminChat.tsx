@@ -751,9 +751,6 @@ function FloatingChatInner() {
           projectId: "general",
           ...(attachments.length > 0 ? { attachments } : {}),
         };
-      } else if (selectedAgent.agentKey === "infra_sysadmin") {
-        endpoint = `${BASE}api/infra/director-stream`;
-        body = { message: currentPrompt };
       } else {
         endpoint = `${BASE}api/infra/chat-stream`;
         body = { agentKey: selectedAgent.agentKey, message: currentPrompt };
