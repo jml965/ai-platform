@@ -785,13 +785,18 @@ ${blueprint}
   خطوة 4: read_file → اقرأ الملف المحدد + edit_component → عدّل
   خطوة 5: screenshot_page → تحقق أن التغيير ظاهر في الواجهة
 
+⚠️ النظام يمنعك تلقائياً من تنفيذ edit_component على ملف واجهة (.tsx/.jsx/.css) بدون فحص DOM أولاً!
+إذا حاولت edit بدون get_page_structure/browse_page → النظام يرفض ويرجع: DOM_INSPECTION_REQUIRED
+لازم تنفّذ get_page_structure أولاً — بدونها edit ممنوع.
+
 نمط الرد بعد التحديد:
   📍 المصدر: [i18n / component / API]
   📍 الدليل: [class/id من DOM + سطر في الكود]
   📍 الملف: [path]
 
 ممنوع:
-- تعديل ملف بدون ربطه بعنصر DOM حقيقي (إلا إذا التعديل backend فقط)
+- edit على ملف واجهة بدون DOM inspection (النظام يمنعك تلقائياً)
+- search قبل DOM — نفّذ get_page_structure أولاً
 - بحث ثاني لنفس الهدف
 - قول "سأفعل" أو "دعني" بدون تنفيذ
 - ممنوع search أكثر من 3 مرات في المحادثة
@@ -1132,6 +1137,22 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
             console.log(`[Agent] DOM inspection done via ${tool.name} — source of truth check ✓`);
           }
 
+          if (tool.name === "edit_component" && !hasDOMInspection) {
+            const editPath = (tool.input as any)?.componentPath || (tool.input as any)?.path || "";
+            const isUIFile = /\.(tsx|jsx|css|html|vue|svelte)$/i.test(editPath);
+            const oldText = (tool.input as any)?.old_text || "";
+            const hasTextChange = oldText.length > 0 && /[\u0600-\u06FFa-zA-Z]/.test(oldText);
+            if (isUIFile && hasTextChange) {
+              const blocked = `❌ DOM_INSPECTION_REQUIRED — ممنوع تعديل نص واجهة بدون فحص DOM أولاً!\n\nالمطلوب قبل edit_component:\n1. get_page_structure → حدد العنصر (class/id)\n2. search_text → ابحث عن النص في الكود\n3. حدد المصدر (i18n / component / API)\n4. ثم edit_component\n\nنفّذ get_page_structure أولاً.`;
+              res.write(`data: ${JSON.stringify({ type: "chunk", text: `\n\n${blocked}\n` })}\n\n`);
+              fullReply += `\n\n${blocked}\n`;
+              console.log(`[Agent] BLOCKED: edit_component on UI file "${editPath}" without DOM inspection`);
+              await logAudit(agentKey, "blocked_no_dom_inspection", tool.name, tool.input, blocked, "medium", "blocked");
+              toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: blocked });
+              continue;
+            }
+          }
+
           if (tool.name === "edit_component" || tool.name === "write_file" || tool.name === "create_component") {
             hasEdited = true;
             const editPath = (tool.input as any)?.componentPath || (tool.input as any)?.path || "";
@@ -1248,7 +1269,7 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
 
                 const domNote = hasDOMInspection
                   ? `\n📍 مصدر الحقيقة: تم فحص DOM قبل التعديل ✓`
-                  : `\n⚠️ تنبيه: لم يتم فحص DOM قبل التعديل — في المرة القادمة استخدم get_page_structure أولاً`;
+                  : ``;
                 const deployHint = `\n\n🚀 الخطوة التالية: نفّذ git_push مع message يصف التغيير لنشره على mrcodeai.com. التعديل في dev فقط لا يكفي!`;
                 finalContent = `✅ EDIT_SUCCESS: تم التعديل بنجاح!\n📁 الملف: ${editPath}\n🔄 matchesReplaced: ${matchesReplaced}\n📝 قبل: "${oldText}"\n📝 بعد: "${newText}"${domNote}${uiVerification}${deployHint}\n\n${result}`;
                 console.log(`[Agent] EDIT SUCCESS: matchesReplaced=${matchesReplaced} in ${editPath} | before="${oldText}" → after="${newText}" | domInspected=${hasDOMInspection}`);
