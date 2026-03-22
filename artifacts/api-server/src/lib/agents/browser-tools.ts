@@ -141,7 +141,9 @@ export async function clickElement(
   const page = await browser.newPage();
   try {
     await page.setViewport({ width: 1280, height: 720 });
-    await page.goto(resolveUrl(pathOrUrl), {
+    const clickUrl = resolveUrl(pathOrUrl);
+    await injectAuthCookie(page, clickUrl);
+    await page.goto(clickUrl, {
       waitUntil: "networkidle2",
       timeout: 20000,
     });
@@ -293,6 +295,7 @@ export async function getPageStructure(
   try {
     await page.setViewport({ width: 1280, height: 720 });
     const targetUrl = resolveUrl(pathOrUrl);
+    await injectAuthCookie(page, targetUrl);
     if (lang) {
       await page.evaluateOnNewDocument((l: string) => {
         localStorage.setItem("lang", l);
@@ -371,7 +374,9 @@ export async function scrollAndScreenshot(
   const page = await browser.newPage();
   try {
     await page.setViewport({ width: 1280, height: 720 });
-    await page.goto(resolveUrl(pathOrUrl), {
+    const scrollTarget = resolveUrl(pathOrUrl);
+    await injectAuthCookie(page, scrollTarget);
+    await page.goto(scrollTarget, {
       waitUntil: "networkidle2",
       timeout: 20000,
     });
@@ -419,7 +424,9 @@ export async function hoverElement(
   const page = await browser.newPage();
   try {
     await page.setViewport({ width: 1280, height: 720 });
-    await page.goto(resolveUrl(pathOrUrl), {
+    const hoverUrl = resolveUrl(pathOrUrl);
+    await injectAuthCookie(page, hoverUrl);
+    await page.goto(hoverUrl, {
       waitUntil: "networkidle2",
       timeout: 20000,
     });
