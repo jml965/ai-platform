@@ -1434,7 +1434,17 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
               }
             } else {
               searchWithNoResults++;
-              console.log(`[Agent] search_text returned no useful results — searchWithNoResults=${searchWithNoResults}/3`);
+              console.log(`[Agent] search_text returned no useful results — searchWithNoResults=${searchWithNoResults}`);
+
+              if (searchWithNoResults >= 1 && !searchFoundFile) {
+                decisionState.dbAllowed = true;
+                decisionState.uiSearchAttempted = true;
+                decisionState.i18nSearchAttempted = true;
+                decisionState.componentSearchAttempted = true;
+                const dbHint = `\n\n💡 النص غير موجود في ملفات الكود. غالباً هو من قاعدة البيانات.\n✅ جرّب: db_query أو run_sql للبحث عن النص في الجداول (users, projects, etc).`;
+                toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: (result || "لم يتم العثور على نتائج") + dbHint });
+                continue;
+              }
             }
 
             if (decisionState.domTextDetected) {
@@ -1466,11 +1476,13 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
                 console.log(`[Decision] All searches done — DB ALLOWED ✓`);
               }
 
-              if (decisionState.failedSearchCount >= 3) {
+              if (decisionState.failedSearchCount >= 1) {
                 decisionState.dbAllowed = true;
-                const fallbackMsg = `⚠️ تم السماح باستخدام DB بعد فشل البحث في UI (${decisionState.failedSearchCount} محاولات فاشلة)`;
+                decisionState.uiSearchAttempted = true;
+                decisionState.i18nSearchAttempted = true;
+                decisionState.componentSearchAttempted = true;
+                const fallbackMsg = `✅ النص غير موجود في الكود — DB مسموح الآن (بحث فاشل: ${decisionState.failedSearchCount})`;
                 console.log(`[Decision] FALLBACK: ${fallbackMsg}`);
-                await logAudit(agentKey, "decision_db_fallback", tool.name, { decisionState }, fallbackMsg, "medium", "override");
               }
             }
           }
