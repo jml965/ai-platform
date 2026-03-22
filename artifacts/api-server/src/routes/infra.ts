@@ -698,7 +698,7 @@ router.post("/infra/access-toggle", requireInfraAdmin, async (req, res) => {
   res.json({ enabled: getInfraAccessEnabled(), message: enabled ? "Infrastructure access enabled" : "Infrastructure access disabled" });
 });
 
-router.get("/infra/agents", requireInfraAdmin, async (_req, res) => {
+router.get("/infra/agents", async (_req, res) => {
   try {
     const agents = await db.select({
       id: agentConfigsTable.id,
