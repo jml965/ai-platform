@@ -2098,24 +2098,38 @@ export async function executeInfraTool(toolName: string, input: any, callerRole?
           const allResults: string[] = [];
           let matchedVariant = "";
 
+          console.log(`[search_text] PROJECT_ROOT=${PROJECT_ROOT}, dir=${dir}, text="${searchText}", variants=${variants.length}`);
+
+          const srcDir = path.resolve(PROJECT_ROOT, "artifacts/website-builder/src");
+          const searchDirs = [dir];
+          if (dir === PROJECT_ROOT && fs.existsSync(srcDir)) {
+            searchDirs.unshift(srcDir);
+          }
+
           for (const variant of variants) {
-            try {
-              const escaped = variant.replace(/"/g, '\\"');
-              let grepCmd: string;
-              if (filePattern) {
-                grepCmd = `grep -rn --include='${filePattern}' "${escaped}" "${dir}" --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git --exclude='*.lock' 2>/dev/null | head -50`;
-              } else {
-                grepCmd = `grep -rn "${escaped}" "${dir}" --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git --exclude='*.lock' 2>/dev/null | head -50`;
-              }
-              const result = execSync(grepCmd, { encoding: "utf-8", timeout: 10000, cwd: PROJECT_ROOT }).trim();
-              if (result) {
-                const lines = result.split("\n").map((line: string) => line.replace(PROJECT_ROOT + "/", ""));
-                for (const l of lines) {
-                  if (!allResults.includes(l)) allResults.push(l);
+            for (const sDir of searchDirs) {
+              try {
+                const escaped = variant.replace(/"/g, '\\"');
+                let grepCmd: string;
+                if (filePattern) {
+                  grepCmd = `grep -rn --include='${filePattern}' "${escaped}" "${sDir}" --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git --exclude='*.lock' 2>/dev/null | head -50`;
+                } else {
+                  grepCmd = `grep -rn "${escaped}" "${sDir}" --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.git --exclude='*.lock' 2>/dev/null | head -50`;
                 }
-                if (!matchedVariant) matchedVariant = variant;
+                const result = execSync(grepCmd, { encoding: "utf-8", timeout: 10000, cwd: PROJECT_ROOT }).trim();
+                if (result) {
+                  const lines = result.split("\n").map((line: string) => line.replace(PROJECT_ROOT + "/", ""));
+                  for (const l of lines) {
+                    if (!allResults.includes(l)) allResults.push(l);
+                  }
+                  if (!matchedVariant) matchedVariant = variant;
+                }
+              } catch (grepErr: any) {
+                if (grepErr?.status !== 1) {
+                  console.log(`[search_text] grep error in ${sDir}: ${grepErr?.message?.slice(0, 100)}`);
+                }
               }
-            } catch {}
+            }
           }
 
           if (allResults.length === 0) {
