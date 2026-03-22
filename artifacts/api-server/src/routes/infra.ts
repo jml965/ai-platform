@@ -1119,24 +1119,8 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
           const riskCfg = TOOL_RISK_CONFIG[tool.name] || { risk: "medium", category: "unknown", requiresApproval: false, sandboxed: false };
           const toolStart = Date.now();
 
-          if (decisionState.domTextDetected) {
-            if (tool.name === "run_sql" && !decisionState.dbAllowed) {
-              const blocked = `⛔ run_sql (كتابة) محظور قبل البحث. استخدم db_query للقراءة أولاً.`;
-              console.log(`[Decision] BLOCKED: run_sql — DB write not allowed yet`);
-              toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: blocked });
-              continue;
-            }
-
-            if ((tool.name === "edit_component" || tool.name === "write_file") && !decisionState.componentSearchAttempted && !decisionState.i18nSearchAttempted) {
-              const blocked = `⛔ DECISION_ENFORCEMENT — يجب البحث في الكود أولاً قبل التعديل.\n\nالنص المكتشف: "${(decisionState.domText || "").slice(0, 50)}"\n\n✅ ابحث أولاً:\n1. search_text عن النص\n2. search_text في i18n أو components`;
-              console.log(`[Decision] BLOCKED: ${tool.name} — search not attempted yet. State: i18n=${decisionState.i18nSearchAttempted}, comp=${decisionState.componentSearchAttempted}`);
-              await logAudit(agentKey, "decision_blocked_edit", tool.name, { input: tool.input, decisionState }, blocked, "medium", "blocked");
-              res.write(`data: ${JSON.stringify({ type: "chunk", text: `\n\n${blocked}\n` })}\n\n`);
-              fullReply += `\n\n${blocked}\n`;
-              toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: blocked });
-              continue;
-            }
-          }
+          // Security: block destructive SQL without approval (DROP, ALTER, TRUNCATE)
+          // db_query (SELECT only) and run_sql (write) are handled by their own safety checks below
 
           const EXECUTOR_ONLY_TOOLS = new Set(["edit_component", "write_file", "create_component", "delete_file", "git_push", "trigger_deploy", "run_sql", "exec_command", "run_command", "set_env"]);
           const EXECUTOR_AGENTS = new Set(["infra_builder", "infra_deploy", "execution_engine"]);
@@ -1411,79 +1395,22 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
           }
 
           if (tool.name === "search_text") {
-            const searchQuery = ((tool.input as any)?.text || "").trim();
             const noResultIndicators = ["لم يتم", "no results", "not found", "0 matches", "لا يوجد", "no match"];
             const isActuallyEmpty = !result || result.trim().length < 5 || noResultIndicators.some(ind => (result || "").toLowerCase().includes(ind));
             const hasFileMatch = !isActuallyEmpty && result && /\.(tsx|jsx|ts|js|css|html|vue|svelte)/.test(result) && result.length > 10;
-            if (hasFileMatch) {
-              searchFoundFile = true;
-              console.log(`[Agent] search_text found file match — searchFoundFile=true, DOM alternative ✓`);
-
-              if (!targetState.found) {
-                const fileMatch = result.match(/([^\s]+\.(tsx|jsx|ts|js|css|html|vue|svelte))/);
-                targetState.found = true;
-                targetState.file = fileMatch ? fileMatch[1] : "unknown";
-                targetState.stepsAfterFound = 0;
-                targetState.mustEdit = true;
-                targetState.commitSteps = 0;
-                console.log(`[Agent] EXECUTION_COMMIT — file found. mustEdit=true, file="${targetState.file}" dom=${decisionState.domTextDetected}`);
-
-                const execOrder = `\n\n🔧 EXECUTE_NOW — تم تحديد الملف "${targetState.file}".\n\nالخطوة التالية المطلوبة فوراً:\n1. read_file path="${targetState.file}"\n2. edit_component مع old_text و new_text\n\n⛔ لا تشرح. لا تسأل. نفّذ مباشرة.`;
-                toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: result + execOrder });
-                continue;
-              }
-            } else {
+            if (hasFileMatch && !targetState.found) {
+              const fileMatch = result.match(/([^\s]+\.(tsx|jsx|ts|js|css|html|vue|svelte))/);
+              targetState.found = true;
+              targetState.file = fileMatch ? fileMatch[1] : "unknown";
+              targetState.mustEdit = true;
+              console.log(`[Agent] search_text found → file="${targetState.file}"`);
+              toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: result + `\n\n🔧 تم تحديد الملف "${targetState.file}". نفّذ: read_file ثم edit_component مباشرة.` });
+              continue;
+            } else if (!hasFileMatch) {
               searchWithNoResults++;
-              console.log(`[Agent] search_text returned no useful results — searchWithNoResults=${searchWithNoResults}`);
-
-              if (searchWithNoResults >= 1 && !searchFoundFile) {
-                decisionState.dbAllowed = true;
-                decisionState.uiSearchAttempted = true;
-                decisionState.i18nSearchAttempted = true;
-                decisionState.componentSearchAttempted = true;
-                const dbHint = `\n\n💡 النص غير موجود في ملفات الكود. غالباً هو من قاعدة البيانات.\n✅ جرّب: db_query أو run_sql للبحث عن النص في الجداول (users, projects, etc).`;
-                toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: (result || "لم يتم العثور على نتائج") + dbHint });
-                continue;
-              }
-            }
-
-            if (decisionState.domTextDetected) {
-              const searchText = ((tool.input as any)?.text || "").toLowerCase();
-              const searchPath = ((tool.input as any)?.path || "").toLowerCase();
-
-              if (decisionState.domText && searchText.includes(decisionState.domText.toLowerCase().slice(0, 20))) {
-                decisionState.uiSearchAttempted = true;
-                console.log(`[Decision] UI search attempted ✓`);
-              }
-
-              if (searchPath.includes("i18n") || searchPath.includes("locale") || searchPath.includes("translation") || searchText.includes("t(") || searchText.includes("useTranslation")) {
-                decisionState.i18nSearchAttempted = true;
-                console.log(`[Decision] i18n search attempted ✓`);
-              }
-
-              if (searchPath.includes("component") || searchPath.includes("layout") || searchPath.includes("sidebar") || searchPath.includes("header") || searchPath.includes("footer") || searchPath.includes("page")) {
-                decisionState.componentSearchAttempted = true;
-                console.log(`[Decision] Component search attempted ✓`);
-              }
-
-              if (!hasFileMatch) {
-                decisionState.failedSearchCount++;
-                console.log(`[Decision] Failed search count: ${decisionState.failedSearchCount}/3`);
-              }
-
-              if (decisionState.uiSearchAttempted && decisionState.i18nSearchAttempted && decisionState.componentSearchAttempted) {
-                decisionState.dbAllowed = true;
-                console.log(`[Decision] All searches done — DB ALLOWED ✓`);
-              }
-
-              if (decisionState.failedSearchCount >= 1) {
-                decisionState.dbAllowed = true;
-                decisionState.uiSearchAttempted = true;
-                decisionState.i18nSearchAttempted = true;
-                decisionState.componentSearchAttempted = true;
-                const fallbackMsg = `✅ النص غير موجود في الكود — DB مسموح الآن (بحث فاشل: ${decisionState.failedSearchCount})`;
-                console.log(`[Decision] FALLBACK: ${fallbackMsg}`);
-              }
+              console.log(`[Agent] search_text: no results (${searchWithNoResults})`);
+              toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: (result || "لم يتم العثور على نتائج") + `\n\n💡 النص غير موجود في الكود. جرّب db_query: SELECT * FROM users WHERE display_name ILIKE '%text%'` });
+              continue;
             }
           }
 
