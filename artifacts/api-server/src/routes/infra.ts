@@ -1170,11 +1170,8 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
         const toolUseBlocks = response.content.filter((b: any) => b.type === "tool_use");
         if (response.stop_reason !== "tool_use" || toolUseBlocks.length === 0) {
           if (
-            hasDOMInspection &&
-            userCurrentPage &&
-            decisionState.domTextDetected &&
-            !targetState.mustEdit &&
             targetState.found &&
+            userCurrentPage &&
             toolActionCount < dynamicMaxActions
           ) {
             const textReply = response.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
@@ -1496,12 +1493,13 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
                 targetState.found = true;
                 targetState.file = fileMatch ? fileMatch[1] : "unknown";
                 targetState.stepsAfterFound = 0;
-                if (decisionState.domTextDetected) {
-                  targetState.mustEdit = true;
-                  targetState.commitSteps = 0;
-                  console.log(`[Agent] EXECUTION_COMMIT — DOM+target confirmed. mustEdit=true, file="${targetState.file}"`);
-                }
-                console.log(`[Agent] TARGET_FOUND — file="${targetState.file}" — blocking future searches`);
+                targetState.mustEdit = true;
+                targetState.commitSteps = 0;
+                console.log(`[Agent] EXECUTION_COMMIT — file found. mustEdit=true, file="${targetState.file}" dom=${decisionState.domTextDetected}`);
+
+                const execOrder = `\n\n🔧 EXECUTE_NOW — تم تحديد الملف "${targetState.file}".\n\nالخطوة التالية المطلوبة فوراً:\n1. read_file path="${targetState.file}"\n2. edit_component مع old_text و new_text\n\n⛔ لا تشرح. لا تسأل. نفّذ مباشرة.`;
+                toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: result + execOrder });
+                continue;
               }
             } else {
               searchWithNoResults++;
