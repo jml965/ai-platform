@@ -1406,7 +1406,9 @@ export default function InfraPanel() {
                           <div><span className="text-[#d4dae3]">العملية:</span> <span className="text-white font-mono">{data.tool}</span></div>
                           <div><span className="text-[#d4dae3]">النوع:</span> <span className="text-white">{catAr[data.category] || data.category}</span></div>
                           <div><span className="text-[#d4dae3]">الخطورة:</span> <span className={`font-bold ${data.risk === "critical" ? "text-red-400" : data.risk === "high" ? "text-orange-400" : "text-amber-400"}`}>{riskAr[data.risk] || data.risk}</span></div>
-                          {data.input && <div className="mt-2 font-mono text-[10px] text-[#d4dae3] bg-[#0d1117] rounded-lg px-3 py-2 max-h-16 overflow-auto">{JSON.stringify(data.input).slice(0, 200)}</div>}
+                          {data.inputSummary && <div className="mt-2 text-[11px] text-[#d4dae3]"><span className="text-[#d4dae3]">التفاصيل:</span> {data.inputSummary.slice(0, 200)}</div>}
+                          {!data.inputSummary && data.input && <div className="mt-2 font-mono text-[10px] text-[#d4dae3] bg-[#0d1117] rounded-lg px-3 py-2 max-h-16 overflow-auto">{JSON.stringify(data.input).slice(0, 200)}</div>}
+                          <div><span className="text-[#d4dae3]">إمكانية التراجع:</span> <span className={data.reversible ? "text-emerald-400" : "text-red-400"}>{data.reversible ? "نعم" : "لا"}</span></div>
                         </div>
                         {data.decided ? (
                           <div className={`mt-3 text-[12px] font-bold ${data.decided === "approved" ? "text-emerald-400" : "text-red-400"}`}>

@@ -1392,18 +1392,17 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
               status: "pending",
             }).returning();
 
-            const approvalMsg = `\n\n🔴 **طلب موافقة**\n\n` +
-              `**العملية:** ${tool.name}\n` +
-              `**النوع:** ${categoryAr[riskCfg.category] || riskCfg.category}\n` +
-              `**الخطورة:** ${riskAr[riskCfg.risk] || riskCfg.risk}\n\n` +
-              `**الشرح:**\n${inputSummary}\n\n` +
-              `**إمكانية التراجع:** ${!["trigger_deploy", "delete_file"].includes(tool.name) ? "نعم" : "لا"}\n\n` +
-              `⏳ *في انتظار موافقتك...*\n` +
-              `\`approval:${approval.id}\`\n`;
-
-            res.write(`data: ${JSON.stringify({ type: "chunk", text: approvalMsg })}\n\n`);
-            res.write(`data: ${JSON.stringify({ type: "approval_request", id: approval.id, tool: tool.name, risk: riskCfg.risk, category: riskCfg.category, input: tool.input })}\n\n`);
-            fullReply += approvalMsg;
+            res.write(`data: ${JSON.stringify({
+              type: "approval_request",
+              id: approval.id,
+              tool: tool.name,
+              risk: riskCfg.risk,
+              category: riskCfg.category,
+              input: tool.input,
+              inputSummary,
+              reversible: !["trigger_deploy", "delete_file", "run_sql"].includes(tool.name),
+            })}\n\n`);
+            fullReply += `\n⏳ طلب موافقة: ${tool.name} (${approval.id})\n`;
 
             await logAudit(agentKey, "approval_requested", tool.name, tool.input, { approvalId: approval.id }, riskCfg.risk, "pending");
             toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: `⏳ العملية ${tool.name} تنتظر موافقة المالك. رقم الطلب: ${approval.id}` });
