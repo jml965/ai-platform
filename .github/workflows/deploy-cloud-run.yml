@@ -31,7 +31,7 @@ jobs:
           service: ${{ env.SERVICE_NAME }}
           region: ${{ env.REGION }}
           image: ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/mrcodeai/${{ env.IMAGE_NAME }}:${{ github.sha }}
-          flags: --allow-unauthenticated --port=8080 --memory=512Mi --cpu=1 --min-instances=0 --max-instances=3
+          flags: --allow-unauthenticated --port=8080 --memory=1Gi --cpu=1 --min-instances=0 --max-instances=3 --timeout=300
           env_vars: NODE_ENV=production,DATABASE_URL=${{ secrets.DATABASE_URL }},CUSTOM_ANTHROPIC_API_KEY=${{ secrets.CUSTOM_ANTHROPIC_API_KEY }}
       - run: |
           URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region=${{ env.REGION }} --format='value(status.url)')
