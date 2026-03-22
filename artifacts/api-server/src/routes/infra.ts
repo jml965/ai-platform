@@ -925,7 +925,8 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
     const EMERGENCY_ONLY_TOOLS = new Set(["run_command", "exec_command"]);
     filteredTools = filteredTools.filter((t: any) => !EMERGENCY_ONLY_TOOLS.has(t.name));
 
-    const userLang = context?.lang || detectedLang;
+    const earlyDetectedLang = /[\u0600-\u06FF]/.test(typeof message === "string" ? message : "") ? "ar" : "en";
+    const userLang = context?.lang || earlyDetectedLang;
     const userCurrentPage = context?.currentPage || "/dashboard";
 
     let enrichedMessage = message;
