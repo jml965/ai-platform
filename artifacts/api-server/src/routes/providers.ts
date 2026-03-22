@@ -2,6 +2,7 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import { db } from "@workspace/db";
 import { aiProvidersTable, providerUsageLogsTable, agentConfigsTable, mediaProvidersTable } from "@workspace/db/schema";
 import { eq, desc, sql, gte } from "drizzle-orm";
+import { clearKeyCache } from "../lib/agents/ai-clients";
 
 const router = Router();
 
@@ -468,6 +469,7 @@ router.put("/providers/:key", requireAdmin, async (req, res) => {
     if (!updated) return res.status(404).json({ error: "Provider not found" });
 
     if (updates.apiKey !== undefined) {
+      clearKeyCache();
       const childMedia = await db.select().from(mediaProvidersTable);
       const siblings = childMedia.filter((m: any) => m.parentProvider === req.params.key);
       for (const sibling of siblings) {
