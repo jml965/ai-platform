@@ -1052,6 +1052,8 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
         found: false,
         file: null as string | null,
         stepsAfterFound: 0,
+        mustEdit: false,
+        commitSteps: 0,
       };
 
       const userMsg = typeof message === "string" ? message : "";
@@ -1254,7 +1256,22 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
 
           toolActionCount++;
 
-          if (targetState.found) {
+          if (tool.name === "edit_component" || tool.name === "write_file") {
+            targetState.mustEdit = false;
+            targetState.commitSteps = 0;
+          }
+
+          if (targetState.mustEdit) {
+            targetState.commitSteps++;
+            if (targetState.commitSteps >= 2 && tool.name !== "edit_component" && tool.name !== "read_file" && tool.name !== "write_file") {
+              const commitMsg = `✏️ EXECUTION_COMMIT — تم تحديد العنصر "${(decisionState.domText || "").slice(0, 30)}" والملف "${targetState.file}".\n\n🔧 نفّذ التعديل الآن:\n1. read_file path="${targetState.file}" (إذا لم تقرأه)\n2. edit_component مع old_text و new_text\n\n⛔ ممنوع أي أداة أخرى — نفّذ edit_component مباشرة.`;
+              console.log(`[Agent] EXECUTION_COMMIT: ${targetState.commitSteps} steps, forcing edit. tool=${tool.name}`);
+              toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: commitMsg });
+              continue;
+            }
+          }
+
+          if (targetState.found && !targetState.mustEdit) {
             targetState.stepsAfterFound++;
             const allowedAfterTarget = ["edit_component", "write_file", "read_file", "view_page_source", "get_page_structure", "browse_page"];
             if (targetState.stepsAfterFound >= 3 && !allowedAfterTarget.includes(tool.name)) {
@@ -1447,6 +1464,11 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
                 targetState.found = true;
                 targetState.file = fileMatch ? fileMatch[1] : "unknown";
                 targetState.stepsAfterFound = 0;
+                if (decisionState.domTextDetected) {
+                  targetState.mustEdit = true;
+                  targetState.commitSteps = 0;
+                  console.log(`[Agent] EXECUTION_COMMIT — DOM+target confirmed. mustEdit=true, file="${targetState.file}"`);
+                }
                 console.log(`[Agent] TARGET_FOUND — file="${targetState.file}" — blocking future searches`);
               }
             } else {
