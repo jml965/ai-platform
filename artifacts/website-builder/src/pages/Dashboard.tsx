@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Plus, LayoutTemplate, Trash2, Loader2, Coins, LogOut, CreditCard, Users, ShieldCheck, Activity, Globe, ExternalLink, Square, RefreshCw, Rocket, Bell, Palette, Home, Smartphone, Play, BarChart2, Gamepad2, FileText, Settings, BookOpen, Gift, Search, ChevronDown, Upload, UploadCloud, Download, Cpu, Wand2, Camera, ArrowRight, Check, X, Bot, FolderGit2, Plug, ChevronRight, Shield, Crown, Lock, Database, Crosshair, FlaskConical, Send, Copy, Server, Maximize2, Minimize2, MousePointer2 } from "lucide-react";
 import AdminFilesPanel from "@/components/AdminFilesPanel";
 import { useI18n } from "@/lib/i18n";
+import { isProductionSite } from "@/lib/utils";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import type { Project, ProjectStatus as ProjectStatusType } from "@workspace/api-client-react";
 import type { DeploymentResponse } from "@workspace/api-client-react";
@@ -131,7 +132,7 @@ export default function Dashboard() {
             <ShieldCheck className="w-4 h-4" />
             {t.qa_title}
           </Link>
-          {isAdmin && (
+          {isAdmin && !isProductionSite() && (
             <button
               onClick={toggleInfraAccess}
               disabled={infraToggleLoading}
@@ -963,7 +964,7 @@ function HomeSidebar({ t, lang, userName, isAdmin, onSelectInfraAgent, onToggleF
       </div>
 
       <nav className="flex flex-col gap-0.5 px-2 py-3 flex-1 overflow-y-auto relative z-10">
-        {isAdmin && <InfraAgentsSection t={t} lang={lang} onSelectAgent={onSelectInfraAgent} />}
+        {isAdmin && !isProductionSite() && <InfraAgentsSection t={t} lang={lang} onSelectAgent={onSelectInfraAgent} />}
 
         {navItems.map((item, i) => (
           <div
@@ -989,7 +990,7 @@ function HomeSidebar({ t, lang, userName, isAdmin, onSelectInfraAgent, onToggleF
           </Link>
         </div>
 
-        {isAdmin && <AdminPanelSection t={t} onToggleFiles={onToggleFiles} />}
+        {isAdmin && !isProductionSite() && <AdminPanelSection t={t} onToggleFiles={onToggleFiles} />}
       </nav>
 
       <div className="border-t border-white/10 p-2 relative z-10" style={{ background: "linear-gradient(to top, rgba(88,166,255,0.04) 0%, transparent 100%)" }}>
