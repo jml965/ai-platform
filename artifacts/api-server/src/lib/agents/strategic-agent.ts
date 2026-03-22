@@ -1489,8 +1489,19 @@ export async function executeInfraTool(toolName: string, input: any, callerRole?
         return JSON.stringify({ tables: tables.rows || tables, columns });
       }
       case "exec_command": {
-        const blocked = ["rm -rf /", "mkfs", "dd if=", ":(){", "fork bomb"];
-        for (const b of blocked) { if (input.command.includes(b)) return JSON.stringify({ error: "Dangerous command blocked" }); }
+        const blocked = ["rm -rf /", "rm -rf /*", "mkfs", "dd if=", "dd of=", ":(){", "fork bomb", "shutdown", "reboot", "kill -9 1", "chmod 777 /", "chown root", "wget|sh", "curl|bash", "wget | sh", "curl | bash", "> /dev/", "mv / ", "init 0", "init 6"];
+        const cmdLower = input.command.toLowerCase().replace(/\s+/g, " ");
+        for (const b of blocked) { if (cmdLower.includes(b.toLowerCase())) return JSON.stringify({ error: `⛔ DANGEROUS_COMMAND_BLOCKED: "${b}"` }); }
+        const rmMatch = input.command.match(/\brm\s+(-[a-z]*\s+)*(.+)/i);
+        if (rmMatch) {
+          const rmTargets = (rmMatch[2] || "").trim().split(/\s+/);
+          for (const target of rmTargets) {
+            const resolved = path.resolve(PROJECT_ROOT, target);
+            if (!resolved.startsWith(PROJECT_ROOT + "/artifacts/") && !resolved.startsWith("/tmp/") && !resolved.startsWith(PROJECT_ROOT + "/node_modules") && !resolved.startsWith(PROJECT_ROOT + "/dist")) {
+              return JSON.stringify({ error: `⛔ FORBIDDEN_PATH_DELETE: rm allowed only inside artifacts/, /tmp/, node_modules, dist. Target: "${target}" → "${resolved}"` });
+            }
+          }
+        }
         try {
           const output = execSync(input.command, { cwd: PROJECT_ROOT, timeout: 30000, maxBuffer: 5 * 1024 * 1024, encoding: "utf-8" });
           return JSON.stringify({ success: true, output: output.slice(0, 50000) });
@@ -1677,6 +1688,50 @@ export async function executeInfraTool(toolName: string, input: any, callerRole?
         return JSON.stringify({ success: true, path: input.componentPath, size: Buffer.byteLength(input.content) });
       }
       case "trigger_deploy": {
+        const qaResults: { step: string; ok: boolean; detail?: string }[] = [];
+
+        try {
+          execSync("node artifacts/api-server/build.ts", { cwd: PROJECT_ROOT, timeout: 120000, encoding: "utf-8" });
+          qaResults.push({ step: "api_build", ok: true });
+        } catch (e: any) {
+          qaResults.push({ step: "api_build", ok: false, detail: (e?.stderr || e?.message || "").slice(0, 500) });
+        }
+
+        try {
+          execSync("pnpm --filter @workspace/website-builder run build", { cwd: PROJECT_ROOT, timeout: 120000, encoding: "utf-8", env: { ...process.env, NODE_ENV: "production" } });
+          qaResults.push({ step: "frontend_build", ok: true });
+        } catch (e: any) {
+          qaResults.push({ step: "frontend_build", ok: false, detail: (e?.stderr || e?.message || "").slice(0, 500) });
+        }
+
+        const hasPackageJson = fs.existsSync(path.resolve(PROJECT_ROOT, "package.json"));
+        const hasApiDist = fs.existsSync(path.resolve(PROJECT_ROOT, "artifacts/api-server/dist/index.cjs"));
+        qaResults.push({ step: "required_files", ok: hasPackageJson && hasApiDist });
+
+        const qaFailed = qaResults.filter(r => !r.ok);
+        const qaStatus = qaFailed.length === 0 ? "PASS" : "FAIL";
+        try {
+          const { aiAuditLogsTable } = await import("@workspace/db");
+          await db.insert(aiAuditLogsTable).values({
+            agentKey: "system",
+            action: "qa_check",
+            tool: "qa_gate",
+            risk: qaStatus === "PASS" ? "low" : "high",
+            input: { trigger: "pre_deploy" },
+            result: { status: qaStatus, qaResults },
+            status: qaStatus === "PASS" ? "success" : "failed",
+          });
+        } catch {}
+
+        if (qaFailed.length > 0) {
+          return JSON.stringify({
+            error: "QA_GATE_FAILED",
+            message: `⛔ فشل فحص الجودة — لا يمكن النشر`,
+            qaResults,
+            failedSteps: qaFailed.map(f => f.step),
+            details: qaFailed.map(f => `${f.step}: ${f.detail || "failed"}`).join("; "),
+          });
+        }
 
         const ghToken = await getGitHubToken();
         if (!ghToken) return JSON.stringify({ error: "GitHub token not available" });
@@ -1707,6 +1762,8 @@ export async function executeInfraTool(toolName: string, input: any, callerRole?
           return JSON.stringify({
             success: true,
             message: `Deployment triggered on branch '${branch}'`,
+            qaGate: "PASSED",
+            qaResults,
             workflow: deployWf.name,
             deployId: latestRun?.id || "pending",
             runUrl: latestRun?.html_url || `https://github.com/${repo}/actions`,
@@ -2203,6 +2260,19 @@ export async function executeInfraTool(toolName: string, input: any, callerRole?
       case "run_command": {
         try {
           const cmd = input.command as string;
+          const dangerousPatterns = ["rm -rf /", "rm -rf /*", "mkfs", "dd if=", "dd of=", ":(){", "fork bomb", "shutdown", "reboot", "kill -9 1", "chmod 777 /", "chown root", "wget|sh", "curl|bash", "wget | sh", "curl | bash", "> /dev/", "mv / ", "init 0", "init 6"];
+          const cmdLower = cmd.toLowerCase().replace(/\s+/g, " ");
+          for (const b of dangerousPatterns) { if (cmdLower.includes(b.toLowerCase())) return JSON.stringify({ error: `⛔ DANGEROUS_COMMAND_BLOCKED: "${b}"` }); }
+          const rmMatch = cmd.match(/\brm\s+(-[a-z]*\s+)*(.+)/i);
+          if (rmMatch) {
+            const rmTargets = (rmMatch[2] || "").trim().split(/\s+/);
+            for (const target of rmTargets) {
+              const resolved = path.resolve(PROJECT_ROOT, target);
+              if (!resolved.startsWith(PROJECT_ROOT + "/artifacts/") && !resolved.startsWith("/tmp/") && !resolved.startsWith(PROJECT_ROOT + "/node_modules") && !resolved.startsWith(PROJECT_ROOT + "/dist")) {
+                return JSON.stringify({ error: `⛔ FORBIDDEN_PATH_DELETE: rm allowed only inside artifacts/, /tmp/, node_modules, dist. Target: "${target}" → "${resolved}"` });
+              }
+            }
+          }
           const cwd = input.cwd ? path.resolve(PROJECT_ROOT, input.cwd) : PROJECT_ROOT;
           if (!cwd.startsWith(PROJECT_ROOT)) return JSON.stringify({ error: "Access denied" });
           const result = execSync(cmd, { encoding: "utf-8", timeout: 30000, cwd, maxBuffer: 1024 * 1024 });

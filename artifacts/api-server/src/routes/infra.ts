@@ -1800,6 +1800,29 @@ router.get("/ai/audit-logs", requireInfraAdmin, async (req, res) => {
   }
 });
 
+router.get("/qa/last-result", requireInfraAdmin, async (_req, res) => {
+  try {
+    const logs = await db.select().from(aiAuditLogsTable)
+      .where(eq(aiAuditLogsTable.tool, "qa_gate"))
+      .orderBy(desc(aiAuditLogsTable.createdAt))
+      .limit(1);
+    if (logs.length === 0) {
+      res.json({ status: "NO_RESULTS", message: "لم يتم إجراء فحص QA بعد", qaResults: [], checkedAt: null });
+      return;
+    }
+    const last = logs[0];
+    const result = last.result as any;
+    res.json({
+      status: result?.status || last.status,
+      qaResults: result?.qaResults || [],
+      checkedAt: last.createdAt,
+      agentKey: last.agentKey,
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: { message: e.message } });
+  }
+});
+
 router.get("/ai/kill-switch", requireInfraAdmin, async (_req, res) => {
   res.json({ enabled: getInfraAccessEnabled() });
 });
