@@ -1,0 +1,93 @@
+🔧 TASK: تحسين EXECUTE_NOW + منع التعديل الأعمى
+
+المطلوب تعديل مسار التنفيذ الحالي:
+
+search_text → read_file → edit_component
+
+ليصبح:
+
+search_text → evaluateExecutionDecision → validateFileBeforeEdit → EXECUTE_NOW | fallback
+
+-------------------------------------
+
+1) أنشئ ملف جديد:
+
+/server/agent/utils/execution-guard.ts
+
+-------------------------------------
+
+2) أضف الدوال التالية:
+
+export function evaluateExecutionDecision(result, currentPage) {
+  if (!result || !result.filePath) return { ok: false, reason: "NO_RESULT" };
+  if (result.score < 0.75) return { ok: false, reason: "LOW_CONFIDENCE" };
+  if (!result.filePath.toLowerCase().includes(currentPage.toLowerCase())) {
+    return { ok: false, reason: "PAGE_MISMATCH" };
+  }
+  return { ok: true };
+}
+
+export function validateFileBeforeEdit(filePath, keyword, fs) {
+  try {
+    const content = fs.readFileSync(filePath, "utf-8");
+    if (!content.includes(keyword)) return false;
+    if (!content.includes("return (") && !content.includes("<")) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+-------------------------------------
+
+3) عدل ملف:
+
+/server/agent/flows/execute-flow.ts
+
+-------------------------------------
+
+استبدل EXECUTE_NOW المباشر بهذا:
+
+import { evaluateExecutionDecision, validateFileBeforeEdit } from "../utils/execution-guard";
+import fs from "fs";
+
+const decision = evaluateExecutionDecision(searchResult, currentPage);
+
+if (!decision.ok) {
+  return fallback(decision.reason);
+}
+
+const isValid = validateFileBeforeEdit(searchResult.filePath, keyword, fs);
+
+if (!isValid) {
+  return fallback("VALIDATION_FAILED");
+}
+
+// EXECUTE_NOW
+const fileContent = await readFile(searchResult.filePath);
+await editComponent(searchResult.filePath, fileContent);
+
+-------------------------------------
+
+4) أضف fallback بسيط داخل نفس الملف:
+
+function fallback(reason) {
+  console.log("EXECUTION_BLOCKED:", reason);
+  // هنا ممكن:
+  // - إعادة search أدق
+  // - أو ask المستخدم
+}
+
+-------------------------------------
+
+⚠️ شروط التنفيذ:
+
+- لا يتم تنفيذ edit_component إلا بعد decision + validation
+- لا يتم حذف EXECUTE_NOW — فقط جعله مشروط
+- لا تضف أي شرح داخل الوكيل (keep tokens low)
+
+-------------------------------------
+
+🎯 الهدف:
+
+تقليل التوكنز + منع التعديل الخطأ + الحفاظ على السرعة
