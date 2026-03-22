@@ -32,7 +32,7 @@ async function fetchActiveKey(providerKey: string): Promise<string | null> {
 
     const newCache: any = { fetchedAt: now, openai: null, anthropic: null, google: null };
     for (const row of rows) {
-      if (row.apiKey && row.apiKey.trim().length > 5 && row.keyStatus === "active" && row.enabled) {
+      if (row.apiKey && row.apiKey.trim().length > 5 && row.enabled) {
         newCache[row.providerKey] = row.apiKey;
       }
     }
