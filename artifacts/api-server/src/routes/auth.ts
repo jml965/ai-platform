@@ -21,6 +21,8 @@ const router: IRouter = Router();
 function getAuthProvider(): "replit" | "local" {
   const provider = process.env.AUTH_PROVIDER?.toLowerCase();
   if (provider === "local") return "local";
+  if (provider === "replit") return "replit";
+  if (!process.env.REPL_ID && !process.env.REPLIT_DEV_DOMAIN) return "local";
   return "replit";
 }
 
