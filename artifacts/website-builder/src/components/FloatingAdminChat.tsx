@@ -327,8 +327,9 @@ function FloatingChatInner() {
           if (!selectedAgent) {
             const savedKey = saved?.agentKey;
             const restored = savedKey ? allAgents.find(a => a.agentKey === savedKey) : null;
+            const executionEngine = data.find((a: AgentInfo) => a.agentKey === "execution_engine");
             const director = data.find((a: AgentInfo) => a.agentKey === "infra_sysadmin");
-            setSelectedAgent(restored || director || strategicAgent);
+            setSelectedAgent(restored || executionEngine || director || strategicAgent);
           }
         }
       })
@@ -667,17 +668,20 @@ function FloatingChatInner() {
     const imagesToSend = [...pendingImages];
     setPendingImages([]);
 
-    if (!activeThreadId) {
-      const id = crypto.randomUUID();
-      const newThread: ChatThread = { id, title: isRTL ? "محادثة جديدة" : "New Chat", agentKey: selectedAgent.agentKey, messages: [], createdAt: Date.now(), updatedAt: Date.now() };
-      setThreads(prev => [newThread, ...prev]);
-      setActiveThreadId(id);
-    }
-
     const userMsgContent = imagesToSend.length > 0
       ? `${currentPrompt}\n\n${imagesToSend.map(img => `![${img.name}](${img.data.slice(0, 60)}...)`).join("\n")}`
       : currentPrompt;
-    setMessages(prev => [...prev, { id: crypto.randomUUID(), role: "user", content: userMsgContent, timestamp: new Date(), images: imagesToSend.map(i => i.data) } as any]);
+    const userMsgObj: ChatMsg = { id: crypto.randomUUID(), role: "user", content: userMsgContent, timestamp: new Date() };
+
+    if (!activeThreadId) {
+      const id = crypto.randomUUID();
+      const newThread: ChatThread = { id, title: generateTitle([userMsgObj]), agentKey: selectedAgent.agentKey, messages: [userMsgObj], createdAt: Date.now(), updatedAt: Date.now() };
+      setThreads(prev => [newThread, ...prev]);
+      setActiveThreadId(id);
+      setMessages([userMsgObj]);
+    } else {
+      setMessages(prev => [...prev, userMsgObj]);
+    }
 
     const controller = new AbortController();
     abortRef.current = controller;
