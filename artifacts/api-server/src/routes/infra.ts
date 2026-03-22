@@ -983,7 +983,7 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
       const searchQueries: string[] = [];
       const MAX_SEARCHES = 5;
       const MAX_ACTIONS_WITHOUT_EDIT = 8;
-      const MAX_DOM_BLOCKS = 3;
+      const MAX_DOM_BLOCKS = 1;
       let searchWithNoResults = 0;
 
       const targetState = {
@@ -1037,7 +1037,8 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
       if (hasUserDOMInfo) {
         hasDOMInspection = true;
         domSource = "user_input";
-        console.log(`[Agent] DOM info detected from user message — DOM_SOURCE=user_input`);
+        searchFoundFile = true;
+        console.log(`[Agent] DOM info from user (magic wand) — DOM_SOURCE=user_input, searchFoundFile=true ✓`);
       }
 
       for (let loop = 0; loop < maxLoops; loop++) {
@@ -1248,65 +1249,53 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
 
           if (tool.name === "read_file" || tool.name === "view_page_source") {
             hasReadAfterSearch = true;
-            if (searchCount > 0) {
+            if (searchCount > 0 || targetState.found) {
               searchFoundFile = true;
             }
-            console.log(`[Agent] Read file after search — ready to edit, searchFoundFile=${searchFoundFile}`);
+            console.log(`[Agent] Read file — ready to edit directly, searchFoundFile=${searchFoundFile}`);
           }
 
           if (["get_page_structure", "browse_page", "inspect_styles"].includes(tool.name)) {
+            if (targetState.found) {
+              const blocked = `⛔ TARGET_ALREADY_FOUND — الملف "${targetState.file}" معروف. لا حاجة لتصفح الصفحة.\n\n✅ نفّذ مباشرة:\n1. read_file path="${targetState.file}"\n2. edit_component`;
+              console.log(`[Agent] BLOCKED: DOM tool "${tool.name}" after target found. file=${targetState.file}`);
+              await logAudit(agentKey, "dom_blocked_target_found", tool.name, tool.input, blocked, "low", "blocked");
+              toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: blocked });
+              continue;
+            }
+            if (searchFoundFile) {
+              const blocked = `⛔ SEARCH_SUFFICIENT — تم العثور على الملف عبر البحث. لا حاجة لـ DOM.\n\n✅ نفّذ: read_file ثم edit_component مباشرة.`;
+              console.log(`[Agent] BLOCKED: DOM tool "${tool.name}" — searchFoundFile=true`);
+              hasDOMInspection = true;
+              domSource = "search";
+              toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: blocked });
+              continue;
+            }
             domBlockCount++;
-            if (domBlockCount > 1) {
-              const blocked = `⛔ DOM_INSPECTION_LIMIT — تم تصفح الصفحة بالفعل. النص غير موجود في DOM.\n\n✅ الخطوة التالية:\n1. search_text للبحث عن النص في ملفات الكود\n2. read_file لقراءة الملف\n3. edit_component لتنفيذ التعديل`;
-              console.log(`[Agent] BLOCKED: repeated DOM inspection (${domBlockCount}). Redirecting to search.`);
-              await logAudit(agentKey, "dom_repeated_blocked", tool.name, tool.input, blocked, "low", "blocked");
+            if (domBlockCount > MAX_DOM_BLOCKS) {
               hasDOMInspection = true;
               domSource = "forced_override";
+              const blocked = `⛔ DOM مرة واحدة كافية — ابحث بـ search_text ثم نفّذ edit_component مباشرة.`;
+              console.log(`[Agent] DOM forced override (${domBlockCount}/${MAX_DOM_BLOCKS})`);
+              await logAudit(agentKey, "dom_repeated_blocked", tool.name, tool.input, blocked, "low", "blocked");
               toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: blocked });
               continue;
             }
             hasDOMInspection = true;
             domSource = "tool";
             console.log(`[Agent] DOM inspection done via ${tool.name} — DOM_SOURCE=tool ✓`);
-
-            if (decisionState.domText && !targetState.found) {
-              const domSearchHint = `\n\n✅ DOM_TO_SEARCH — تم اكتشاف النص "${decisionState.domText.slice(0, 40)}" في الصفحة.\n\n🔧 الخطوة التالية المطلوبة:\nsearch_text text="${decisionState.domText.slice(0, 30)}" للعثور على الملف الذي يحتوي هذا النص في الكود.\n\n⛔ لا تتصفح الصفحة مرة أخرى.`;
-              console.log(`[Agent] DOM_TO_SEARCH: injecting search hint for domText="${decisionState.domText.slice(0, 30)}"`);
-              toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: (result || "") + domSearchHint });
-              continue;
-            }
           }
 
-          if (tool.name === "edit_component" && !hasDOMInspection) {
-            const editPath = (tool.input as any)?.componentPath || (tool.input as any)?.path || "";
-            const isUIFile = /\.(tsx|jsx|css|html|vue|svelte)$/i.test(editPath);
-            const oldText = (tool.input as any)?.old_text || "";
-            const hasTextChange = oldText.length > 0 && /[\u0600-\u06FFa-zA-Z]/.test(oldText);
-            if (isUIFile && hasTextChange) {
-              if (searchFoundFile) {
+          if (tool.name === "edit_component") {
+            if (!hasDOMInspection) {
+              if (searchFoundFile || hasReadAfterSearch || searchCount > 0 || domSource === "user_input") {
                 hasDOMInspection = true;
-                domSource = "search";
-                console.log(`[Agent] DOM bypassed via search_text match — DOM_SOURCE=search ✓`);
-              } else if (domBlockCount >= MAX_DOM_BLOCKS) {
+                domSource = domSource === "user_input" ? "user_input" : "search";
+                console.log(`[Agent] DOM not needed — edit allowed via ${domSource} ✓`);
+              } else {
                 hasDOMInspection = true;
                 domSource = "forced_override";
-                const overrideMsg = `⚠️ تم تجاوز شرط DOM بعد ${domBlockCount} محاولات لتجنب التعليق — DOM_SOURCE=forced_override`;
-                res.write(`data: ${JSON.stringify({ type: "chunk", text: `\n\n${overrideMsg}\n` })}\n\n`);
-                fullReply += `\n\n${overrideMsg}\n`;
-                console.log(`[Agent] DOM forced override after ${domBlockCount} blocks — DOM_SOURCE=forced_override`);
-                await logAudit(agentKey, "dom_forced_override", tool.name, { editPath, domBlockCount }, overrideMsg, "medium", "override");
-              } else {
-                domBlockCount++;
-                const hint = searchCount === 0
-                  ? `💡 جرّب search_text للبحث عن النص "${oldText.slice(0, 30)}" في الكود — يكفي كبديل عن DOM.`
-                  : `💡 نتائج البحث موجودة — اقرأ الملف بـ read_file ثم نفّذ edit_component.`;
-                const blocked = `❌ DOM_INSPECTION_REQUIRED (${domBlockCount}/${MAX_DOM_BLOCKS})\n\nالمطلوب:\n• get_page_structure أو browse_page\n• أو search_text يجد النص في ملف\n• أو المستخدم يرسل معلومات DOM\n\n${hint}`;
-                res.write(`data: ${JSON.stringify({ type: "chunk", text: `\n\n${blocked}\n` })}\n\n`);
-                fullReply += `\n\n${blocked}\n`;
-                console.log(`[Agent] BLOCKED: edit_component on UI file "${editPath}" without DOM (block ${domBlockCount}/${MAX_DOM_BLOCKS})`);
-                await logAudit(agentKey, "blocked_no_dom_inspection", tool.name, { ...tool.input, domBlockCount, domSource }, blocked, "medium", "blocked");
-                toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: blocked });
-                continue;
+                console.log(`[Agent] DOM skipped — edit_component proceeds without DOM (no blocking) ✓`);
               }
             }
           }
@@ -1357,6 +1346,13 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
 
             await logAudit(agentKey, "approval_requested", tool.name, tool.input, { approvalId: approval.id }, riskCfg.risk, "pending");
             toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: `⏳ العملية ${tool.name} تنتظر موافقة المالك. رقم الطلب: ${approval.id}` });
+            continue;
+          }
+
+          if (tool.name === "screenshot_page" && !hasEdited && (targetState.found || searchFoundFile || hasReadAfterSearch)) {
+            const blocked = `⛔ SCREENSHOT_AFTER_EDIT — ممنوع screenshot قبل التعديل. نفّذ edit_component أولاً، ثم screenshot للتحقق.`;
+            console.log(`[Agent] BLOCKED: screenshot before edit — targetFound=${targetState.found}`);
+            toolResults.push({ type: "tool_result", tool_use_id: tool.id, content: blocked });
             continue;
           }
 
