@@ -8,8 +8,6 @@ import * as fs from "fs";
 import * as path from "path";
 const router = Router();
 
-const isDev = process.env.NODE_ENV !== "production";
-
 const TOOL_RISK_CONFIG: Record<string, { risk: string; category: string; requiresApproval: boolean; sandboxed: boolean }> = {
   search_text: { risk: "low", category: "search", requiresApproval: false, sandboxed: false },
   list_files: { risk: "low", category: "search", requiresApproval: false, sandboxed: false },
