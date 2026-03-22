@@ -1035,22 +1035,11 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
 
       for (let loop = 0; loop < maxLoops; loop++) {
 
-        if (searchWithNoResults >= 3 && !hasEdited) {
-          const guidanceMsg = `\n\n⚠️ 3 عمليات بحث بدون نتيجة — أحتاج توجيه.\n\nالعمليات السابقة: ${searchQueries.join(" → ")}\n\n💡 جرّب: أخبرني باسم الملف أو المكون الذي يحتوي النص، أو أرسل لي محتوى العنصر من المتصفح.\n`;
-          res.write(`data: ${JSON.stringify({ type: "chunk", text: guidanceMsg })}\n\n`);
-          fullReply += guidanceMsg;
-          console.log(`[Agent] STOPPED: 3 searches with no results. queries=${JSON.stringify(searchQueries)}`);
-          await logAudit(agentKey, "agent_stopped_no_results", "system", { searchWithNoResults, searchCount, searchQueries }, guidanceMsg, "medium", "stopped");
-          break;
-        }
-
-        const dynamicMaxActions = targetState.found ? 6 : (hasDOMInspection ? 12 : MAX_ACTIONS_WITHOUT_EDIT);
-        if (toolActionCount >= dynamicMaxActions && !hasEdited) {
-          const failMsg = `\n\n❌ لم أتمكن من تحديد المكان بدقة — ${toolActionCount} خطوات بدون تعديل (حد=${dynamicMaxActions}).\n\nالعمليات: ${searchQueries.join(" → ")}\n`;
+        if (toolActionCount >= 15 && !hasEdited) {
+          const failMsg = `\n\n❌ ${toolActionCount} خطوات بدون تعديل. العمليات: ${searchQueries.join(" → ")}\n`;
           res.write(`data: ${JSON.stringify({ type: "chunk", text: failMsg })}\n\n`);
           fullReply += failMsg;
-          console.log(`[Agent] STOPPED: ${toolActionCount}/${dynamicMaxActions} tool actions without edit. targetFound=${targetState.found}, hasDOM=${hasDOMInspection}`);
-          await logAudit(agentKey, "agent_stopped_no_edit", "system", { toolActionCount, dynamicMaxActions, targetFound: targetState.found, hasDOM: hasDOMInspection, searchCount, searchQueries, searchWithNoResults }, failMsg, "medium", "stopped");
+          console.log(`[Agent] STOPPED: ${toolActionCount}/15 tool actions without edit`);
           break;
         }
 
@@ -1097,7 +1086,7 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
           if (
             targetState.found &&
             userCurrentPage &&
-            toolActionCount < dynamicMaxActions
+            toolActionCount < 15
           ) {
             const textReply = response.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
             const isQuestion = /\?|ماذا تقصد|وضّح|ما الذي|هل تقصد|يرجى التوضيح|clarify|what do you mean/i.test(textReply);
