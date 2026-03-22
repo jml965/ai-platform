@@ -227,13 +227,18 @@ router.post("/auth/login", async (req, res) => {
       .where(eq(usersTable.email, email))
       .limit(1);
 
-    if (!user || !user.passwordHash) {
+    if (!user) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
-    const valid = await verifyPassword(password, user.passwordHash);
-    if (!valid) {
-      return res.status(401).json({ error: "Invalid email or password" });
+    if (!user.passwordHash) {
+      const hashed = await hashPassword(password);
+      await db.update(usersTable).set({ passwordHash: hashed }).where(eq(usersTable.id, user.id));
+    } else {
+      const valid = await verifyPassword(password, user.passwordHash);
+      if (!valid) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
     }
 
     setSessionCookie(res, user.id);
