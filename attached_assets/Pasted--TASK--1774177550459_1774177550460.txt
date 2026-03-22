@@ -1,0 +1,155 @@
+🔧 TASK: فصل بيئة التطوير عن الإنتاج + إلغاء التعطيل داخل المحرك
+
+-------------------------------------
+
+📍 ملاحظة مهمة جداً:
+
+جميع البيئات (development + production) موجودة على نفس السيرفر في Google Cloud  
+الدومين: mrcodeai.com
+
+❌ لا يوجد Replit  
+❌ لا يوجد بيئات خارجية  
+
+يجب الفصل منطقياً داخل نفس السيرفر
+
+-------------------------------------
+
+🎯 الهدف:
+
+- AI يعمل بحرية في DEV
+- PRODUCTION محمي
+- لا يوجد توقف (blocking) داخل المحرك
+
+-------------------------------------
+
+1) إنشاء متغير بيئة:
+
+.env
+
+ENV=development   // أو production
+
+-------------------------------------
+
+2) تعديل infra.ts
+
+أضف في الأعلى:
+
+const isDev = process.env.ENV === "development";
+
+-------------------------------------
+
+3) تعديل TOOL_RISK_CONFIG
+
+استبدل requiresApproval:
+
+if (isDev) {
+  tool.requiresApproval = false;
+} else {
+  tool.requiresApproval = true;
+}
+
+-------------------------------------
+
+4) تعطيل approval داخل DEV بالكامل:
+
+if (isDev) {
+  bypassApproval = true;
+}
+
+-------------------------------------
+
+5) منع AI من التنفيذ المباشر في PRODUCTION:
+
+داخل tool execution:
+
+if (!isDev && agentType !== "DEPLOY_AGENT") {
+  throw new Error("AI execution blocked in production");
+}
+
+-------------------------------------
+
+6) إنشاء Deploy Agent:
+
+/server/agent/agents/deploy-agent.ts
+
+وظيفته:
+
+- تنفيذ التعديلات فقط في production
+- استلام build من dev
+- نشره
+
+-------------------------------------
+
+7) إنشاء endpoint:
+
+POST /api/ai/deploy
+
+-------------------------------------
+
+8) منطق deploy:
+
+- تحميل آخر نسخة من dev (build أو git)
+- تشغيل:
+
+npm install
+npm run build
+
+- تحقق:
+
+if (build fails) → STOP
+
+-------------------------------------
+
+9) Validation قبل النشر:
+
+- لا يوجد errors
+- الملفات الأساسية موجودة
+- server يعمل
+
+-------------------------------------
+
+10) التنفيذ:
+
+إذا كل شيء سليم:
+
+- restart server (PM2 أو Docker)
+- deploy على production
+
+-------------------------------------
+
+11) تسجيل العمليات:
+
+logAudit("deploy_started")
+logAudit("deploy_success")
+logAudit("deploy_failed")
+
+-------------------------------------
+
+12) مهم جداً:
+
+❌ لا تستخدم approval system داخل DEV  
+❌ لا توقف المحرك داخل DEV  
+✅ approval فقط عند deploy أو في production
+
+-------------------------------------
+
+🎯 النتيجة:
+
+- AI سريع داخل DEV
+- production آمن
+- لا يوجد توقف بسبب approval
+- النظام قابل للتوسع
+
+-------------------------------------
+
+⚠️ تنبيه:
+
+أي tool يكتب أو يحذف ملفات:
+يسمح له فقط في DEV
+
+PRODUCTION:
+فقط DEPLOY_AGENT ينفذ
+
+-------------------------------------
+
+🔥 هذا التعديل مطلوب فوراً لأنه سبب توقف المحرك حالياً
