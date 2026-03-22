@@ -1,7 +1,7 @@
 import { getAnthropicClient, getOpenAIClient, getGoogleClient } from "./ai-clients";
 import { db } from "@workspace/db";
-import { agentConfigsTable, projectFilesTable, agentLogsTable, aiSystemSettingsTable } from "@workspace/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { agentConfigsTable, projectFilesTable, agentLogsTable, aiSystemSettingsTable, snapshotsTable } from "@workspace/db/schema";
+import { eq, sql, and, like, desc } from "drizzle-orm";
 import type { AgentConfig } from "@workspace/db/schema";
 import * as fs from "fs";
 import * as path from "path";
@@ -1379,6 +1379,200 @@ export async function setInfraAccessEnabled(enabled: boolean): Promise<void> {
   }
 }
 
+export const PROJECT_TOOLS = [
+  {
+    name: "list_project_files",
+    description: "List all files in the current project. Returns file paths and types.",
+    input_schema: { type: "object" as const, properties: { directory: { type: "string", description: "Optional subdirectory to filter, e.g. 'components' or 'pages'" } } },
+  },
+  {
+    name: "read_project_file",
+    description: "Read the content of a file in the project by its file path.",
+    input_schema: { type: "object" as const, properties: { path: { type: "string", description: "File path, e.g. 'index.html' or 'css/style.css'" } }, required: ["path"] },
+  },
+  {
+    name: "search_project",
+    description: "Search for text in all project files. Returns matching files and lines.",
+    input_schema: { type: "object" as const, properties: { text: { type: "string", description: "Text to search for" }, fileType: { type: "string", description: "Optional file type filter, e.g. 'html', 'css', 'js'" } }, required: ["text"] },
+  },
+  {
+    name: "edit_project_file",
+    description: "Edit a file by replacing old_text with new_text. The old_text must match exactly.",
+    input_schema: { type: "object" as const, properties: { path: { type: "string", description: "File path" }, old_text: { type: "string", description: "Exact text to find and replace" }, new_text: { type: "string", description: "Replacement text" } }, required: ["path", "old_text", "new_text"] },
+  },
+  {
+    name: "write_project_file",
+    description: "Create or overwrite a file in the project with the given content.",
+    input_schema: { type: "object" as const, properties: { path: { type: "string", description: "File path" }, content: { type: "string", description: "Full file content" }, fileType: { type: "string", description: "File type: html, css, js, json, etc." } }, required: ["path", "content"] },
+  },
+  {
+    name: "delete_project_file",
+    description: "Delete a file from the project. This action is reversible via snapshots.",
+    input_schema: { type: "object" as const, properties: { path: { type: "string", description: "File path to delete" } }, required: ["path"] },
+  },
+  {
+    name: "rename_project_file",
+    description: "Rename/move a file within the project.",
+    input_schema: { type: "object" as const, properties: { oldPath: { type: "string", description: "Current file path" }, newPath: { type: "string", description: "New file path" } }, required: ["oldPath", "newPath"] },
+  },
+  {
+    name: "list_snapshots",
+    description: "List available snapshots (version history) for the project. Users can restore any previous state.",
+    input_schema: { type: "object" as const, properties: {} },
+  },
+  {
+    name: "restore_snapshot",
+    description: "Restore the project to a previous snapshot. Creates a backup snapshot before restoring.",
+    input_schema: { type: "object" as const, properties: { snapshotId: { type: "string", description: "Snapshot ID to restore" } }, required: ["snapshotId"] },
+  },
+];
+
+async function createAutoSnapshot(projectId: string, label: string) {
+  try {
+    const files = await db.select().from(projectFilesTable).where(eq(projectFilesTable.projectId, projectId));
+    if (files.length === 0) return;
+    const filesData = files.map(f => ({ filePath: f.filePath, content: f.content, fileType: f.fileType }));
+    const snapshots = await db.select({ id: snapshotsTable.id }).from(snapshotsTable).where(eq(snapshotsTable.projectId, projectId));
+    if (snapshots.length >= 50) {
+      const oldest = await db.select({ id: snapshotsTable.id }).from(snapshotsTable).where(eq(snapshotsTable.projectId, projectId)).orderBy(snapshotsTable.createdAt).limit(1);
+      if (oldest.length > 0) await db.delete(snapshotsTable).where(eq(snapshotsTable.id, oldest[0].id));
+    }
+    await db.insert(snapshotsTable).values({ projectId, label, filesData });
+  } catch (e) {
+    console.error("[Snapshot] Failed to create:", e);
+  }
+}
+
+export async function executeProjectTool(toolName: string, input: any, projectId: string): Promise<string> {
+  if (!projectId || projectId === "general") {
+    return JSON.stringify({ error: "No project context. Tools require a specific project." });
+  }
+
+  switch (toolName) {
+    case "list_project_files": {
+      const dirFilter = input.directory as string | undefined;
+      let files;
+      if (dirFilter) {
+        files = await db.select({ filePath: projectFilesTable.filePath, fileType: projectFilesTable.fileType })
+          .from(projectFilesTable).where(and(eq(projectFilesTable.projectId, projectId), like(projectFilesTable.filePath, `${dirFilter}%`)));
+      } else {
+        files = await db.select({ filePath: projectFilesTable.filePath, fileType: projectFilesTable.fileType })
+          .from(projectFilesTable).where(eq(projectFilesTable.projectId, projectId));
+      }
+      return JSON.stringify({ files, count: files.length });
+    }
+
+    case "read_project_file": {
+      const filePath = input.path as string;
+      const [file] = await db.select().from(projectFilesTable)
+        .where(and(eq(projectFilesTable.projectId, projectId), eq(projectFilesTable.filePath, filePath))).limit(1);
+      if (!file) return JSON.stringify({ error: `File not found: ${filePath}` });
+      return JSON.stringify({ path: file.filePath, content: file.content, fileType: file.fileType, version: file.version });
+    }
+
+    case "search_project": {
+      const searchText = (input.text as string).toLowerCase();
+      const fileTypeFilter = input.fileType as string | undefined;
+      let files;
+      if (fileTypeFilter) {
+        files = await db.select().from(projectFilesTable)
+          .where(and(eq(projectFilesTable.projectId, projectId), eq(projectFilesTable.fileType, fileTypeFilter)));
+      } else {
+        files = await db.select().from(projectFilesTable).where(eq(projectFilesTable.projectId, projectId));
+      }
+      const results: { file: string; line: number; text: string }[] = [];
+      for (const f of files) {
+        const lines = (f.content || "").split("\n");
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].toLowerCase().includes(searchText)) {
+            results.push({ file: f.filePath, line: i + 1, text: lines[i].trim().slice(0, 200) });
+          }
+        }
+      }
+      if (results.length === 0) return JSON.stringify({ found: false, message: `No matches for "${input.text}"` });
+      return JSON.stringify({ found: true, matchCount: results.length, results: results.slice(0, 30) });
+    }
+
+    case "edit_project_file": {
+      const filePath = input.path as string;
+      const oldText = input.old_text as string;
+      const newText = input.new_text as string;
+      const [file] = await db.select().from(projectFilesTable)
+        .where(and(eq(projectFilesTable.projectId, projectId), eq(projectFilesTable.filePath, filePath))).limit(1);
+      if (!file) return JSON.stringify({ error: `File not found: ${filePath}` });
+      if (!file.content.includes(oldText)) return JSON.stringify({ error: `old_text not found in ${filePath}. Make sure it matches exactly.` });
+      await createAutoSnapshot(projectId, `قبل تعديل ${filePath}`);
+      const newContent = file.content.replace(oldText, newText);
+      await db.update(projectFilesTable).set({ content: newContent, version: (file.version || 1) + 1, updatedAt: new Date() })
+        .where(eq(projectFilesTable.id, file.id));
+      return JSON.stringify({ success: true, path: filePath, version: (file.version || 1) + 1 });
+    }
+
+    case "write_project_file": {
+      const filePath = input.path as string;
+      const content = input.content as string;
+      const fileType = (input.fileType as string) || filePath.split(".").pop() || "txt";
+      const [existing] = await db.select().from(projectFilesTable)
+        .where(and(eq(projectFilesTable.projectId, projectId), eq(projectFilesTable.filePath, filePath))).limit(1);
+      if (existing) {
+        await createAutoSnapshot(projectId, `قبل كتابة ${filePath}`);
+        await db.update(projectFilesTable).set({ content, fileType, version: (existing.version || 1) + 1, updatedAt: new Date() })
+          .where(eq(projectFilesTable.id, existing.id));
+        return JSON.stringify({ success: true, path: filePath, version: (existing.version || 1) + 1, action: "updated" });
+      } else {
+        await db.insert(projectFilesTable).values({ projectId, filePath, content, fileType, version: 1 });
+        return JSON.stringify({ success: true, path: filePath, version: 1, action: "created" });
+      }
+    }
+
+    case "delete_project_file": {
+      const filePath = input.path as string;
+      const [file] = await db.select().from(projectFilesTable)
+        .where(and(eq(projectFilesTable.projectId, projectId), eq(projectFilesTable.filePath, filePath))).limit(1);
+      if (!file) return JSON.stringify({ error: `File not found: ${filePath}` });
+      await createAutoSnapshot(projectId, `قبل حذف ${filePath}`);
+      await db.delete(projectFilesTable).where(eq(projectFilesTable.id, file.id));
+      return JSON.stringify({ success: true, deleted: filePath });
+    }
+
+    case "rename_project_file": {
+      const oldPath = input.oldPath as string;
+      const newPath = input.newPath as string;
+      const [file] = await db.select().from(projectFilesTable)
+        .where(and(eq(projectFilesTable.projectId, projectId), eq(projectFilesTable.filePath, oldPath))).limit(1);
+      if (!file) return JSON.stringify({ error: `File not found: ${oldPath}` });
+      const [conflict] = await db.select({ id: projectFilesTable.id }).from(projectFilesTable)
+        .where(and(eq(projectFilesTable.projectId, projectId), eq(projectFilesTable.filePath, newPath))).limit(1);
+      if (conflict) return JSON.stringify({ error: `File already exists: ${newPath}` });
+      await createAutoSnapshot(projectId, `قبل إعادة تسمية ${oldPath} → ${newPath}`);
+      await db.update(projectFilesTable).set({ filePath: newPath, updatedAt: new Date() }).where(eq(projectFilesTable.id, file.id));
+      return JSON.stringify({ success: true, oldPath, newPath });
+    }
+
+    case "list_snapshots": {
+      const snapshots = await db.select({ id: snapshotsTable.id, label: snapshotsTable.label, description: snapshotsTable.description, createdAt: snapshotsTable.createdAt })
+        .from(snapshotsTable).where(eq(snapshotsTable.projectId, projectId)).orderBy(desc(snapshotsTable.createdAt)).limit(20);
+      return JSON.stringify({ snapshots, count: snapshots.length });
+    }
+
+    case "restore_snapshot": {
+      const snapshotId = input.snapshotId as string;
+      const [snapshot] = await db.select().from(snapshotsTable).where(and(eq(snapshotsTable.id, snapshotId), eq(snapshotsTable.projectId, projectId))).limit(1);
+      if (!snapshot) return JSON.stringify({ error: "Snapshot not found or belongs to another project" });
+      await createAutoSnapshot(projectId, `نسخة احتياطية قبل الاستعادة`);
+      await db.delete(projectFilesTable).where(eq(projectFilesTable.projectId, projectId));
+      const filesData = snapshot.filesData as { filePath: string; content: string; fileType: string }[];
+      for (const f of filesData) {
+        await db.insert(projectFilesTable).values({ projectId, filePath: f.filePath, content: f.content, fileType: f.fileType, version: 1 });
+      }
+      return JSON.stringify({ success: true, restored: snapshotId, label: snapshot.label, filesCount: filesData.length });
+    }
+
+    default:
+      return JSON.stringify({ error: `Unknown project tool: ${toolName}` });
+  }
+}
+
 export async function executeInfraTool(toolName: string, input: any, callerRole?: string): Promise<string> {
   if (!_infraAccessEnabled) {
     return JSON.stringify({ error: "Infrastructure access is currently DISABLED by admin. Enable it from the dashboard toggle to allow tool execution." });
@@ -2547,7 +2741,7 @@ export async function streamStrategicAgent(
       model: slot.model,
       max_tokens: Math.min(maxTok, 64000),
       system: enrichedPrompt,
-      tools: INFRA_TOOLS,
+      tools: callerRole === "admin" ? INFRA_TOOLS : PROJECT_TOOLS,
     };
     if (effectiveCreativity !== undefined && effectiveCreativity >= 0) {
       baseParams.temperature = Math.min(effectiveCreativity, 1.0);
@@ -2594,7 +2788,10 @@ export async function streamStrategicAgent(
         console.log(`[Agent] Executing tool: ${tool.name}`, JSON.stringify(tool.input).slice(0, 500));
         onChunk(`\n\n...*${tool.name}*...\n`);
         fullReply += `\n\n...*${tool.name}*...\n`;
-        const result = await executeInfraTool(tool.name, tool.input, callerRole);
+        const isProjectTool = PROJECT_TOOLS.some(t => t.name === tool.name);
+        const result = isProjectTool
+          ? await executeProjectTool(tool.name, tool.input, projectId)
+          : await executeInfraTool(tool.name, tool.input, callerRole);
         console.log(`[Agent] Tool ${tool.name} result:`, result.slice(0, 500));
         if (onToolResult) onToolResult(tool.name, result);
 
