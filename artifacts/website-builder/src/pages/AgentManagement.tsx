@@ -318,6 +318,7 @@ export default function AgentManagement() {
     { key: "stats", icon: BarChart2, label: isRTL ? "الإحصائيات" : "Statistics" },
     { key: "approvals", icon: ShieldCheck, label: isRTL ? "الموافقات" : "Approvals" },
     { key: "audit", icon: ScrollText, label: isRTL ? "سجل التدقيق" : "Audit Log" },
+    { key: "deploy", icon: Rocket, label: isRTL ? "النشر للإنتاجية" : "Deploy" },
   ];
 
   return (
@@ -483,6 +484,7 @@ export default function AgentManagement() {
               {activeTab === "stats" && <StatsTab agent={currentAgent} stats={stats[currentAgent.agentKey]} isRTL={isRTL} />}
               {activeTab === "approvals" && <ApprovalsTab isRTL={isRTL} />}
               {activeTab === "audit" && <AuditLogTab isRTL={isRTL} />}
+              {activeTab === "deploy" && <DeployTab isRTL={isRTL} />}
             </div>
           </>
         ) : (
@@ -1693,6 +1695,97 @@ function AuditLogTab({ isRTL }: { isRTL: boolean }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function DeployTab({ isRTL }: { isRTL: boolean }) {
+  const [deploying, setDeploying] = useState(false);
+  const [status, setStatus] = useState<string>("");
+  const [runs, setRuns] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchStatus = async () => {
+    try {
+      const res = await fetch(`${API}/infra/deploy-status`);
+      if (res.ok) {
+        const data = await res.json();
+        setRuns(data.runs || []);
+      }
+    } catch {}
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchStatus(); }, []);
+
+  const deployProduction = async () => {
+    if (!confirm(isRTL ? "هل أنت متأكد من النشر على mrcodeai.com؟" : "Deploy to production mrcodeai.com?")) return;
+    setDeploying(true);
+    setStatus(isRTL ? "جاري النشر..." : "Deploying...");
+    try {
+      const res = await fetch(`${API}/infra/deploy-production`, { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        setStatus(isRTL ? "تم بدء النشر بنجاح!" : "Deployment triggered!");
+        setTimeout(fetchStatus, 5000);
+      } else {
+        setStatus(isRTL ? `خطأ: ${data.error}` : `Error: ${data.error}`);
+      }
+    } catch (err: any) {
+      setStatus(isRTL ? `خطأ: ${err.message}` : `Error: ${err.message}`);
+    }
+    setDeploying(false);
+  };
+
+  const statusIcon = (conclusion: string, s: string) => {
+    if (conclusion === "success") return <CheckCircle className="w-4 h-4 text-green-400" />;
+    if (conclusion === "failure") return <XCircle className="w-4 h-4 text-red-400" />;
+    if (s === "in_progress" || s === "queued") return <RefreshCw className="w-4 h-4 text-yellow-400 animate-spin" />;
+    return <Clock className="w-4 h-4 text-gray-400" />;
+  };
+
+  return (
+    <div className="p-4 space-y-4">
+      <div className="bg-gradient-to-r from-[#7c3aed]/20 to-[#2563eb]/20 border border-[#7c3aed]/30 rounded-lg p-6 text-center">
+        <Rocket className="w-10 h-10 text-[#7c3aed] mx-auto mb-3" />
+        <h2 className="text-lg font-bold mb-2">{isRTL ? "النشر للإنتاجية" : "Deploy to Production"}</h2>
+        <p className="text-[#d4dae3] text-sm mb-4">{isRTL ? "نشر على mrcodeai.com" : "Deploy to mrcodeai.com"}</p>
+        <button
+          onClick={deployProduction}
+          disabled={deploying}
+          className="px-8 py-3 bg-gradient-to-r from-[#7c3aed] to-[#2563eb] text-white font-bold rounded-lg hover:opacity-90 disabled:opacity-50 transition-all text-base"
+        >
+          {deploying ? (
+            <span className="flex items-center gap-2 justify-center"><RefreshCw className="w-4 h-4 animate-spin" />{isRTL ? "جاري النشر..." : "Deploying..."}</span>
+          ) : (
+            <span className="flex items-center gap-2 justify-center"><Rocket className="w-4 h-4" />{isRTL ? "نشر للإنتاجية" : "Deploy to Production"}</span>
+          )}
+        </button>
+        {status && <p className="mt-3 text-sm font-medium">{status}</p>}
+      </div>
+
+      <div className="bg-[#161b22] border border-white/10 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-sm">{isRTL ? "آخر عمليات النشر" : "Recent Deployments"}</h3>
+          <button onClick={fetchStatus} className="text-[10px] text-[#7c3aed] hover:underline">{isRTL ? "تحديث" : "Refresh"}</button>
+        </div>
+        {loading ? (
+          <p className="text-[#d4dae3] text-sm">{isRTL ? "جاري التحميل..." : "Loading..."}</p>
+        ) : runs.length === 0 ? (
+          <p className="text-[#d4dae3] text-sm">{isRTL ? "لا توجد عمليات نشر" : "No deployments found"}</p>
+        ) : (
+          <div className="space-y-2">
+            {runs.map((run: any) => (
+              <div key={run.id} className="flex items-center gap-3 p-2 bg-[#0e1117] rounded text-xs">
+                {statusIcon(run.conclusion, run.status)}
+                <span className="flex-1 font-medium">{run.name}</span>
+                <span className="text-[#d4dae3]">{run.status === "completed" ? run.conclusion : run.status}</span>
+                <span className="text-[#d4dae3]">{new Date(run.created).toLocaleString("ar-SA")}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

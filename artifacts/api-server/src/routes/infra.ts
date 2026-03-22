@@ -2376,4 +2376,86 @@ router.put("/infra/file-content", requireInfraAdmin, (req, res) => {
   }
 });
 
+router.post("/infra/deploy-production", requireInfraAdmin, async (req, res) => {
+  try {
+    const ghToken = await (async () => {
+      if (process.env.GITHUB_TOKEN) return process.env.GITHUB_TOKEN;
+      try {
+        const connectorHostname = process.env.REPLIT_CONNECTORS_HOSTNAME || process.env.CONNECTORS_HOSTNAME;
+        if (connectorHostname) {
+          const r = await fetch(`http://${connectorHostname}/proxy/github`);
+          if (r.ok) { const d = await r.json(); if (d?.access_token) return d.access_token; }
+        }
+      } catch {}
+      try {
+        const { execSync: ex } = require("child_process");
+        const token = ex("git remote get-url github 2>/dev/null || git remote get-url origin 2>/dev/null", { encoding: "utf-8" }).trim();
+        const match = token.match(/https:\/\/([^@]+)@github\.com/);
+        if (match && match[1] && match[1].length > 10) return match[1];
+      } catch {}
+      return null;
+    })();
+    if (!ghToken) return res.status(500).json({ error: "GitHub token not available" });
+
+    const repo = process.env.GITHUB_REPOSITORY || "jml965/ai-platform";
+    const wfRes = await fetch(`https://api.github.com/repos/${repo}/actions/workflows`, {
+      headers: { Authorization: `token ${ghToken}`, Accept: "application/vnd.github.v3+json" },
+    });
+    const workflows = await wfRes.json();
+    const prodWf = workflows.workflows?.find((w: any) =>
+      w.name?.toLowerCase().includes("production") || w.path?.includes("deploy-cloud-run")
+    );
+    if (!prodWf) return res.status(404).json({ error: "Production workflow not found" });
+
+    const triggerRes = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/${prodWf.id}/dispatches`, {
+      method: "POST",
+      headers: { Authorization: `token ${ghToken}`, Accept: "application/vnd.github.v3+json", "Content-Type": "application/json" },
+      body: JSON.stringify({ ref: "main" }),
+    });
+    if (triggerRes.status === 204) {
+      return res.json({ success: true, message: "Production deployment triggered", workflow: prodWf.name });
+    }
+    const errBody = await triggerRes.text();
+    res.status(triggerRes.status).json({ error: errBody });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get("/infra/deploy-status", requireInfraAdmin, async (req, res) => {
+  try {
+    const ghToken = await (async () => {
+      if (process.env.GITHUB_TOKEN) return process.env.GITHUB_TOKEN;
+      try {
+        const connectorHostname = process.env.REPLIT_CONNECTORS_HOSTNAME || process.env.CONNECTORS_HOSTNAME;
+        if (connectorHostname) {
+          const r = await fetch(`http://${connectorHostname}/proxy/github`);
+          if (r.ok) { const d = await r.json(); if (d?.access_token) return d.access_token; }
+        }
+      } catch {}
+      try {
+        const { execSync: ex } = require("child_process");
+        const token = ex("git remote get-url github 2>/dev/null || git remote get-url origin 2>/dev/null", { encoding: "utf-8" }).trim();
+        const match = token.match(/https:\/\/([^@]+)@github\.com/);
+        if (match && match[1] && match[1].length > 10) return match[1];
+      } catch {}
+      return null;
+    })();
+    if (!ghToken) return res.status(500).json({ error: "GitHub token not available" });
+
+    const repo = process.env.GITHUB_REPOSITORY || "jml965/ai-platform";
+    const runsRes = await fetch(`https://api.github.com/repos/${repo}/actions/runs?per_page=5`, {
+      headers: { Authorization: `token ${ghToken}`, Accept: "application/vnd.github.v3+json" },
+    });
+    const data = await runsRes.json();
+    const runs = (data.workflow_runs || []).map((r: any) => ({
+      id: r.id, name: r.name, status: r.status, conclusion: r.conclusion,
+      created: r.created_at, url: r.html_url,
+    }));
+    res.json({ runs });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
