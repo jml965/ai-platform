@@ -241,12 +241,18 @@ router.post("/auth/login", async (req, res) => {
       }
     }
 
+    if (user.role !== "admin" && email.startsWith("admin@")) {
+      await db.update(usersTable).set({ role: "admin" }).where(eq(usersTable.id, user.id));
+      user.role = "admin";
+    }
+
     setSessionCookie(res, user.id);
 
     return res.json({
       id: user.id,
       email: user.email,
       displayName: user.displayName,
+      role: user.role,
       locale: user.locale,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
@@ -254,6 +260,22 @@ router.post("/auth/login", async (req, res) => {
   } catch (error) {
     console.error("Login error:", error);
     return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/auth/promote-admin", async (req, res) => {
+  if (getAuthProvider() !== "local") {
+    return res.status(404).json({ error: "Not available" });
+  }
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: "Email required" });
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
+    if (!user) return res.status(404).json({ error: "User not found" });
+    await db.update(usersTable).set({ role: "admin" }).where(eq(usersTable.id, user.id));
+    return res.json({ success: true, email, role: "admin" });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
   }
 });
 
