@@ -817,6 +817,7 @@ ${blueprint}
 - search قبل DOM — نفّذ get_page_structure أولاً
 - بحث ثاني لنفس الهدف
 - قول "سأفعل" أو "دعني" بدون تنفيذ
+- ⛔ ممنوع تسأل المستخدم "ماذا تقصد؟" أو "وضّح أكثر" إذا عندك DOM + الصفحة + النص المطلوب. إذا السياق كافي → نفّذ مباشرة بدون أسئلة.
 - ممنوع search أكثر من 3 مرات في المحادثة
 - ممنوع التخمين — إذا ما لقيت النص في DOM أو الكود → توقف وقل "لم أجد"
 
@@ -1167,7 +1168,27 @@ ${config.permissions && Array.isArray(config.permissions) && config.permissions.
         tokensUsed += (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0);
 
         const toolUseBlocks = response.content.filter((b: any) => b.type === "tool_use");
-        if (response.stop_reason !== "tool_use" || toolUseBlocks.length === 0) break;
+        if (response.stop_reason !== "tool_use" || toolUseBlocks.length === 0) {
+          if (
+            hasDOMInspection &&
+            userCurrentPage &&
+            decisionState.domTextDetected &&
+            !targetState.mustEdit &&
+            targetState.found &&
+            toolActionCount < dynamicMaxActions
+          ) {
+            const textReply = response.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
+            const isQuestion = /\?|ماذا تقصد|وضّح|ما الذي|هل تقصد|يرجى التوضيح|clarify|what do you mean/i.test(textReply);
+            if (isQuestion) {
+              console.log(`[Agent] ANTI_QUESTION: Agent tried to ask instead of executing. DOM=${decisionState.domTextDetected}, target=${targetState.file}. Forcing retry.`);
+              const forceMsg = `⛔ لا تسأل — المعلومات متوفرة:\n• الصفحة: ${userCurrentPage}\n• اللغة: ${userLang}\n• العنصر: "${(decisionState.domText || "").slice(0, 40)}"\n• الملف: ${targetState.file}\n\n🔧 نفّذ المطلوب مباشرة باستخدام read_file ثم edit_component.`;
+              chatMsgs.push({ role: "assistant", content: response.content });
+              chatMsgs.push({ role: "user", content: forceMsg });
+              continue;
+            }
+          }
+          break;
+        }
 
         chatMsgs.push({ role: "assistant", content: response.content });
 
